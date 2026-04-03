@@ -1,16 +1,32 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import ParticlesBackground from "@/components/ParticlesBackground";
+import Navigation from "@/components/Navigation";
+import MobileNav from "@/components/MobileNav";
+import HeroSection from "@/components/HeroSection";
+import AboutSection from "@/components/AboutSection";
+import SkillsSection from "@/components/SkillsSection";
+import EducationSection from "@/components/EducationSection";
+import ProjectsSection from "@/components/ProjectsSection";
+import ContactSection from "@/components/ContactSection";
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="relative">
+      <ParticlesBackground />
+      <Navigation />
+      <MobileNav />
+      <main className="relative z-10">
+        <HeroSection />
+        <AboutSection />
+        <SkillsSection />
+        <EducationSection />
+        <ProjectsSection />
+        <ContactSection />
+      </main>
+      <footer className="relative z-10 py-6 text-center text-muted-foreground text-xs border-t border-border/30 pb-20 xl:pb-6">
+        © 2026 Yassine Sinif. Tous droits réservés.
+      </footer>
     </div>
   );
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;
