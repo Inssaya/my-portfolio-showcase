@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { ArrowDown, Github, Linkedin, Mail } from "lucide-react";
 import profileImg from "@/assets/profile.jpeg";
+import bgExplosion from "@/assets/bg-explosion.png";
 
 const fadeIn = (direction: string, delay: number) => ({
   hidden: {
@@ -19,11 +20,40 @@ const fadeIn = (direction: string, delay: number) => ({
 const HeroSection = () => {
   return (
     <section id="home" className="relative min-h-screen flex items-center overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent z-10" />
-      
+      {/* Gradient overlay for text readability */}
+      <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/20 z-10" />
+
+      {/* Right side: avatar area with explosion */}
+      <div className="absolute right-0 bottom-0 w-[1280px] h-full hidden xl:block">
+        {/* Explosion background */}
+        <div
+          className="absolute inset-0 bg-cover bg-right bg-no-repeat mix-blend-color-dodge opacity-80"
+          style={{ backgroundImage: `url(${bgExplosion})` }}
+        />
+
+        {/* Avatar image */}
+        <motion.div
+          variants={fadeIn("up", 0.5)}
+          initial="hidden"
+          animate="show"
+          className="absolute bottom-0 right-[8%] w-full max-w-[600px] h-full max-h-[90vh] flex items-end"
+        >
+          <img
+            src={profileImg}
+            alt="Yassine Sinif"
+            className="w-full h-auto max-h-[85vh] object-contain object-bottom pointer-events-none select-none"
+            style={{
+              maskImage: "linear-gradient(to top, transparent 0%, black 15%, black 85%, transparent 100%)",
+              WebkitMaskImage: "linear-gradient(to top, transparent 0%, black 15%, black 85%, transparent 100%)",
+            }}
+          />
+        </motion.div>
+      </div>
+
+      {/* Text content */}
       <div className="container mx-auto relative z-20">
-        <div className="flex flex-col xl:flex-row items-center gap-12">
-          <div className="flex-1 text-center xl:text-left">
+        <div className="flex flex-col xl:flex-row items-center">
+          <div className="flex-1 text-center xl:text-left xl:max-w-[55%]">
             <motion.p
               variants={fadeIn("down", 0.1)}
               initial="hidden"
@@ -32,15 +62,16 @@ const HeroSection = () => {
             >
               Ingénieur Informatique & Data Science
             </motion.p>
-            
+
             <motion.h1
               variants={fadeIn("down", 0.2)}
               initial="hidden"
               animate="show"
               className="font-sora text-4xl md:text-6xl lg:text-7xl font-bold leading-tight mb-6"
             >
-              Yassine{" "}
-              <span className="text-gradient-accent">Sinif</span>
+              Transformer les Idées <br />
+              en{" "}
+              <span className="text-gradient-accent">Réalité Digitale</span>
             </motion.h1>
 
             <motion.p
@@ -49,8 +80,8 @@ const HeroSection = () => {
               animate="show"
               className="text-muted-foreground text-base md:text-lg max-w-xl mx-auto xl:mx-0 mb-8 leading-relaxed"
             >
-              Étudiant en Ingénierie Informatique, spécialité Intelligence Artificielle 
-              et Data Science à l'EMSI Casa. Passionné par les nouvelles technologies et l'IA, 
+              Étudiant en Ingénierie Informatique, spécialité Intelligence Artificielle
+              et Data Science à l'EMSI Casa. Passionné par les nouvelles technologies et l'IA,
               je transforme les idées en réalités digitales.
             </motion.p>
 
@@ -94,13 +125,14 @@ const HeroSection = () => {
             </motion.div>
           </div>
 
+          {/* Mobile avatar */}
           <motion.div
             variants={fadeIn("up", 0.5)}
             initial="hidden"
             animate="show"
-            className="flex-shrink-0 relative"
+            className="xl:hidden mt-12 relative"
           >
-            <div className="w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 rounded-full overflow-hidden border-4 border-accent/30 shadow-[var(--shadow-glow)]" style={{ animation: "pulse-glow 3s ease-in-out infinite" }}>
+            <div className="w-64 h-64 md:w-80 md:h-80 rounded-full overflow-hidden border-4 border-accent/30" style={{ animation: "pulse-glow 3s ease-in-out infinite" }}>
               <img
                 src={profileImg}
                 alt="Yassine Sinif"
