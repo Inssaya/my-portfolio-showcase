@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Mail, Phone, MapPin, Send } from "lucide-react";
 import { useState, FormEvent } from "react";
+import { adminData } from "@/lib/admin-data";
 
 const fadeIn = (delay: number) => ({
   hidden: { y: 40, opacity: 0 },
@@ -12,9 +13,12 @@ const fadeIn = (delay: number) => ({
 
 const ContactSection = () => {
   const [submitted, setSubmitted] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    adminData.addMessage(form);
+    setForm({ name: "", email: "", subject: "", message: "" });
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 3000);
   };
@@ -82,24 +86,32 @@ const ContactSection = () => {
                 type="text"
                 placeholder="Nom"
                 required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="w-full px-4 py-3 rounded-lg bg-secondary/50 border border-border/50 text-foreground placeholder:text-muted-foreground/50 text-sm outline-none focus:border-accent/50 transition-colors"
               />
               <input
                 type="email"
                 placeholder="Email"
                 required
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className="w-full px-4 py-3 rounded-lg bg-secondary/50 border border-border/50 text-foreground placeholder:text-muted-foreground/50 text-sm outline-none focus:border-accent/50 transition-colors"
               />
             </div>
             <input
               type="text"
               placeholder="Sujet"
+              value={form.subject}
+              onChange={(e) => setForm({ ...form, subject: e.target.value })}
               className="w-full px-4 py-3 rounded-lg bg-secondary/50 border border-border/50 text-foreground placeholder:text-muted-foreground/50 text-sm outline-none focus:border-accent/50 transition-colors"
             />
             <textarea
               placeholder="Votre message..."
               rows={5}
               required
+              value={form.message}
+              onChange={(e) => setForm({ ...form, message: e.target.value })}
               className="w-full px-4 py-3 rounded-lg bg-secondary/50 border border-border/50 text-foreground placeholder:text-muted-foreground/50 text-sm outline-none focus:border-accent/50 transition-colors resize-none"
             />
             <button
