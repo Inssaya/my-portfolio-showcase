@@ -13,9 +13,12 @@ const fadeIn = (delay: number) => ({
 
 const ContactSection = () => {
   const [submitted, setSubmitted] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    adminData.addMessage(form);
+    setForm({ name: "", email: "", subject: "", message: "" });
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 3000);
   };
