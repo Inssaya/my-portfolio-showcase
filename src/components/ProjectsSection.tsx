@@ -15,36 +15,56 @@ const projects = [
     tech: ["React", "Next.js", "Express", "MongoDB", "Redis", "Kafka"],
     description: "Architecture microservices avec Firebase, websockets et déploiement cloud (AWS).",
     status: "En cours",
+    category: "Personnel",
   },
   {
     title: "Application Mobile Transport",
     tech: ["React Native"],
     description: "Application mobile de services de transport en cours de développement.",
     status: "En cours",
+    category: "Personnel",
   },
   {
     title: "Système de Détection de Plagiat",
     tech: ["Python", "TF-IDF", "SBERT"],
     description: "Détection de plagiat utilisant des techniques de NLP avancées.",
     status: "Terminé",
+    category: "Académique",
   },
   {
     title: "Gestion des Vols (Web)",
     tech: ["Python", "Django", "Tailwind CSS"],
     description: "Application web de gestion des vols avec interface moderne.",
     status: "Terminé",
+    category: "Académique",
   },
   {
     title: "Site de Localisation de Voitures",
     tech: ["PHP", "Laravel", "JavaScript"],
     description: "Plateforme de localisation de véhicules avec carte interactive.",
     status: "Terminé",
+    category: "Académique",
   },
   {
     title: "To-Do List Web App",
     tech: ["React", "TypeScript", "Tailwind CSS"],
     description: "Application de gestion de tâches avec interface réactive.",
     status: "Terminé",
+    category: "Personnel",
+  },
+  {
+    title: "Portfolio Personnel",
+    tech: ["React", "TypeScript", "Tailwind CSS", "Framer Motion"],
+    description: "Site portfolio interactif avec animations et design moderne.",
+    status: "Terminé",
+    category: "Personnel",
+  },
+  {
+    title: "Chatbot IA",
+    tech: ["Python", "NLP", "Flask", "OpenAI API"],
+    description: "Chatbot intelligent utilisant le traitement du langage naturel.",
+    status: "Terminé",
+    category: "Académique",
   },
 ];
 
@@ -59,7 +79,7 @@ const ProjectsSection = () => {
           viewport={{ once: true }}
           className="font-sora text-3xl md:text-5xl font-bold text-center mb-16"
         >
-          Projets <span className="text-gradient-accent">Académiques</span>
+          Mes <span className="text-gradient-accent">Projets</span>
         </motion.h2>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
@@ -73,15 +93,20 @@ const ProjectsSection = () => {
               className="glass-card p-6 group hover:border-accent/50 transition-all duration-300 flex flex-col"
             >
               <div className="flex items-start justify-between mb-3">
-                <span
-                  className={`text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full ${
-                    project.status === "En cours"
-                      ? "bg-accent/15 text-accent"
-                      : "bg-green-500/15 text-green-400"
-                  }`}
-                >
-                  {project.status}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full ${
+                      project.status === "En cours"
+                        ? "bg-accent/15 text-accent"
+                        : "bg-green-500/15 text-green-400"
+                    }`}
+                  >
+                    {project.status}
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
+                    {project.category}
+                  </span>
+                </div>
                 <ExternalLink size={16} className="text-muted-foreground group-hover:text-accent transition-colors" />
               </div>
               <h3 className="font-sora font-semibold text-sm mb-2 leading-snug">{project.title}</h3>
