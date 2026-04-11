@@ -86,24 +86,32 @@ const ContactSection = () => {
                 type="text"
                 placeholder="Nom"
                 required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="w-full px-4 py-3 rounded-lg bg-secondary/50 border border-border/50 text-foreground placeholder:text-muted-foreground/50 text-sm outline-none focus:border-accent/50 transition-colors"
               />
               <input
                 type="email"
                 placeholder="Email"
                 required
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className="w-full px-4 py-3 rounded-lg bg-secondary/50 border border-border/50 text-foreground placeholder:text-muted-foreground/50 text-sm outline-none focus:border-accent/50 transition-colors"
               />
             </div>
             <input
               type="text"
               placeholder="Sujet"
+              value={form.subject}
+              onChange={(e) => setForm({ ...form, subject: e.target.value })}
               className="w-full px-4 py-3 rounded-lg bg-secondary/50 border border-border/50 text-foreground placeholder:text-muted-foreground/50 text-sm outline-none focus:border-accent/50 transition-colors"
             />
             <textarea
               placeholder="Votre message..."
               rows={5}
               required
+              value={form.message}
+              onChange={(e) => setForm({ ...form, message: e.target.value })}
               className="w-full px-4 py-3 rounded-lg bg-secondary/50 border border-border/50 text-foreground placeholder:text-muted-foreground/50 text-sm outline-none focus:border-accent/50 transition-colors resize-none"
             />
             <button
