@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Mail, Phone, MapPin, Send } from "lucide-react";
 import { useState, FormEvent } from "react";
+import { adminData } from "@/lib/admin-data";
 
 const fadeIn = (delay: number) => ({
   hidden: { y: 40, opacity: 0 },
