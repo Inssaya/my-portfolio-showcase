@@ -24,7 +24,7 @@ const AboutSection = () => {
           viewport={{ once: true }}
           className="font-sora text-3xl md:text-5xl font-bold text-center mb-16"
         >
-          À Propos de <span className="text-gradient-accent">Moi</span>
+          About <span className="text-gradient-accent">Me</span>
         </motion.h2>
 
         <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
@@ -38,10 +38,10 @@ const AboutSection = () => {
             <div className="w-14 h-14 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4 group-hover:bg-accent/20 transition-colors">
               <Briefcase className="text-accent" size={24} />
             </div>
-            <h3 className="font-sora text-lg font-semibold mb-2">Expérience</h3>
+            <h3 className="font-sora text-lg font-semibold mb-2">Experience</h3>
             <p className="text-muted-foreground text-sm">
-              Stage chez Web Agency à Casablanca — Développement d'un chatbot avec Laravel, 
-              générateur PDF et base de données.
+              Internship at a Web Agency in Casablanca — Built a chatbot with Laravel,
+              PDF generator and database integration.
             </p>
           </motion.div>
 
@@ -55,11 +55,11 @@ const AboutSection = () => {
             <div className="w-14 h-14 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4 group-hover:bg-accent/20 transition-colors">
               <Globe className="text-accent" size={24} />
             </div>
-            <h3 className="font-sora text-lg font-semibold mb-2">Langues</h3>
+            <h3 className="font-sora text-lg font-semibold mb-2">Languages</h3>
             <p className="text-muted-foreground text-sm">
-              <span className="text-foreground">Arabe</span> — Langue maternelle<br />
-              <span className="text-foreground">Anglais</span> — Avancé<br />
-              <span className="text-foreground">Français</span> — Intermédiaire
+              <span className="text-foreground">Arabic</span> — Native<br />
+              <span className="text-foreground">English</span> — Advanced<br />
+              <span className="text-foreground">French</span> — Intermediate
             </p>
           </motion.div>
 
@@ -75,7 +75,7 @@ const AboutSection = () => {
             </div>
             <h3 className="font-sora text-lg font-semibold mb-2">Certifications</h3>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              Python for Data Science (IBM) • Software Engineering (HKUST) • 
+              Python for Data Science (IBM) • Software Engineering (HKUST) •
               Web Development (U. Michigan) • React Native (Meta)
             </p>
           </motion.div>

@@ -26,7 +26,7 @@ const HeroSection = () => {
             animate="show"
             className="text-accent font-sora font-semibold tracking-widest uppercase text-sm mb-4"
           >
-            Ingénieur Informatique & Data Science
+            Software Engineer · AI & Data Science
           </motion.p>
 
           <motion.h1
@@ -35,9 +35,9 @@ const HeroSection = () => {
             animate="show"
             className="font-sora text-4xl md:text-6xl lg:text-7xl font-bold leading-tight mb-6"
           >
-            Transformer les Idées <br />
-            en{" "}
-            <span className="text-gradient-accent">Réalité Digitale</span>
+            I Build Systems <br />
+            That{" "}
+            <span className="text-gradient-accent">Actually Scale</span>
           </motion.h1>
 
           <motion.p
@@ -46,9 +46,9 @@ const HeroSection = () => {
             animate="show"
             className="text-muted-foreground text-base md:text-lg max-w-xl mb-8 leading-relaxed"
           >
-            Étudiant en Ingénierie Informatique, spécialité Intelligence Artificielle
-            et Data Science à l'EMSI Casa. Passionné par les nouvelles technologies et l'IA,
-            je transforme les idées en réalités digitales.
+            Computer Engineering student specializing in AI & Data Science at EMSI Casablanca.
+            From microservices to machine learning pipelines — I ship production-ready software
+            with clean architecture and real-world impact.
           </motion.p>
 
           <motion.div
@@ -62,14 +62,14 @@ const HeroSection = () => {
               onClick={(e) => { e.preventDefault(); document.querySelector("#contact")?.scrollIntoView({ behavior: "smooth" }); }}
               className="px-8 py-3 rounded-full bg-accent text-accent-foreground font-semibold hover:opacity-90 transition-opacity"
             >
-              Me Contacter
+              Get In Touch
             </a>
             <a
               href="#projects"
               onClick={(e) => { e.preventDefault(); document.querySelector("#projects")?.scrollIntoView({ behavior: "smooth" }); }}
               className="px-8 py-3 rounded-full border border-foreground/20 text-foreground hover:border-accent hover:text-accent transition-colors"
             >
-              Mes Projets
+              View Projects
             </a>
           </motion.div>
 
