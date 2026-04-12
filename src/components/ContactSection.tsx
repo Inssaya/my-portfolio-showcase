@@ -33,7 +33,7 @@ const ContactSection = () => {
           viewport={{ once: true }}
           className="font-sora text-3xl md:text-5xl font-bold text-center mb-16"
         >
-          Me <span className="text-gradient-accent">Contacter</span>
+          Get In <span className="text-gradient-accent">Touch</span>
         </motion.h2>
 
         <div className="grid md:grid-cols-2 gap-12 max-w-5xl mx-auto">
@@ -45,8 +45,8 @@ const ContactSection = () => {
             className="space-y-8"
           >
             <p className="text-muted-foreground leading-relaxed">
-              Je suis à la recherche d'un stage de deux mois à partir du 01/07/2026. 
-              N'hésitez pas à me contacter pour toute opportunité.
+              I'm looking for a two-month internship starting July 1st, 2026.
+              Feel free to reach out for any opportunity or collaboration.
             </p>
 
             <div className="space-y-4">
@@ -68,7 +68,7 @@ const ContactSection = () => {
                 <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center">
                   <MapPin className="text-accent" size={18} />
                 </div>
-                <span className="text-sm">Casablanca, Maroc</span>
+                <span className="text-sm">Casablanca, Morocco</span>
               </div>
             </div>
           </motion.div>
@@ -84,7 +84,7 @@ const ContactSection = () => {
             <div className="grid grid-cols-2 gap-4">
               <input
                 type="text"
-                placeholder="Nom"
+                placeholder="Name"
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -101,13 +101,13 @@ const ContactSection = () => {
             </div>
             <input
               type="text"
-              placeholder="Sujet"
+              placeholder="Subject"
               value={form.subject}
               onChange={(e) => setForm({ ...form, subject: e.target.value })}
               className="w-full px-4 py-3 rounded-lg bg-secondary/50 border border-border/50 text-foreground placeholder:text-muted-foreground/50 text-sm outline-none focus:border-accent/50 transition-colors"
             />
             <textarea
-              placeholder="Votre message..."
+              placeholder="Your message..."
               rows={5}
               required
               value={form.message}
@@ -118,8 +118,8 @@ const ContactSection = () => {
               type="submit"
               className="w-full py-3 rounded-full bg-accent text-accent-foreground font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
             >
-              {submitted ? "Message Envoyé ✓" : (
-                <>Envoyer <Send size={16} /></>
+              {submitted ? "Message Sent ✓" : (
+                <>Send Message <Send size={16} /></>
               )}
             </button>
           </motion.form>

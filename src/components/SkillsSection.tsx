@@ -14,7 +14,7 @@ const fadeIn = (direction: string, delay: number) => ({
 
 const skillCategories = [
   {
-    title: "Langages",
+    title: "Languages",
     skills: ["C", "C++", "C#", "Java", "Python", "PHP", "JavaScript", "TypeScript"],
   },
   {
@@ -22,20 +22,20 @@ const skillCategories = [
     skills: ["React", "React Native", "Laravel", "Django", ".NET", "Bootstrap", "Tailwind CSS"],
   },
   {
-    title: "Bases de Données",
+    title: "Databases",
     skills: ["SQL", "PL/SQL", "SQL Server", "NoSQL", "MongoDB", "Redis"],
   },
   {
-    title: "IA & Data Science",
+    title: "AI & Data Science",
     skills: ["MLOps", "NLP", "Deep Learning", "TensorFlow", "Computer Vision", "Multi-Agent Systems"],
   },
   {
-    title: "DevOps & Outils",
+    title: "DevOps & Tools",
     skills: ["Git", "Docker", "Linux", "CI/CD", "Kafka", "Firebase", "AWS"],
   },
   {
     title: "Architecture",
-    skills: ["UML", "Merise", "MVC", "POO", "TCP/IP", "Microservices"],
+    skills: ["UML", "Merise", "MVC", "OOP", "TCP/IP", "Microservices"],
   },
 ];
 
@@ -50,7 +50,7 @@ const SkillsSection = () => {
           viewport={{ once: true }}
           className="font-sora text-3xl md:text-5xl font-bold text-center mb-16"
         >
-          Compétences <span className="text-gradient-accent">Techniques</span>
+          Technical <span className="text-gradient-accent">Skills</span>
         </motion.h2>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
