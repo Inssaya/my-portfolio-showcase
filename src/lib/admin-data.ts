@@ -64,14 +64,18 @@ export interface Certificate {
 
 // Default data
 const defaultProjects: Project[] = [
-  { id: "1", title: "Plateforme E-commerce SaaS Multi-Vendeurs", tech: ["React", "Next.js", "Express", "MongoDB", "Redis", "Kafka"], description: "Architecture microservices avec Firebase, websockets et déploiement cloud (AWS).", status: "En cours", category: "Personnel" },
-  { id: "2", title: "Application Mobile Transport", tech: ["React Native"], description: "Application mobile de services de transport en cours de développement.", status: "En cours", category: "Personnel" },
-  { id: "3", title: "Système de Détection de Plagiat", tech: ["Python", "TF-IDF", "SBERT"], description: "Détection de plagiat utilisant des techniques de NLP avancées.", status: "Terminé", category: "Académique" },
-  { id: "4", title: "Gestion des Vols (Web)", tech: ["Python", "Django", "Tailwind CSS"], description: "Application web de gestion des vols avec interface moderne.", status: "Terminé", category: "Académique" },
-  { id: "5", title: "Site de Localisation de Voitures", tech: ["PHP", "Laravel", "JavaScript"], description: "Plateforme de localisation de véhicules avec carte interactive.", status: "Terminé", category: "Académique" },
-  { id: "6", title: "To-Do List Web App", tech: ["React", "TypeScript", "Tailwind CSS"], description: "Application de gestion de tâches avec interface réactive.", status: "Terminé", category: "Personnel" },
-  { id: "7", title: "Portfolio Personnel", tech: ["React", "TypeScript", "Tailwind CSS", "Framer Motion"], description: "Site portfolio interactif avec animations et design moderne.", status: "Terminé", category: "Personnel" },
-  { id: "8", title: "Chatbot IA", tech: ["Python", "NLP", "Flask", "OpenAI API"], description: "Chatbot intelligent utilisant le traitement du langage naturel.", status: "Terminé", category: "Académique" },
+  { id: "1", title: "Multi-Vendor E-commerce SaaS Platform", tech: ["React", "Next.js", "Express", "MongoDB", "Redis", "Kafka"], description: "Microservices architecture with Firebase, websockets and cloud deployment (AWS).", status: "En cours", category: "Personnel" },
+  { id: "2", title: "Gym Management App", tech: ["Java", "NFC", "Face Recognition", "Fingerprint", "QR Code"], description: "Full-featured gym management with biometric check-in: NFC, facial recognition, fingerprint and QR code.", status: "Terminé", category: "Personnel" },
+  { id: "3", title: "Optic Management App", tech: ["Java", "MySQL", "Swing"], description: "Desktop app for optical store management — inventory, prescriptions, client records.", status: "Terminé", category: "Personnel" },
+  { id: "4", title: "POS System App", tech: ["Java", "JavaFX", "MySQL"], description: "Point of sale system with real-time inventory, receipt generation and analytics.", status: "Terminé", category: "Personnel" },
+  { id: "5", title: "RAG Chatbot", tech: ["Python", "LangChain", "FAISS", "OpenAI API", "Flask"], description: "Retrieval-Augmented Generation chatbot querying custom knowledge bases.", status: "Terminé", category: "Personnel" },
+  { id: "6", title: "AI-Based Enterprise Ticket Management", tech: ["Python", "NLP", "Django", "PostgreSQL"], description: "Intelligent ticket routing and prioritization using NLP.", status: "Terminé", category: "Académique" },
+  { id: "7", title: "Mobile Transport App", tech: ["React Native"], description: "Mobile application for transport services.", status: "En cours", category: "Personnel" },
+  { id: "8", title: "Plagiarism Detection System", tech: ["Python", "TF-IDF", "SBERT"], description: "Plagiarism detection using advanced NLP techniques.", status: "Terminé", category: "Académique" },
+  { id: "9", title: "Flight Management System", tech: ["Python", "Django", "Tailwind CSS"], description: "Web app for flight management with modern interface.", status: "Terminé", category: "Académique" },
+  { id: "10", title: "Car Locator Platform", tech: ["PHP", "Laravel", "JavaScript"], description: "Vehicle location platform with interactive map.", status: "Terminé", category: "Académique" },
+  { id: "11", title: "To-Do List Web App", tech: ["React", "TypeScript", "Tailwind CSS"], description: "Task management app with reactive UI.", status: "Terminé", category: "Personnel" },
+  { id: "12", title: "AI Chatbot", tech: ["Python", "NLP", "Flask", "OpenAI API"], description: "Intelligent chatbot using natural language processing.", status: "Terminé", category: "Académique" },
 ];
 
 const defaultSocialLinks: SocialLinks = {
@@ -83,29 +87,29 @@ const defaultSocialLinks: SocialLinks = {
 };
 
 const defaultHero: HeroContent = {
-  subtitle: "Ingénieur Informatique & Data Science",
-  title: "Transformer les Idées en",
-  titleHighlight: "Réalité Digitale",
-  description: "Étudiant en Ingénierie Informatique, spécialité Intelligence Artificielle et Data Science à l'EMSI Casa. Passionné par les nouvelles technologies et l'IA, je transforme les idées en réalités digitales.",
+  subtitle: "Software Engineer · AI & Data Science",
+  title: "I Build Systems That",
+  titleHighlight: "Actually Scale",
+  description: "Computer Engineering student specializing in AI & Data Science at EMSI Casablanca. From microservices to machine learning pipelines — I ship production-ready software with clean architecture and real-world impact.",
 };
 
 const defaultAbout: AboutCard[] = [
-  { id: "1", icon: "Briefcase", title: "Expérience", content: "Stage chez Web Agency à Casablanca — Développement d'un chatbot avec Laravel, générateur PDF et base de données." },
-  { id: "2", icon: "Globe", title: "Langues", content: "Arabe — Langue maternelle\nAnglais — Avancé\nFrançais — Intermédiaire" },
+  { id: "1", icon: "Briefcase", title: "Experience", content: "Internship at a Web Agency in Casablanca — Built a chatbot with Laravel, PDF generator and database integration." },
+  { id: "2", icon: "Globe", title: "Languages", content: "Arabic — Native\nEnglish — Advanced\nFrench — Intermediate" },
   { id: "3", icon: "Award", title: "Certifications", content: "Python for Data Science (IBM) • Software Engineering (HKUST) • Web Development (U. Michigan) • React Native (Meta)" },
 ];
 
 const defaultEducation: Education[] = [
-  { id: "1", period: "2024 - 2026", title: "Cycle Ingénieur en Informatique et Réseaux", institution: "EMSI Casablanca", description: "Spécialité Intelligence Artificielle et Data Science" },
-  { id: "2", period: "2022 - 2024", title: "Classes Préparatoires", institution: "EMSI Rabat", description: "Formation scientifique intensive" },
+  { id: "1", period: "2024 - 2026", title: "Engineering Degree in Computer Science & Networks", institution: "EMSI Casablanca", description: "Specialization in AI and Data Science" },
+  { id: "2", period: "2022 - 2024", title: "Preparatory Classes", institution: "EMSI Rabat", description: "Intensive scientific program" },
 ];
 
 const defaultSkills: SkillCategory[] = [
-  { id: "1", title: "Langages", skills: ["C", "C++", "C#", "Java", "Python", "PHP", "JavaScript", "TypeScript"] },
+  { id: "1", title: "Languages", skills: ["C", "C++", "C#", "Java", "Python", "PHP", "JavaScript", "TypeScript"] },
   { id: "2", title: "Frameworks & Libs", skills: ["React", "React Native", "Laravel", "Django", ".NET", "Bootstrap", "Tailwind CSS"] },
-  { id: "3", title: "Bases de Données", skills: ["SQL", "PL/SQL", "SQL Server", "NoSQL", "MongoDB", "Redis"] },
-  { id: "4", title: "IA & Data Science", skills: ["MLOps", "NLP", "Deep Learning", "TensorFlow", "Computer Vision", "Multi-Agent Systems"] },
-  { id: "5", title: "DevOps & Outils", skills: ["Git", "Docker", "Linux", "CI/CD", "Kafka", "Firebase", "AWS"] },
+  { id: "3", title: "Databases", skills: ["SQL", "PL/SQL", "SQL Server", "NoSQL", "MongoDB", "Redis"] },
+  { id: "4", title: "AI & Data Science", skills: ["MLOps", "NLP", "Deep Learning", "TensorFlow", "Computer Vision", "Multi-Agent Systems"] },
+  { id: "5", title: "DevOps & Tools", skills: ["Git", "Docker", "Linux", "CI/CD", "Kafka", "Firebase", "AWS"] },
   { id: "6", title: "Architecture", skills: ["UML", "Merise", "MVC", "POO", "TCP/IP", "Microservices"] },
 ];
 
