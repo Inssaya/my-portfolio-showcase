@@ -35,9 +35,7 @@ const HeroSection = () => {
             animate="show"
             className="font-sora text-4xl md:text-6xl lg:text-7xl font-bold leading-tight mb-6"
           >
-            I Build Systems <br />
-            That{" "}
-            <span className="text-gradient-accent">Actually Scale</span>
+            Yassine <span className="text-gradient-accent">Sinif</span>
           </motion.h1>
 
           <motion.p
