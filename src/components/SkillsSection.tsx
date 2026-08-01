@@ -14,28 +14,28 @@ const fadeIn = (direction: string, delay: number) => ({
 
 const skillCategories = [
   {
-    title: "Languages",
-    skills: ["C", "C++", "C#", "Java", "Python", "PHP", "JavaScript", "TypeScript"],
+    title: "Languages & Frameworks",
+    skills: ["Python", "Django", "FastAPI", "React", "React Native", "JavaScript", "TypeScript", "Java", "C++", "C#", "ASP.NET"],
   },
   {
-    title: "Frameworks & Libs",
-    skills: ["React", "React Native", "Laravel", "Django", ".NET", "Bootstrap", "Tailwind CSS"],
+    title: "Data & ML",
+    skills: ["pandas", "NumPy", "scikit-learn", "PyTorch", "Feature Engineering", "Model Evaluation", "Backtesting"],
   },
   {
-    title: "Databases",
-    skills: ["SQL", "PL/SQL", "SQL Server", "NoSQL", "MongoDB", "Redis"],
+    title: "LLM & RAG",
+    skills: ["LangChain", "LangGraph", "RAG Pipelines", "Embeddings", "ChromaDB", "Ollama", "Prompt Engineering"],
   },
   {
-    title: "AI & Data Science",
-    skills: ["MLOps", "NLP", "Deep Learning", "TensorFlow", "Computer Vision", "Multi-Agent Systems"],
+    title: "Data Engineering",
+    skills: ["PostgreSQL", "SQL Server", "SSIS", "MySQL", "MongoDB", "Neo4j", "Cassandra", "Hadoop", "ETL", "Kafka", "Data Warehousing"],
   },
   {
     title: "DevOps & Tools",
-    skills: ["Git", "Docker", "Linux", "CI/CD", "Kafka", "Firebase", "AWS"],
+    skills: ["Docker", "Git", "CI/CD", "Linux", "REST APIs"],
   },
   {
-    title: "Architecture",
-    skills: ["UML", "Merise", "MVC", "OOP", "TCP/IP", "Microservices"],
+    title: "BI & Cloud",
+    skills: ["Power BI", "Tableau"],
   },
 ];
 

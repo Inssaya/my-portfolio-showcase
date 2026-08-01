@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowDown, Github, Linkedin, Mail } from "lucide-react";
+import { ArrowDown, Github, Mail } from "lucide-react";
 
 const fadeIn = (direction: string, delay: number) => ({
   hidden: {
@@ -26,7 +26,7 @@ const HeroSection = () => {
             animate="show"
             className="text-accent font-sora font-semibold tracking-widest uppercase text-sm mb-4"
           >
-            Software Engineer · AI & Data Science
+            AI & Data Engineering
           </motion.p>
 
           <motion.h1
@@ -44,9 +44,10 @@ const HeroSection = () => {
             animate="show"
             className="text-muted-foreground text-base md:text-lg max-w-xl mb-8 leading-relaxed"
           >
-            Computer Engineering student specializing in AI & Data Science at EMSI Casablanca.
-            From microservices to machine learning pipelines — I ship production-ready software
-            with clean architecture and real-world impact.
+            Final-year engineering student in AI & Data Science at EMSI Casablanca, currently
+            interning as an AI Data Engineer at Aptiv. I build AI-powered and full-stack systems —
+            from RAG pipelines to production-ready web apps — and I'm looking for a 6-month PFE
+            internship starting February 2027.
           </motion.p>
 
           <motion.div
@@ -77,14 +78,11 @@ const HeroSection = () => {
             animate="show"
             className="flex items-center gap-5 mt-8"
           >
-            <a href="mailto:yassine.sinif@emsi-edu.ma" className="text-muted-foreground hover:text-accent transition-colors">
+            <a href="mailto:yassinsinif4@gmail.com" className="text-muted-foreground hover:text-accent transition-colors">
               <Mail size={20} />
             </a>
-            <a href="https://github.com" target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-accent transition-colors">
+            <a href="https://github.com/Inssaya" target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-accent transition-colors">
               <Github size={20} />
-            </a>
-            <a href="https://linkedin.com" target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-accent transition-colors">
-              <Linkedin size={20} />
             </a>
           </motion.div>
         </div>

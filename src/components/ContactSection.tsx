@@ -45,24 +45,25 @@ const ContactSection = () => {
             className="space-y-8"
           >
             <p className="text-muted-foreground leading-relaxed">
-              I'm looking for a two-month internship starting July 1st, 2026.
-              Feel free to reach out for any opportunity or collaboration.
+              I'm looking for a 6-month final-year internship (PFE) starting February 2027, with
+              the opportunity to transition into a full-time role after graduation. Feel free to
+              reach out for any opportunity or collaboration.
             </p>
 
             <div className="space-y-4">
-              <a href="mailto:yassine.sinif@emsi-edu.ma" className="flex items-center gap-4 text-foreground/80 hover:text-accent transition-colors group">
+              <a href="mailto:yassinsinif4@gmail.com" className="flex items-center gap-4 text-foreground/80 hover:text-accent transition-colors group">
                 <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
                   <Mail className="text-accent" size={18} />
                 </div>
-                <span className="text-sm">yassine.sinif@emsi-edu.ma</span>
+                <span className="text-sm">yassinsinif4@gmail.com</span>
               </a>
 
-              <div className="flex items-center gap-4 text-foreground/80">
-                <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center">
+              <a href="tel:+212623842535" className="flex items-center gap-4 text-foreground/80 hover:text-accent transition-colors group">
+                <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
                   <Phone className="text-accent" size={18} />
                 </div>
-                <span className="text-sm">0623842...</span>
-              </div>
+                <span className="text-sm">+212 6 23 84 25 35</span>
+              </a>
 
               <div className="flex items-center gap-4 text-foreground/80">
                 <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center">

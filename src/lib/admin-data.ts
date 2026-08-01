@@ -4,10 +4,23 @@ export interface Project {
   id: string;
   title: string;
   description: string;
+  longDescription?: string;
   tech: string[];
   status: "En cours" | "Terminé";
   category: "Personnel" | "Académique";
-  link?: string;
+  image?: string;
+  demoUrl?: string;
+  githubUrl?: string;
+}
+
+export function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 }
 
 export interface Message {
@@ -50,6 +63,15 @@ export interface Education {
   description: string;
 }
 
+export interface Experience {
+  id: string;
+  period: string;
+  title: string;
+  company: string;
+  location: string;
+  bullets: string[];
+}
+
 export interface SkillCategory {
   id: string;
   title: string;
@@ -71,53 +93,106 @@ const defaultProjects: Project[] = [
   { id: "5", title: "RAG Chatbot", tech: ["Python", "LangChain", "FAISS", "OpenAI API", "Flask"], description: "Retrieval-Augmented Generation chatbot querying custom knowledge bases.", status: "Terminé", category: "Personnel" },
   { id: "6", title: "AI-Based Enterprise Ticket Management", tech: ["Python", "NLP", "Django", "PostgreSQL"], description: "Intelligent ticket routing and prioritization using NLP.", status: "Terminé", category: "Académique" },
   { id: "7", title: "Mobile Transport App", tech: ["React Native"], description: "Mobile application for transport services.", status: "En cours", category: "Personnel" },
-  { id: "8", title: "Plagiarism Detection System", tech: ["Python", "TF-IDF", "SBERT"], description: "Plagiarism detection using advanced NLP techniques.", status: "Terminé", category: "Académique" },
+  { id: "8", title: "Plagiarism Detection System", tech: ["Python", "TF-IDF", "SBERT", "Django"], description: "Plagiarism detection using semantic similarity scoring with TF-IDF and SBERT.", status: "Terminé", category: "Académique" },
   { id: "9", title: "Flight Management System", tech: ["Python", "Django", "Tailwind CSS"], description: "Web app for flight management with modern interface.", status: "Terminé", category: "Académique" },
   { id: "10", title: "Car Locator Platform", tech: ["PHP", "Laravel", "JavaScript"], description: "Vehicle location platform with interactive map.", status: "Terminé", category: "Académique" },
   { id: "11", title: "To-Do List Web App", tech: ["React", "TypeScript", "Tailwind CSS"], description: "Task management app with reactive UI.", status: "Terminé", category: "Personnel" },
   { id: "12", title: "AI Chatbot", tech: ["Python", "NLP", "Flask", "OpenAI API"], description: "Intelligent chatbot using natural language processing.", status: "Terminé", category: "Académique" },
+  {
+    id: "13",
+    title: "Nexora AI",
+    tech: ["FastAPI", "React", "TypeScript", "PostgreSQL", "ChromaDB", "Sentence-Transformers", "Ollama"],
+    description: "Call-center SaaS with on-premise RAG for automated ticket handling.",
+    longDescription: "A call-center SaaS platform that automates ticket handling with an on-premise Retrieval-Augmented Generation pipeline — embeddings and retrieval stay fully self-hosted (ChromaDB, sentence-transformers, Ollama) so no support data leaves the client's infrastructure. FastAPI backend, React/TypeScript frontend, PostgreSQL for persistence.",
+    status: "Terminé",
+    category: "Personnel",
+  },
+  {
+    id: "14",
+    title: "Stock Market Analytics Platform",
+    tech: ["Python", "Kafka", "MySQL", "Docker", "Streamlit"],
+    description: "Real-time streaming ingestion and processing for stock market data.",
+    longDescription: "A real-time analytics platform that ingests and processes streaming stock market data through Kafka pipelines, persists it to MySQL, and surfaces live dashboards through Streamlit. Fully containerized with Docker for reproducible deployment.",
+    status: "Terminé",
+    category: "Personnel",
+  },
+  {
+    id: "15",
+    title: "Medical Multi-Agent System",
+    tech: ["LangGraph", "LangChain", "FastAPI", "MCP", "React", "Flutter"],
+    description: "Coordinated LLM agents for clinical workflows.",
+    longDescription: "A multi-agent system coordinating specialized LLM agents (via LangGraph/LangChain) over clinical workflows, exposed through an MCP tool interface with a FastAPI backend and both React (web) and Flutter (mobile) clients.",
+    status: "Terminé",
+    category: "Personnel",
+  },
 ];
 
 const defaultSocialLinks: SocialLinks = {
-  github: "https://github.com",
-  linkedin: "https://linkedin.com",
-  email: "yassine.sinif@emsi-edu.ma",
-  phone: "0623842...",
-  location: "Casablanca, Maroc",
+  github: "https://github.com/Inssaya",
+  linkedin: "",
+  email: "yassinsinif4@gmail.com",
+  phone: "+212 6 23 84 25 35",
+  location: "Casablanca, Morocco",
 };
 
 const defaultHero: HeroContent = {
-  subtitle: "Software Engineer · AI & Data Science",
+  subtitle: "AI & Data Engineering",
   title: "I Build Systems That",
   titleHighlight: "Actually Scale",
-  description: "Computer Engineering student specializing in AI & Data Science at EMSI Casablanca. From microservices to machine learning pipelines — I ship production-ready software with clean architecture and real-world impact.",
+  description: "Final-year engineering student in AI & Data Science at EMSI Casablanca, currently interning as an AI Data Engineer at Aptiv. I build AI-powered and full-stack systems — from RAG pipelines to production-ready web apps — and I'm looking for a 6-month PFE internship starting February 2027.",
 };
 
 const defaultAbout: AboutCard[] = [
-  { id: "1", icon: "Briefcase", title: "Experience", content: "Internship at a Web Agency in Casablanca — Built a chatbot with Laravel, PDF generator and database integration." },
-  { id: "2", icon: "Globe", title: "Languages", content: "Arabic — Native\nEnglish — Advanced\nFrench — Intermediate" },
-  { id: "3", icon: "Award", title: "Certifications", content: "Python for Data Science (IBM) • Software Engineering (HKUST) • Web Development (U. Michigan) • React Native (Meta)" },
+  { id: "1", icon: "Briefcase", title: "Experience", content: "AI Data Engineer Intern at Aptiv (Tangier) — maintenance KPI platform, predictive maintenance and an agentic RAG assistant. Previously: Laravel chatbot & PDF tool internship at a Casablanca web agency." },
+  { id: "2", icon: "Globe", title: "Languages", content: "Arabic — Native\nFrench — B2\nEnglish — B2\nSpanish — A2" },
+  { id: "3", icon: "Award", title: "Certifications", content: "DeepLearning.AI Data Engineering Professional Certificate (in progress) • Python for Data Science, AI & Development (IBM) • Software Engineering: Design and Project Management (HKUST) • La recherche documentaire (École Polytechnique)" },
 ];
 
 const defaultEducation: Education[] = [
-  { id: "1", period: "2024 - 2026", title: "Engineering Degree in Computer Science & Networks", institution: "EMSI Casablanca", description: "Specialization in AI and Data Science" },
-  { id: "2", period: "2022 - 2024", title: "Preparatory Classes", institution: "EMSI Rabat", description: "Intensive scientific program" },
+  { id: "1", period: "2022 - 2027", title: "Engineering Degree, Computer Science & Networks", institution: "EMSI, Casablanca", description: "Specialization: AI & Data Science" },
+];
+
+const defaultExperience: Experience[] = [
+  {
+    id: "1",
+    period: "Jun 2026 – Present",
+    title: "AI Data Engineer Intern",
+    company: "Aptiv",
+    location: "Tangier, Morocco · Maintenance Department",
+    bullets: [
+      "Built a maintenance intervention tracking and KPI platform, replacing a manual Excel workflow, and owned its technical specification end to end.",
+      "Designed a predictive maintenance module ranking machines by failure risk, combining statistical reliability modeling with an ML classifier.",
+      "Built an agentic RAG assistant calling retrieval and clustering tools over past maintenance reports to surface similar cases and suggest likely causes.",
+      "Validated the full pipeline on synthetic data before touching production, keeping sensitive data on-premise.",
+    ],
+  },
+  {
+    id: "2",
+    period: "2024 – 2025 · 1 month",
+    title: "Software Engineering Intern",
+    company: "Web Agency",
+    location: "Casablanca, Morocco",
+    bullets: [
+      "Developed a Laravel chatbot with database information retrieval.",
+      "Built an automated PDF generation tool.",
+    ],
+  },
 ];
 
 const defaultSkills: SkillCategory[] = [
-  { id: "1", title: "Languages", skills: ["C", "C++", "C#", "Java", "Python", "PHP", "JavaScript", "TypeScript"] },
-  { id: "2", title: "Frameworks & Libs", skills: ["React", "React Native", "Laravel", "Django", ".NET", "Bootstrap", "Tailwind CSS"] },
-  { id: "3", title: "Databases", skills: ["SQL", "PL/SQL", "SQL Server", "NoSQL", "MongoDB", "Redis"] },
-  { id: "4", title: "AI & Data Science", skills: ["MLOps", "NLP", "Deep Learning", "TensorFlow", "Computer Vision", "Multi-Agent Systems"] },
-  { id: "5", title: "DevOps & Tools", skills: ["Git", "Docker", "Linux", "CI/CD", "Kafka", "Firebase", "AWS"] },
-  { id: "6", title: "Architecture", skills: ["UML", "Merise", "MVC", "POO", "TCP/IP", "Microservices"] },
+  { id: "1", title: "Languages & Frameworks", skills: ["Python", "Django", "FastAPI", "React", "React Native", "JavaScript", "TypeScript", "Java", "C++", "C#", "ASP.NET"] },
+  { id: "2", title: "Data & ML", skills: ["pandas", "NumPy", "scikit-learn", "PyTorch", "Feature Engineering", "Model Evaluation", "Backtesting"] },
+  { id: "3", title: "LLM & RAG", skills: ["LangChain", "LangGraph", "RAG Pipelines", "Embeddings", "ChromaDB", "Ollama", "Prompt Engineering"] },
+  { id: "4", title: "Data Engineering", skills: ["PostgreSQL", "SQL Server", "SSIS", "MySQL", "MongoDB", "Neo4j", "Cassandra", "Hadoop", "ETL", "Kafka", "Data Warehousing"] },
+  { id: "5", title: "DevOps & Tools", skills: ["Docker", "Git", "CI/CD", "Linux", "REST APIs"] },
+  { id: "6", title: "BI & Cloud", skills: ["Power BI", "Tableau"] },
 ];
 
 const defaultCertificates: Certificate[] = [
-  { id: "1", name: "Python for Data Science", issuer: "IBM" },
-  { id: "2", name: "Software Engineering", issuer: "HKUST" },
-  { id: "3", name: "Web Development", issuer: "U. Michigan" },
-  { id: "4", name: "React Native", issuer: "Meta" },
+  { id: "1", name: "Data Engineering Professional Certificate (in progress, 2026)", issuer: "DeepLearning.AI & AWS" },
+  { id: "2", name: "Python for Data Science, AI & Development", issuer: "IBM" },
+  { id: "3", name: "Software Engineering: Design and Project Management", issuer: "HKUST" },
+  { id: "4", name: "La recherche documentaire", issuer: "École Polytechnique" },
 ];
 
 // Helper
@@ -155,6 +230,9 @@ export const adminData = {
 
   getEducation: (): Education[] => get("admin_education", defaultEducation),
   setEducation: (e: Education[]) => set("admin_education", e),
+
+  getExperience: (): Experience[] => get("admin_experience", defaultExperience),
+  setExperience: (e: Experience[]) => set("admin_experience", e),
 
   getSkills: (): SkillCategory[] => get("admin_skills", defaultSkills),
   setSkills: (s: SkillCategory[]) => set("admin_skills", s),

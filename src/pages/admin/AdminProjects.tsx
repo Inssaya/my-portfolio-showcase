@@ -3,7 +3,7 @@ import { adminData, Project } from "@/lib/admin-data";
 import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
 
 const emptyProject: Omit<Project, "id"> = {
-  title: "", description: "", tech: [], status: "En cours", category: "Personnel",
+  title: "", description: "", longDescription: "", tech: [], status: "En cours", category: "Personnel", image: "", demoUrl: "", githubUrl: "",
 };
 
 const AdminProjects = () => {
@@ -62,7 +62,8 @@ const AdminProjects = () => {
             </div>
 
             <input value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} placeholder="Titre" className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none focus:border-accent/50" />
-            <textarea value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} placeholder="Description" rows={3} className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none focus:border-accent/50 resize-none" />
+            <textarea value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} placeholder="Description courte (carte)" rows={2} className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none focus:border-accent/50 resize-none" />
+            <textarea value={editing.longDescription || ""} onChange={(e) => setEditing({ ...editing, longDescription: e.target.value })} placeholder="Description longue (page projet, optionnel)" rows={4} className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none focus:border-accent/50 resize-none" />
 
             <div className="flex gap-3">
               <select value={editing.status} onChange={(e) => setEditing({ ...editing, status: e.target.value as Project["status"] })} className="flex-1 px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none">
@@ -91,7 +92,9 @@ const AdminProjects = () => {
               </div>
             </div>
 
-            <input value={editing.link || ""} onChange={(e) => setEditing({ ...editing, link: e.target.value })} placeholder="Lien (optionnel)" className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none focus:border-accent/50" />
+            <input value={editing.image || ""} onChange={(e) => setEditing({ ...editing, image: e.target.value })} placeholder="URL Photo (optionnel)" className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none focus:border-accent/50" />
+            <input value={editing.demoUrl || ""} onChange={(e) => setEditing({ ...editing, demoUrl: e.target.value })} placeholder="Lien Démo (optionnel)" className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none focus:border-accent/50" />
+            <input value={editing.githubUrl || ""} onChange={(e) => setEditing({ ...editing, githubUrl: e.target.value })} placeholder="Lien GitHub (optionnel)" className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none focus:border-accent/50" />
 
             <button onClick={save} className="w-full py-2.5 rounded-lg bg-accent text-accent-foreground font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90">
               <Check size={16} /> Sauvegarder

@@ -10,16 +10,10 @@ const fadeIn = (delay: number) => ({
 
 const education = [
   {
-    period: "2024 - 2026",
-    title: "Engineering Degree in Computer Science & Networks",
-    institution: "EMSI Casablanca",
-    description: "Specialization in Artificial Intelligence and Data Science",
-  },
-  {
-    period: "2022 - 2024",
-    title: "Preparatory Classes",
-    institution: "EMSI Rabat",
-    description: "Intensive scientific program",
+    period: "2022 - 2027",
+    title: "Engineering Degree, Computer Science & Networks",
+    institution: "EMSI, Casablanca",
+    description: "Specialization: AI & Data Science",
   },
 ];
 

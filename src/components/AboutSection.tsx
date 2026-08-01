@@ -40,8 +40,9 @@ const AboutSection = () => {
             </div>
             <h3 className="font-sora text-lg font-semibold mb-2">Experience</h3>
             <p className="text-muted-foreground text-sm">
-              Internship at a Web Agency in Casablanca — Built a chatbot with Laravel,
-              PDF generator and database integration.
+              AI Data Engineer Intern at Aptiv (Tangier) — maintenance KPI platform, predictive
+              maintenance and an agentic RAG assistant. Previously: Laravel chatbot & PDF tool
+              internship at a Casablanca web agency.
             </p>
           </motion.div>
 
@@ -58,8 +59,9 @@ const AboutSection = () => {
             <h3 className="font-sora text-lg font-semibold mb-2">Languages</h3>
             <p className="text-muted-foreground text-sm">
               <span className="text-foreground">Arabic</span> — Native<br />
-              <span className="text-foreground">English</span> — Advanced<br />
-              <span className="text-foreground">French</span> — Intermediate
+              <span className="text-foreground">French</span> — B2<br />
+              <span className="text-foreground">English</span> — B2<br />
+              <span className="text-foreground">Spanish</span> — A2
             </p>
           </motion.div>
 
@@ -75,8 +77,9 @@ const AboutSection = () => {
             </div>
             <h3 className="font-sora text-lg font-semibold mb-2">Certifications</h3>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              Python for Data Science (IBM) • Software Engineering (HKUST) •
-              Web Development (U. Michigan) • React Native (Meta)
+              Data Engineering Professional Certificate — DeepLearning.AI & AWS (in progress) •
+              Python for Data Science, AI & Development (IBM) • Software Engineering: Design and
+              Project Management (HKUST) • La recherche documentaire (École Polytechnique)
             </p>
           </motion.div>
         </div>
