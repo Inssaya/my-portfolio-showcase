@@ -51,7 +51,7 @@ const Index = () => {
         }
       />
 
-      <footer className="relative z-10 border-t border-border/30 py-8 pb-24 text-center text-xs text-muted-foreground xl:pb-8">
+      <footer className="relative z-10 border-t border-border/30 py-8 pb-20 text-center text-xs text-muted-foreground xl:pb-8">
         © 2026 Yassine Sinif. Tous droits réservés.
       </footer>
     </div>

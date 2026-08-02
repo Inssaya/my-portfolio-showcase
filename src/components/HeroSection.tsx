@@ -99,8 +99,11 @@ const HeroSection = () => {
               </span>
             </motion.div>
 
-            {/* The name, each word rising out of its own mask. */}
-            <h1 className="mb-5 font-sora text-5xl font-bold leading-[0.95] tracking-tight md:text-6xl lg:text-7xl xl:text-8xl">
+            {/* The name, each word rising out of its own mask.
+                whitespace-nowrap keeps "Yassine Sinif" on one line even at
+                narrow phone widths — the size scales down instead of the
+                composition breaking into two stacked words. */}
+            <h1 className="mb-5 whitespace-nowrap font-sora text-4xl font-bold leading-[0.95] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl">
               {["Yassine", "Sinif"].map((word, wordIndex) => (
                 <span
                   key={word}
@@ -158,11 +161,18 @@ const HeroSection = () => {
             >
               <Link
                 to="/experience"
-                className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full border border-accent/40 bg-accent/10 px-5 py-2.5 text-sm font-semibold text-accent transition-colors hover:border-accent/70 hover:bg-accent/15"
+                className="group relative inline-flex items-center gap-2.5 overflow-hidden rounded-full border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent transition-colors hover:border-accent/70 hover:bg-accent/15 md:gap-3 md:px-5"
               >
                 <Headphones size={15} />
-                <span>Prefer a guided tour? I'll walk you through it.</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-accent/70">
+                {/* Short form on phones so the pill stays a single line;
+                    full sentence on desktop where there's room. The headphone
+                    icon already tells the visitor it makes sound, which is
+                    why the WITH SOUND chip is desktop-only too. */}
+                <span className="md:hidden">Take the guided tour</span>
+                <span className="hidden md:inline">
+                  Prefer a guided tour? I'll walk you through it.
+                </span>
+                <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-accent/70 md:inline">
                   with sound
                 </span>
                 {/* Sheen sweep on hover, same trick as the primary CTA. */}
