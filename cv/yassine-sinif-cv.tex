@@ -1,0 +1,272 @@
+% Yassine Sinif — CV
+% Build with XeLaTeX:  xelatex yassine-sinif-cv.tex
+% Fonts: Inter (body) + Playfair Display (name). Both ship with TeX Live /
+% fonts-inter; see README.md in this folder for the exact packages.
+
+\documentclass[letterpaper,10pt]{article}
+
+\usepackage[margin=0pt]{geometry}
+\usepackage{fontspec}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage[absolute,overlay]{textpos}
+\usepackage{enumitem}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+
+% The original sets everything ragged-right with no hyphenation. Justification
+% would stretch word spacing and split words across lines, which is the most
+% visible way a reissue stops looking like the original.
+\raggedright
+\hyphenpenalty=10000
+\exhyphenpenalty=10000
+\tolerance=9999
+\emergencystretch=3em
+
+% ---------------------------------------------------------------- palette --
+% Sampled directly from the original PDF so the reissue matches it exactly.
+\definecolor{sidebarbg}{HTML}{254553}
+\definecolor{pagebg}{HTML}{FAF9F5}
+\definecolor{accent}{HTML}{0E5B52}   % section headings, role line, employer
+\definecolor{namecol}{HTML}{12241F}
+\definecolor{bodycol}{HTML}{3A3734}
+\definecolor{titlecol}{HTML}{1A1A17}
+\definecolor{metacol}{HTML}{797772}  % dates and locations
+\definecolor{sidehead}{HTML}{C2C6CF}
+\definecolor{sidebody}{HTML}{E3E6E9}
+\definecolor{photoring}{HTML}{677E88} % sidebody 35%% over sidebarbg
+
+% ------------------------------------------------------------------ fonts --
+% RawFeature={-calt} is essential, not cosmetic: Inter's contextual alternates
+% substitute "+" with a glyph that carries no proper Unicode mapping, so
+% "+212" and "C++" extract as private-use characters and any CV parser reading
+% this file gets garbage. Disabling calt keeps the text machine-readable.
+\setmainfont{Inter-}[
+  Path            = /usr/share/fonts/opentype/inter/,
+  Extension       = .otf,
+  UprightFont     = *Regular,
+  BoldFont        = *Bold,
+  ItalicFont      = *Italic,
+  BoldItalicFont  = *BoldItalic,
+  RawFeature      = {-calt},
+]
+\newfontfamily\intersemi{Inter-SemiBold}[
+  Path = /usr/share/fonts/opentype/inter/, Extension = .otf,
+  RawFeature = {-calt}]
+\newfontfamily\playfair{PlayfairDisplay-}[
+  Path        = /usr/share/texlive/texmf-dist/fonts/opentype/public/playfair/,
+  Extension   = .otf,
+  UprightFont = *Regular,
+  BoldFont    = *Bold,
+]
+
+% --------------------------------------------------------------- geometry --
+% All positions are in points, measured off the original document.
+\setlength{\TPHorizModule}{1pt}
+\setlength{\TPVertModule}{1pt}
+
+\newcommand{\sidebarwidth}{202.1}
+\newcommand{\sidemargin}{19.7}
+\newcommand{\sidetextwidth}{162.7}
+\newcommand{\maincolx}{230}
+\newcommand{\maincolwidth}{336}
+
+% Page background: cream sheet with the dark sidebar band down the left edge.
+\usepackage{eso-pic}
+% Portrait is placed here too, in absolute page coordinates, because textpos
+% blocks anchor by their top-left corner while the circle is defined by its
+% centre — mixing the two makes the position hard to reason about.
+\AddToShipoutPictureBG{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \fill[pagebg] (current page.south west) rectangle (current page.north east);
+    \fill[sidebarbg] (current page.north west)
+      rectangle ([xshift=\sidebarwidth pt]current page.south west);
+
+    \coordinate (photo) at
+      ([xshift=101pt,yshift=-72.3pt]current page.north west);
+    \begin{scope}
+      \clip (photo) circle (44pt);
+      \node at (photo) {\includegraphics[width=88pt]{photo.png}};
+    \end{scope}
+    \draw[photoring,line width=0.8pt] (photo) circle (44pt);
+  \end{tikzpicture}%
+}
+
+% ------------------------------------------------------------ type styles --
+% Tracked-out uppercase labels, as used for every section heading.
+\newcommand{\tracked}[1]{{\addfontfeature{LetterSpace=14}\MakeUppercase{#1}}}
+
+\newcommand{\sectionhead}[1]{%
+  {\bfseries\fontsize{8.4}{8.4}\selectfont\color{accent}\tracked{#1}}%
+  \par\vspace{7pt}%
+}
+\newcommand{\sidesection}[1]{%
+  {\bfseries\fontsize{8}{8}\selectfont\color{sidehead}\tracked{#1}}%
+  \par\vspace{5pt}%
+}
+\newcommand{\sidesub}[1]{%
+  {\bfseries\fontsize{6.8}{6.8}\selectfont\color{sidehead}\tracked{#1}}%
+  \par\vspace{2.4pt}%
+}
+
+% A role: bold title, employer in accent, right-aligned dates, then location.
+\newcommand{\role}[4]{%
+  {\bfseries\fontsize{10.5}{13}\selectfont\color{titlecol}#1%
+   \color{accent}\ ---\ #2}%
+  \hfill
+  {\fontsize{8.5}{11}\selectfont\color{metacol}#3}\par
+  \vspace{1.5pt}
+  {\fontsize{8.5}{11}\selectfont\color{metacol}#4}\par
+  \vspace{3pt}%
+}
+
+\setlist[itemize]{
+  leftmargin   = 11pt,
+  labelsep     = 5pt,
+  topsep       = 0pt,
+  partopsep    = 0pt,
+  parsep       = 0pt,
+  itemsep      = 2.6pt,
+  label        = {\raisebox{0.4ex}{\scriptsize$\bullet$}},
+}
+
+\begin{document}
+
+% ================================================================= sidebar ==
+\begin{textblock}{\sidetextwidth}(\sidemargin,140.6)
+  \color{sidebody}\fontsize{8.6}{13.9}\selectfont
+
+  \sidesection{Contact}
+  Casablanca, Morocco\par
+  +212 6 23 84 25 35\par
+  \href{mailto:yassinsinif4@gmail.com}{\color{sidebody}yassinsinif4@gmail.com}\par
+  \href{https://github.com/Inssaya}{\color{sidebody}github.com/Inssaya}\par
+  \href{https://sinif-yassine.vercel.app}{\color{sidebody}sinif-yassine.vercel.app}\par
+
+  \vspace{14pt}
+  \sidesection{Technical Skills}
+
+  \sidesub{Languages \& Frameworks}
+  Python, Django, FastAPI, React, React Native, JavaScript, TypeScript, Java,
+  C++, C\#, ASP.NET\par
+  \vspace{6pt}
+
+  \sidesub{Data \& ML}
+  pandas, NumPy, scikit-learn, PyTorch, feature engineering, model evaluation,
+  backtesting\par
+  \vspace{6pt}
+
+  \sidesub{LLM \& RAG}
+  LangChain, LangGraph, RAG pipelines, embeddings, ChromaDB, Ollama,
+  prompt engineering\par
+  \vspace{6pt}
+
+  \sidesub{Data Engineering}
+  PostgreSQL, SQL Server, SSIS, MySQL, MongoDB, Neo4j, Cassandra, Hadoop,
+  ETL, Kafka, data warehousing\par
+  \vspace{6pt}
+
+  \sidesub{DevOps \& Tools}
+  Docker, Git, CI/CD, Linux, REST APIs\par
+  \vspace{6pt}
+
+  \sidesub{BI \& Cloud}
+  Power BI, Tableau\par
+
+  \vspace{14pt}
+  \sidesection{Languages}
+  {\fontsize{8.6}{15.85}\selectfont
+   Arabic --- Native\par
+   French --- B2\par
+   English --- B2\par
+   Spanish --- A2\par}
+
+  \vspace{14pt}
+  \sidesection{Education}
+  {\bfseries\color{white}Engineering Degree, Computer Science \& Networks}\par
+  \vspace{2pt}
+  {\fontsize{8.2}{11}\selectfont\color{sidehead}
+   EMSI, Casablanca $\cdot$ 2022\par
+   Specialization: AI \& Data Science\par}
+\end{textblock}
+
+% ============================================================= main column ==
+\begin{textblock}{\maincolwidth}(\maincolx,37.4)
+  {\playfair\fontsize{24.4}{28}\selectfont\color{namecol}Yassine Sinif}\par
+  \vspace{7.3pt}
+  {\intersemi\fontsize{10.3}{12}\selectfont\color{accent}AI \& Data Engineering}\par
+
+  \vspace{14pt}
+  \sectionhead{Profile}
+  {\color{bodycol}\fontsize{8.9}{14.6}\selectfont
+   Engineering student in Artificial Intelligence and Data Science, entering my
+   final year this October, with a strong interest in building AI-powered and
+   full-stack solutions. I am seeking a 6-month final-year internship (PFE)
+   starting February 2027, with the opportunity to transition into a full-time
+   role after graduation.\par}
+
+  \vspace{13pt}
+  \sectionhead{Professional Experience}
+
+  \role{AI Data Engineer Intern}{Aptiv}{Jun 2026 -- Present}
+       {Tangier, Morocco $\cdot$ Maintenance Department}
+  {\color{bodycol}\fontsize{8.9}{14.6}\selectfont
+  \begin{itemize}
+    \item Built a maintenance intervention tracking and KPI platform, replacing
+          a manual Excel workflow, and owned its technical specification end to
+          end.
+    \item Designed a predictive maintenance module ranking machines by failure
+          risk, combining statistical reliability modeling with an ML
+          classifier.
+    \item Built an agentic RAG assistant calling retrieval and clustering tools
+          over past maintenance reports to surface similar cases and suggest
+          likely causes.
+    \item Validated the full pipeline on synthetic data before touching
+          production, keeping sensitive data on-premise.
+  \end{itemize}\par}
+
+  \vspace{9pt}
+  \role{Software Engineering Intern}{Web Agency}{2024 -- 2025 $\cdot$ 1 month}
+       {Casablanca, Morocco}
+  {\color{bodycol}\fontsize{8.9}{14.6}\selectfont
+  \begin{itemize}
+    \item Developed a Laravel chatbot with database information retrieval.
+    \item Built an automated PDF generation tool.
+  \end{itemize}\par}
+
+  \vspace{13pt}
+  \sectionhead{Key Projects}
+  {\color{bodycol}\fontsize{8.9}{14.6}\selectfont
+  \begin{itemize}
+    \item {\bfseries\color{titlecol}Nexora AI} --- Call-center SaaS with
+          on-premise RAG for automated ticket handling. FastAPI, React,
+          TypeScript, PostgreSQL, ChromaDB, sentence-transformers, Ollama.
+    \item {\bfseries\color{titlecol}Stock market analytics platform} ---
+          Real-time streaming ingestion and processing. Python, Kafka, MySQL,
+          Docker, Streamlit.
+    \item {\bfseries\color{titlecol}Medical multi-agent system} --- Coordinated
+          LLM agents for clinical workflows. LangGraph, LangChain, FastAPI,
+          MCP, React, Flutter.
+    \item {\bfseries\color{titlecol}Plagiarism detection system} --- Semantic
+          similarity scoring with TF-IDF and SBERT. Python, Django.
+    \item {\bfseries\color{titlecol}Management applications} --- POS, gym and
+          optics desktop apps with NFC, facial recognition, QR. Java, JavaFX,
+          MySQL.
+  \end{itemize}\par}
+
+  \vspace{13pt}
+  \sectionhead{Certifications}
+  {\color{bodycol}\fontsize{8.9}{14.6}\selectfont
+  \begin{itemize}
+    \item DeepLearning.AI Data Engineering Professional Certificate ---
+          DeepLearning.AI \& AWS $\cdot$ in progress, 2026
+    \item Python for Data Science, AI \& Development --- IBM
+    \item Software Engineering: Design and Project Management --- HKUST
+    \item La recherche documentaire --- \'Ecole Polytechnique
+  \end{itemize}\par}
+\end{textblock}
+
+\end{document}
