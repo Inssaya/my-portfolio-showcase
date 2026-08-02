@@ -86,12 +86,14 @@
     background-image: var(--gradient-accent);
   }
 
-  /* True glass: bg-card/8 is barely a tint — the coloured nebulae read
-     through almost as if the card weren't there. backdrop-blur-2xl carries
-     legibility: it smears whatever sharp thing (mesh node, star) is behind
-     into a soft wash, so text stays crisp against a diffuse background. */
+  /* True glass. The dark fill is now a 4% tint — the coloured nebulae
+     essentially bleed straight through. The blur does the real work: it
+     turns any sharp thing behind (mesh node, star) into a soft wash so text
+     stays crisp against a diffuse background. The border is what says
+     "there's a card here" — without it a fully-transparent panel would look
+     like the content is floating on nothing. */
   .glass-card {
-    @apply bg-card/[0.08] backdrop-blur-2xl border border-border/50 rounded-xl;
+    @apply bg-card/[0.04] backdrop-blur-2xl border border-border/60 rounded-xl;
   }
 
   /* Faint blueprint grid, fading out toward the bottom of the viewport. */
