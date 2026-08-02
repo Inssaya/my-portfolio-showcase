@@ -86,14 +86,34 @@
     background-image: var(--gradient-accent);
   }
 
-  /* True glass. The dark fill is now a 4% tint — the coloured nebulae
-     essentially bleed straight through. The blur does the real work: it
-     turns any sharp thing behind (mesh node, star) into a soft wash so text
-     stays crisp against a diffuse background. The border is what says
-     "there's a card here" — without it a fully-transparent panel would look
-     like the content is floating on nothing. */
+  /* True glass. The dark fill is a 4% tint — the coloured nebulae bleed
+     straight through. The blur does the real work: it turns any sharp thing
+     behind (mesh node, star) into a soft wash so text stays crisp.
+
+     The backdrop-filter lives on a ::before pseudo-element, NOT on the card
+     itself. That matters: mobile browsers drop the backdrop compositor layer
+     when the element they sit on gets a transform applied (which framer-motion
+     does during and after every enter animation). The pseudo-element is never
+     touched by any animation, so its blur stays live for as long as the card
+     exists. Text and children sit above it on ::after? No — the border and
+     children are the card, the ::before is the glass underneath. */
   .glass-card {
-    @apply bg-card/[0.04] backdrop-blur-2xl border border-border/60 rounded-xl;
+    position: relative;
+    isolation: isolate;
+    @apply border border-border/60 rounded-xl;
+  }
+  .glass-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: hsl(var(--card) / 0.04);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    /* Keep the glass on its own compositor layer forever, so no parent
+       animation can push it back to a flat render. */
+    will-change: backdrop-filter;
   }
 
   /* Faint blueprint grid, fading out toward the bottom of the viewport. */

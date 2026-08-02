@@ -125,13 +125,31 @@ const MorphingCore = () => {
       }
     }
 
-    const resize = () => {
+    // Same address-bar-collapse guard as the other background layers: only
+    // recentre the sphere when the layout really changes, not when a mobile
+    // scroll toggles the address bar and jerks the reported viewport height.
+    let logicalWidth = 0;
+    let logicalHeight = 0;
+
+    const resize = (isReal = true) => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
-      canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `${window.innerHeight}px`;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (isReal) {
+        logicalWidth = width;
+        logicalHeight = height;
+      }
+    };
+
+    const onResize = () => {
+      const dw = Math.abs(window.innerWidth - logicalWidth);
+      const dh = Math.abs(window.innerHeight - logicalHeight);
+      resize(dw > 20 || dh > 150);
     };
 
     const onScroll = () => {
@@ -148,7 +166,7 @@ const MorphingCore = () => {
 
     resize();
     onScroll();
-    window.addEventListener("resize", resize);
+    window.addEventListener("resize", onResize);
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("pointermove", onPointerMove, { passive: true });
 
@@ -159,9 +177,11 @@ const MorphingCore = () => {
     const projected = new Float32Array(count * 4); // x, y, scale, depth
 
     const render = (time: number) => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      ctx.clearRect(0, 0, width, height);
+      // Logical size (fixed unless a real layout change), not window.inner*,
+      // so address-bar scroll toggles don't jerk the sphere across the screen.
+      const width = logicalWidth;
+      const height = logicalHeight;
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
       smoothScroll += (scrollRef.current - smoothScroll) * 0.06;
       smoothPointerX += (pointerRef.current.x - smoothPointerX) * 0.04;
@@ -255,7 +275,7 @@ const MorphingCore = () => {
 
     return () => {
       cancelAnimationFrame(frameRef.current);
-      window.removeEventListener("resize", resize);
+      window.removeEventListener("resize", onResize);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("pointermove", onPointerMove);
     };

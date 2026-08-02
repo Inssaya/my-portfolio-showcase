@@ -77,22 +77,50 @@ const Starfield = () => {
       };
     });
 
-    const resize = () => {
+    // Cached dimensions. On mobile the address bar collapses on scroll and
+    // fires a `resize` — if we recompute star positions from a new height
+    // every time, every star jumps at once. So we lock the "logical" size
+    // and only accept updates that look like a real layout change (width
+    // change, or a big height jump like an orientation flip).
+    let logicalWidth = 0;
+    let logicalHeight = 0;
+
+    const resize = (isReal = true) => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
-      canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `${window.innerHeight}px`;
+
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      if (isReal) {
+        logicalWidth = width;
+        logicalHeight = height;
+      }
     };
 
     resize();
-    window.addEventListener("resize", resize);
+
+    const onResize = () => {
+      const dw = Math.abs(window.innerWidth - logicalWidth);
+      const dh = Math.abs(window.innerHeight - logicalHeight);
+      // Anything under ~150px of pure-height change is almost certainly a
+      // mobile chrome collapse. Keep positions, just resize the canvas.
+      const isRealLayoutChange = dw > 20 || dh > 150;
+      resize(isRealLayoutChange);
+    };
+
+    window.addEventListener("resize", onResize);
 
     const render = (time: number) => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      ctx.clearRect(0, 0, width, height);
+      // Use the logical size, not window.inner*, so address-bar toggles on
+      // mobile don't jerk every star sideways every frame.
+      const width = logicalWidth;
+      const height = logicalHeight;
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
       // Additive blending makes overlapping stars blossom into a bloom, which
       // is what a dense patch of sky actually looks like.
@@ -135,7 +163,7 @@ const Starfield = () => {
 
     return () => {
       cancelAnimationFrame(frameRef.current);
-      window.removeEventListener("resize", resize);
+      window.removeEventListener("resize", onResize);
     };
   }, []);
 

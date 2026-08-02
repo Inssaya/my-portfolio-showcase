@@ -73,23 +73,46 @@ const Nebulae = () => {
       });
     };
 
-    const resize = () => {
+    // Same address-bar-collapse guard as Starfield: rebuilding cloud
+    // positions on a 60px height shrink makes them jump. Lock the logical
+    // size, resize the canvas fabric on every resize, but only rebuild the
+    // cloud positions when the change is a real layout event.
+    let logicalWidth = 0;
+    let logicalHeight = 0;
+
+    const resize = (isReal = true) => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
-      canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `${window.innerHeight}px`;
+
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      build();
+
+      if (isReal) {
+        logicalWidth = width;
+        logicalHeight = height;
+        build();
+      }
     };
 
     resize();
-    window.addEventListener("resize", resize);
+
+    const onResize = () => {
+      const dw = Math.abs(window.innerWidth - logicalWidth);
+      const dh = Math.abs(window.innerHeight - logicalHeight);
+      resize(dw > 20 || dh > 150);
+    };
+    window.addEventListener("resize", onResize);
 
     const render = (time: number) => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      ctx.clearRect(0, 0, width, height);
+      // Logical size, not window.inner*, so scroll-triggered address-bar
+      // resizes don't slide every cloud sideways every frame.
+      const width = logicalWidth;
+      const height = logicalHeight;
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
       // Additive so overlapping clouds blend into brighter, warmer patches
       // instead of muddy overlaps.
@@ -121,7 +144,7 @@ const Nebulae = () => {
     frameRef.current = requestAnimationFrame(render);
     return () => {
       cancelAnimationFrame(frameRef.current);
-      window.removeEventListener("resize", resize);
+      window.removeEventListener("resize", onResize);
     };
   }, []);
 
