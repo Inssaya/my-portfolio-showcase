@@ -3,25 +3,29 @@
 One-time generation. The output (`public/tour/`) is committed, so this only
 needs re-running when the narration text in `src/lib/tour/script.ts` changes.
 
-## Windows / PowerShell
+## Windows — just run the script
 
-PowerShell does **not** support the `VAR=value command` syntax used on
-macOS and Linux — it will fail with a "not recognized" error. Set the variable
-first, as its own statement:
-
-```powershell
-$env:OPENAI_API_KEY = "sk-your-key"
-
-npm run voices:sample     # audition four voices on the greeting line
-npm run voices            # generate the whole tour
+```
+scripts\generate-voices.bat
 ```
 
-To pick a different voice:
+It checks Node, installs dependencies, prompts for the key, auditions the four
+voices, generates the tour in the one you pick, and pushes the result. Nothing
+to memorise.
 
-```powershell
-$env:TOUR_VOICE = "onyx"
-npm run voices
-```
+### Setting the key by hand instead
+
+The syntax differs between the two Windows shells, which is the usual source of
+"The filename, directory name, or volume label syntax is incorrect":
+
+| Shell | Prompt looks like | Syntax |
+|---|---|---|
+| Command Prompt | `C:\Users\you\portfolio>` | `set "OPENAI_API_KEY=sk-..."` |
+| PowerShell | `PS C:\Users\you\portfolio>` | `$env:OPENAI_API_KEY = "sk-..."` |
+
+In Command Prompt the quotes must wrap the **whole** `NAME=value` pair, and
+there must be no spaces around the `=`, or the spaces and quotes end up inside
+the value itself.
 
 ## macOS / Linux
 
