@@ -86,10 +86,11 @@
     background-image: var(--gradient-accent);
   }
 
-  /* True glass: low opacity so the mesh and stars show through, high blur so
-     what shows through reads as a soft glow rather than sharp specks. */
+  /* True glass: very low opacity so the coloured nebulae bleed through, high
+     blur so anything sharp behind (mesh nodes, stars) reads as a soft wash
+     rather than distinct specks. */
   .glass-card {
-    @apply bg-card/30 backdrop-blur-2xl border border-border/50 rounded-xl;
+    @apply bg-card/15 backdrop-blur-2xl border border-border/50 rounded-xl;
   }
 
   /* Faint blueprint grid, fading out toward the bottom of the viewport. */

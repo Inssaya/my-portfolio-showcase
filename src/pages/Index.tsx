@@ -9,6 +9,7 @@ import ProjectsSection from "@/components/ProjectsSection";
 import ContactSection from "@/components/ContactSection";
 import MorphingCore from "@/components/visuals/MorphingCore";
 import Starfield from "@/components/visuals/Starfield";
+import Nebulae from "@/components/visuals/Nebulae";
 import Preloader from "@/components/visuals/Preloader";
 import CursorGlow from "@/components/visuals/CursorGlow";
 import ScrollProgress from "@/components/visuals/ScrollProgress";
@@ -20,9 +21,11 @@ const Index = () => {
   return (
     <div className="relative">
       <Preloader />
-      {/* Two background layers, painted in this order: cool stars far back,
-          warm mesh in front. The grid sits above both for a blueprint feel. */}
+      {/* Three background layers, painted back to front: stars far back,
+          coloured nebulae in the middle giving glass cards something to
+          filter, warm mesh in front. The grid sits above all three. */}
       <Starfield />
+      <Nebulae />
       <MorphingCore />
       <div aria-hidden="true" className="grid-overlay" />
       <ScrollProgress />
