@@ -18,6 +18,16 @@ February 2027. Every item below is judged by whether it moves that forward.
 | ✅ | **CV rebuilt in LaTeX** (`cv/`) — pixel-matched to the original, real text layer, `+`-glyph extraction bug fixed, 278 KB → 118 KB. |
 | ✅ | **Real hero portrait** replacing the AI-generated illustration. |
 | ✅ | **`package-lock.json` repaired** — was missing six declared dependencies including `framer-motion`, breaking every `npm ci`. |
+| ✅ | **Tour narration script** — 18 segments, ~3 min, grounded in `admin-data.ts` and the ANTIV README. |
+| ✅ | **Voice generation pipeline** — `scripts/generate-voices.mjs`, hash-guarded, negotiates model access, falls back to estimated timings. Windows one-shot `.bat` included. |
+| ✅ | **Tour playback engine** — state machine with injected audio, timing maths, React binding. 38 tests. |
+| ✅ | **Entry gate + routing** — `/`, `/classic`, `/experience`, all deep-linkable. |
+| ✅ | **Tour player UI** — caption, stage, project chooser, transport controls. Verified end-to-end in a browser against a fixture manifest. |
+| ✅ | **Route-level code splitting** — one 525 kB bundle became a 444 kB shared vendor chunk plus small per-route chunks. |
+| ✅ | **The assistant** — grounded system prompt built from `admin-data`, four tools, edge API route, floating widget on both modes, tour interrupt wired. |
+| ✅ | **SEO and link previews** — generated OG card, full Open Graph/Twitter tags, structured data, sitemap, robots. |
+| ✅ | **CV downloads** — hero, contact section and tour closing screen. |
+| ✅ | **Real README** replacing the Lovable placeholder. |
 
 ---
 
@@ -35,11 +45,12 @@ Full spec: `AI_VOICE_GUIDE_PLAN.md`. Design briefs: `DESIGN_BRIEFS.md`.
 - [ ] **Language decision** — Arabic greeting then English body, or English
       throughout.
 
-### A1 · Script *(unblocked — can start now)*
-- [ ] Author `src/lib/tour/script.ts` from `admin-data.ts` + the ANTIV repo docs.
-      Segments of 5–15 s. First-person guide voice.
-- [ ] Per featured project: intro + one segment per screenshot + tech-stack close.
-- [ ] Define visual cues against the script.
+### A1 · Script — **done**, pending sign-off
+- [x] `src/lib/tour/script.ts` — 18 segments.
+- [x] Aptiv deep-dive written from the ANTIV README.
+- [ ] **Owner: read the script and correct anything you'd say differently.**
+- [ ] Deep-dives for Nexora AI, the stock platform and the medical multi-agent
+      system — blocked on source material for those three.
 
 ### A2 · Voice pipeline
 - [ ] `scripts/generate-voices.ts` — TTS per segment, then Whisper word
@@ -54,17 +65,17 @@ Full spec: `AI_VOICE_GUIDE_PLAN.md`. Design briefs: `DESIGN_BRIEFS.md`.
 - [ ] Entry gate routing: `/` gate, `/classic`, `/experience`.
 - [ ] Unit tests for the state machine and timing math.
 
-### A4 · Experience UI
-- [ ] Build from Claude Design's output: gate, stage, captions, project chooser,
-      deep-dive, paused state.
-- [ ] Preloading, skip control, mute mode, reduced-motion, mobile.
+### A4 · Experience UI — **working, awaiting design**
+- [x] Gate, stage, captions, chooser, controls, paused state.
+- [x] Preloading, skip, mute, tab-hide pause, keyboard shortcuts.
+- [ ] Restyle from Claude Design's output (`docs/DESIGN_BRIEFS.md`).
+- [ ] Wire project screenshots into the deep-dive once they exist.
 
-### A5 · Live AI widget
-- [ ] `api/chat.ts` serverless agent loop, pattern ported from
-      `My_assistance/hub/app/core/agent.py`.
-- [ ] Five tools: `send_cv`, `open_github`, `show_project`, `resume_tour`,
-      `get_profile`. Grounded strictly in real data.
-- [ ] Widget UI on both modes; interrupt → status report → resume wiring.
+### A5 · Assistant — **built**, needs a key
+- [x] `api/chat.ts`, four tools, grounded prompt, widget on both modes,
+      interrupt/status-report/resume wiring, 11 grounding tests.
+- [ ] **Owner: set `ASSISTANT_API_KEY` in the Vercel project.** Until then the
+      widget shows a friendly "not switched on" state rather than failing.
 
 ### A6 · Ship
 - [ ] Playwright E2E: gate → tour → checkpoint → deep-dive → interrupt → ask →
@@ -77,20 +88,19 @@ Full spec: `AI_VOICE_GUIDE_PLAN.md`. Design briefs: `DESIGN_BRIEFS.md`.
 
 Cheap wins that make the site work harder during the internship hunt.
 
-- [ ] **SEO and link previews** — real `<title>`, meta description, Open Graph
-      and Twitter card images. Right now a shared link renders as a bare URL,
-      which matters because links get pasted into recruiter chats.
-- [ ] **Bundle split** — the JS bundle is 525 KB (161 KB gzipped) in one chunk.
-      Route-level lazy loading, especially for `/admin`, which no visitor needs.
-- [ ] **CV download button** in the hero and contact section, pointing at
-      `/cv/yassine-sinif-cv.pdf`.
-- [ ] **Populate the LinkedIn link** — it is empty in `admin-data.ts`, so the
-      icon is currently suppressed.
-- [ ] **Rewrite `README.md`** — still says "Welcome to your Lovable project."
+- [x] SEO, link previews, sitemap, structured data.
+- [x] Bundle split.
+- [x] CV downloads.
+- [x] Real README.
+- [ ] **Populate the LinkedIn link** — empty in `admin-data.ts`, so the icon is
+      suppressed everywhere. One line, and recruiters look for it.
 - [ ] **Consolidate lockfiles** — `bun.lock`, `bun.lockb` and
       `package-lock.json` all coexist, leaving the package manager ambiguous.
 - [ ] **Fix the CV education line** — reads "EMSI, Casablanca · 2022" where the
       site says 2022–2027.
+- [ ] **Confirm the Vercel project** — the live site is
+      `my-portfolio-three-tau-68.vercel.app`, while the CV and metadata say
+      `sinif-yassine.vercel.app`. Pick one and make the other redirect.
 
 ---
 
