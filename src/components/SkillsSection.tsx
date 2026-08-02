@@ -1,81 +1,65 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-
-const fadeIn = (direction: string, delay: number) => ({
-  hidden: {
-    y: direction === "up" ? 60 : 0,
-    x: direction === "left" ? 60 : direction === "right" ? -60 : 0,
-    opacity: 0,
-  },
-  show: {
-    y: 0, x: 0, opacity: 1,
-    transition: { type: "tween", duration: 0.8, delay, ease: [0.25, 0.25, 0.25, 0.75] },
-  },
-});
-
-const skillCategories = [
-  {
-    title: "Languages & Frameworks",
-    skills: ["Python", "Django", "FastAPI", "React", "React Native", "JavaScript", "TypeScript", "Java", "C++", "C#", "ASP.NET"],
-  },
-  {
-    title: "Data & ML",
-    skills: ["pandas", "NumPy", "scikit-learn", "PyTorch", "Feature Engineering", "Model Evaluation", "Backtesting"],
-  },
-  {
-    title: "LLM & RAG",
-    skills: ["LangChain", "LangGraph", "RAG Pipelines", "Embeddings", "ChromaDB", "Ollama", "Prompt Engineering"],
-  },
-  {
-    title: "Data Engineering",
-    skills: ["PostgreSQL", "SQL Server", "SSIS", "MySQL", "MongoDB", "Neo4j", "Cassandra", "Hadoop", "ETL", "Kafka", "Data Warehousing"],
-  },
-  {
-    title: "DevOps & Tools",
-    skills: ["Docker", "Git", "CI/CD", "Linux", "REST APIs"],
-  },
-  {
-    title: "BI & Cloud",
-    skills: ["Power BI", "Tableau"],
-  },
-];
+import SectionHeading from "@/components/visuals/SectionHeading";
+import TiltCard from "@/components/visuals/TiltCard";
+import { adminData, SkillCategory } from "@/lib/admin-data";
 
 const SkillsSection = () => {
+  const [categories, setCategories] = useState<SkillCategory[]>([]);
+
+  useEffect(() => {
+    setCategories(adminData.getSkills());
+  }, []);
+
   return (
     <section id="skills" className="py-24 relative">
       <div className="container mx-auto">
-        <motion.h2
-          variants={fadeIn("up", 0.1)}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true }}
-          className="font-sora text-3xl md:text-5xl font-bold text-center mb-16"
-        >
-          Technical <span className="text-gradient-accent">Skills</span>
-        </motion.h2>
+        <SectionHeading
+          eyebrow="03 — Toolkit"
+          title="Technical"
+          accent="Skills"
+          subtitle="The stack I reach for, grouped by where it sits in a system."
+        />
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-          {skillCategories.map((cat, i) => (
+          {categories.map((category, i) => (
             <motion.div
-              key={cat.title}
-              variants={fadeIn("up", 0.1 + i * 0.1)}
-              initial="hidden"
-              whileInView="show"
-              viewport={{ once: true }}
-              className="glass-card p-6 hover:border-accent/50 transition-colors"
+              key={category.id}
+              initial={{ opacity: 0, y: 34 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.6, delay: Math.min(i * 0.08, 0.4) }}
             >
-              <h3 className="font-sora text-accent font-semibold mb-4 text-sm uppercase tracking-wider">
-                {cat.title}
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {cat.skills.map((skill) => (
-                  <span
-                    key={skill}
-                    className="px-3 py-1.5 text-xs rounded-full bg-secondary text-foreground/80 border border-border/50 hover:border-accent/50 hover:text-accent transition-colors"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
+              <TiltCard className="h-full" max={6}>
+                <div className="glass-card h-full p-6 transition-colors duration-300 hover:border-accent/50">
+                  <div className="mb-4 flex items-baseline justify-between gap-3">
+                    <h3 className="font-sora text-sm font-semibold uppercase tracking-wider text-accent">
+                      {category.title}
+                    </h3>
+                    <span className="font-sora text-[10px] tabular-nums text-muted-foreground">
+                      {String(category.skills.length).padStart(2, "0")}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {category.skills.map((skill, skillIndex) => (
+                      <motion.span
+                        key={skill}
+                        initial={{ opacity: 0, scale: 0.85 }}
+                        whileInView={{ opacity: 1, scale: 1 }}
+                        viewport={{ once: true }}
+                        transition={{
+                          duration: 0.35,
+                          delay: Math.min(i * 0.08 + skillIndex * 0.025, 0.8),
+                        }}
+                        className="rounded-full border border-border/50 bg-secondary px-3 py-1.5 text-xs text-foreground/80 transition-colors hover:border-accent/50 hover:text-accent"
+                      >
+                        {skill}
+                      </motion.span>
+                    ))}
+                  </div>
+                </div>
+              </TiltCard>
             </motion.div>
           ))}
         </div>

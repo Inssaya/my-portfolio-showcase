@@ -86,8 +86,32 @@
     background-image: var(--gradient-accent);
   }
 
+  /* Opaque enough to stay legible over the animated background mesh. */
   .glass-card {
-    @apply bg-card/50 backdrop-blur-md border border-border/50 rounded-xl;
+    @apply bg-card/75 backdrop-blur-xl border border-border/50 rounded-xl;
+  }
+
+  /* Faint blueprint grid, fading out toward the bottom of the viewport. */
+  .grid-overlay {
+    @apply fixed inset-0 -z-10 pointer-events-none;
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.35) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(ellipse 100% 70% at 50% 0%, black 10%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 100% 70% at 50% 0%, black 10%, transparent 75%);
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

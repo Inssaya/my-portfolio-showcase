@@ -1,4 +1,3 @@
-import ParticlesBackground from "@/components/ParticlesBackground";
 import Navigation from "@/components/Navigation";
 import MobileNav from "@/components/MobileNav";
 import HeroSection from "@/components/HeroSection";
@@ -8,23 +7,37 @@ import SkillsSection from "@/components/SkillsSection";
 import EducationSection from "@/components/EducationSection";
 import ProjectsSection from "@/components/ProjectsSection";
 import ContactSection from "@/components/ContactSection";
+import MorphingCore from "@/components/visuals/MorphingCore";
+import Preloader from "@/components/visuals/Preloader";
+import CursorGlow from "@/components/visuals/CursorGlow";
+import ScrollProgress from "@/components/visuals/ScrollProgress";
+import TechMarquee from "@/components/visuals/TechMarquee";
+import StatsBand from "@/components/visuals/StatsBand";
 
 const Index = () => {
   return (
     <div className="relative">
-      <ParticlesBackground />
+      <Preloader />
+      <MorphingCore />
+      <div aria-hidden="true" className="grid-overlay" />
+      <ScrollProgress />
+      <CursorGlow />
       <Navigation />
       <MobileNav />
+
       <main className="relative z-10">
         <HeroSection />
+        <TechMarquee />
         <AboutSection />
+        <StatsBand />
         <ExperienceSection />
         <SkillsSection />
         <EducationSection />
         <ProjectsSection />
         <ContactSection />
       </main>
-      <footer className="relative z-10 py-6 text-center text-muted-foreground text-xs border-t border-border/30 pb-20 xl:pb-6">
+
+      <footer className="relative z-10 border-t border-border/30 py-8 pb-24 text-center text-xs text-muted-foreground xl:pb-8">
         © 2026 Yassine Sinif. Tous droits réservés.
       </footer>
     </div>
