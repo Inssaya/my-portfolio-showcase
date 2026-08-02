@@ -62,13 +62,51 @@ if (!apiKey) {
 
 const sampleMode = process.argv.includes("--sample");
 
+/**
+ * Small projects are capped hard — this one at three requests per twenty-second
+ * window (`x-ratelimit-limit-project-requests: 3`). Crucially, OpenAI reports an
+ * overage on the speech endpoint as `403 model_not_found`, which is the exact
+ * shape of a model the project was never granted. An unpaced run therefore
+ * looks like a permissions failure and gives up, when all it needed was to wait.
+ *
+ * So every call takes a slot from a single global pacer. Three minutes of
+ * generation becomes five; a run that could not finish at all now finishes.
+ * Override with TOUR_MIN_INTERVAL_MS if the project's limits are raised.
+ */
+const MIN_CALL_INTERVAL_MS = Number(process.env.TOUR_MIN_INTERVAL_MS ?? 7500);
+let nextSlotAt = 0;
+
+async function takeSlot() {
+  const now = Date.now();
+  const wait = Math.max(0, nextSlotAt - now);
+  nextSlotAt = Math.max(now, nextSlotAt) + MIN_CALL_INTERVAL_MS;
+  if (wait) await new Promise((r) => setTimeout(r, wait));
+}
+
 /** POST to the OpenAI API, retrying on rate limits and transient failures. */
 async function callOpenAI(endpoint, { body, headers = {} }, attempt = 1) {
-  const res = await fetch(`https://api.openai.com/v1/${endpoint}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, ...headers },
-    body,
-  });
+  await takeSlot();
+
+  let res;
+  try {
+    res = await fetch(`https://api.openai.com/v1/${endpoint}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, ...headers },
+      body,
+    });
+  } catch (err) {
+    // Undici reports DNS hiccups, dropped connections and TLS resets as a bare
+    // "fetch failed" thrown from fetch itself, so it never reaches the status
+    // handling below. These are exactly as transient as the 5xx we already
+    // retry, and one of them should not end an eighteen-segment run.
+    if (attempt <= 4) {
+      const wait = 2 ** attempt * 1000;
+      console.log(`   network error (${err.cause?.code ?? err.message}) — retrying in ${wait / 1000}s`);
+      await new Promise((r) => setTimeout(r, wait));
+      return callOpenAI(endpoint, { body, headers }, attempt + 1);
+    }
+    throw err;
+  }
 
   if (res.ok) return res;
 
@@ -95,6 +133,29 @@ async function callOpenAI(endpoint, { body, headers = {} }, attempt = 1) {
 const isModelUnavailable = (err) =>
   err.code === "model_not_found" || err.status === 403 || err.status === 404;
 
+/**
+ * A 403 `model_not_found` is ambiguous: it means either "this project was never
+ * granted the model" or "this project just exceeded its request cap". Pacing
+ * (see takeSlot) prevents most of the second kind, but bursts still slip
+ * through, so a denial is only believed once it survives a full reset window.
+ *
+ * The wait matches `x-ratelimit-reset-project-requests`. Abandoning an
+ * eighteen-segment run — and the manifest, which is written only after the last
+ * segment — over a 403 that clears in twenty seconds is far more expensive than
+ * waiting. A genuinely ungranted model still fails, just a minute later.
+ */
+async function retryingSpuriousDenial(label, run, attempts = 5) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (err) {
+      if (!isModelUnavailable(err) || attempt >= attempts) throw err;
+      console.log(`   ${label}: 403 on attempt ${attempt}/${attempts}, waiting 20s for the window to reset`);
+      await new Promise((r) => setTimeout(r, 20000));
+    }
+  }
+}
+
 function speechRequest(model, text, voice) {
   return {
     headers: { "Content-Type": "application/json" },
@@ -109,26 +170,34 @@ function speechRequest(model, text, voice) {
 }
 
 async function synthesise(text, voice) {
+  // The model already answered once, so a 403 now is a stale cache, not a
+  // denial. Retry rather than lose the run.
   if (ttsModel) {
-    const res = await callOpenAI("audio/speech", speechRequest(ttsModel, text, voice));
+    const res = await retryingSpuriousDenial(ttsModel, () =>
+      callOpenAI("audio/speech", speechRequest(ttsModel, text, voice)),
+    );
     return Buffer.from(await res.arrayBuffer());
   }
 
-  // First call: find a speech model this project is allowed to use.
-  let lastError;
-  for (const model of TTS_MODELS) {
-    try {
-      const res = await callOpenAI("audio/speech", speechRequest(model, text, voice));
-      ttsModel = model;
-      console.log(`  speech model: ${model}`);
-      return Buffer.from(await res.arrayBuffer());
-    } catch (err) {
-      if (!isModelUnavailable(err)) throw err;
-      console.log(`  ${model} unavailable on this project, trying next`);
-      lastError = err;
+  // First call: find a speech model this project is allowed to use. The whole
+  // sequence is retried, so a stale 403 cannot demote us to a worse model — or
+  // fail the run outright when only one model is granted.
+  return retryingSpuriousDenial("speech model negotiation", async () => {
+    let lastError;
+    for (const model of TTS_MODELS) {
+      try {
+        const res = await callOpenAI("audio/speech", speechRequest(model, text, voice));
+        ttsModel = model;
+        console.log(`  speech model: ${model}`);
+        return Buffer.from(await res.arrayBuffer());
+      } catch (err) {
+        if (!isModelUnavailable(err)) throw err;
+        console.log(`  ${model} unavailable on this project, trying next`);
+        lastError = err;
+      }
     }
-  }
-  throw lastError;
+    throw lastError;
+  });
 }
 
 function transcriptionRequest(model, mp3, filename) {
@@ -152,22 +221,34 @@ async function wordTimings(mp3, filename) {
   const candidates = transcribeModel ? [transcribeModel] : TRANSCRIBE_MODELS;
   let lastError;
 
-  for (const model of candidates) {
-    try {
-      const res = await callOpenAI("audio/transcriptions", transcriptionRequest(model, mp3, filename));
-      const json = await res.json();
-      if (!transcribeModel) {
-        transcribeModel = model;
-        console.log(`  timing model: ${model}`);
+  // Retried as a whole: a stale 403 here would otherwise latch
+  // `transcribeUnavailable` and silently downgrade every remaining segment to
+  // estimated caption timing, which is a quality loss that survives the run.
+  try {
+    return await retryingSpuriousDenial("transcription", async () => {
+      let denial;
+      for (const model of candidates) {
+        try {
+          const res = await callOpenAI("audio/transcriptions", transcriptionRequest(model, mp3, filename));
+          const json = await res.json();
+          if (!transcribeModel) {
+            transcribeModel = model;
+            console.log(`  timing model: ${model}`);
+          }
+          return {
+            words: json.words ?? [],
+            durationMs: Math.round((json.duration ?? 0) * 1000),
+          };
+        } catch (err) {
+          if (!isModelUnavailable(err)) throw err;
+          denial = err;
+        }
       }
-      return {
-        words: json.words ?? [],
-        durationMs: Math.round((json.duration ?? 0) * 1000),
-      };
-    } catch (err) {
-      if (!isModelUnavailable(err)) throw err;
-      lastError = err;
-    }
+      throw denial;
+    });
+  } catch (err) {
+    if (!isModelUnavailable(err)) throw err;
+    lastError = err;
   }
 
   transcribeUnavailable = true;
@@ -338,6 +419,33 @@ async function loadScript() {
   return module.TOUR_SCRIPT;
 }
 
+/**
+ * Write the manifest as it currently stands.
+ *
+ * Called after every segment rather than once at the end. The hash guard reads
+ * this file to decide what to skip, so a run that died on segment fifteen used
+ * to throw away fourteen perfectly good clips — the MP3s survived on disk but
+ * nothing recorded their timings. Writing as we go turns a crash into a resume,
+ * which matters a great deal on a rate-limited project.
+ */
+async function writeManifest(segments) {
+  await writeFile(
+    MANIFEST,
+    `${JSON.stringify(
+      {
+        version: "1",
+        generatedAt: new Date().toISOString(),
+        voice: VOICE,
+        ttsModel,
+        transcribeModel,
+        segments,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
 async function main() {
   const script = await loadScript();
   await mkdir(AUDIO_DIR, { recursive: true });
@@ -402,27 +510,14 @@ async function main() {
     });
 
     generated += 1;
+    await writeManifest(segments);
     console.log(
       `${(durationMs / 1000).toFixed(1)}s, ${words.length} words` +
         (heard?.words?.length ? "" : " (estimated timing)"),
     );
   }
 
-  await writeFile(
-    MANIFEST,
-    `${JSON.stringify(
-      {
-        version: "1",
-        generatedAt: new Date().toISOString(),
-        voice: VOICE,
-        ttsModel,
-        transcribeModel,
-        segments,
-      },
-      null,
-      2,
-    )}\n`,
-  );
+  await writeManifest(segments);
 
   const total = segments.reduce((sum, s) => sum + s.durationMs, 0);
   const estimated = segments.filter((s) => s.timingSource === "estimated").length;
