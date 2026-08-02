@@ -84,7 +84,7 @@ const TourPlayer = ({ manifest }: { manifest: TourManifest }) => {
             Begin
           </button>
           <p className="mt-6 text-xs text-muted-foreground">
-            <Link to="/classic" className="underline underline-offset-4 hover:text-accent">
+            <Link to="/" className="underline underline-offset-4 hover:text-accent">
               Or read the portfolio instead
             </Link>
           </p>
@@ -139,7 +139,7 @@ const TourPlayer = ({ manifest }: { manifest: TourManifest }) => {
                   Download my CV
                 </a>
                 <Link
-                  to="/classic"
+                  to="/"
                   className="rounded-full border border-foreground/20 px-6 py-3 text-sm font-semibold transition-colors hover:border-accent hover:text-accent"
                 >
                   Browse the portfolio
@@ -188,7 +188,7 @@ const TourPlayer = ({ manifest }: { manifest: TourManifest }) => {
       />
 
       <Link
-        to="/classic"
+        to="/"
         className="fixed left-5 top-5 z-40 inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/70 px-3.5 py-2 text-xs font-semibold text-muted-foreground backdrop-blur-md transition-colors hover:border-accent/50 hover:text-accent"
       >
         <LayoutGrid size={13} />
@@ -220,7 +220,7 @@ const Experience = () => {
             : "The narration audio has not been generated yet, so there is nothing to play."}
         </p>
         <Link
-          to="/classic"
+          to="/"
           className="mt-8 inline-block rounded-full bg-accent px-7 py-3 text-sm font-semibold text-accent-foreground"
         >
           Read the portfolio instead

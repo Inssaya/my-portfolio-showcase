@@ -31,11 +31,11 @@ npm run dev        # http://localhost:8080
 
 | Path | Page |
 |---|---|
-| `/` | Entry gate — choose classic or guided |
-| `/classic` | The portfolio |
+| `/` | The portfolio (with a button inviting into the guided tour) |
 | `/experience` | The guided tour |
 | `/projects/:slug` | Project case study |
 | `/admin` | Content editor |
+| `/classic` | Kept as a redirect to `/` for old links |
 
 ## Layout
 

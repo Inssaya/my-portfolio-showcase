@@ -1,15 +1,15 @@
 import { Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import EntryGate from "./pages/EntryGate.tsx";
+import Index from "./pages/Index.tsx";
 
-// The gate is the entry point and stays in the main bundle. Everything else is
-// split: a recruiter reading the portfolio should never download the admin
-// panel, and the tour player should not weigh down the first paint.
-const Index = lazy(() => import("./pages/Index.tsx"));
+// The portfolio is the entry point and stays in the main bundle so the first
+// paint isn't waiting on a chunk. Everything else is split: reading the
+// portfolio should never download the admin panel, and the tour player should
+// not weigh down that first paint either.
 const Experience = lazy(() => import("./pages/Experience.tsx"));
 const ProjectDetail = lazy(() => import("./pages/ProjectDetail.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
@@ -38,8 +38,10 @@ const App = () => (
       <BrowserRouter>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
-            <Route path="/" element={<EntryGate />} />
-            <Route path="/classic" element={<Index />} />
+            <Route path="/" element={<Index />} />
+            {/* /classic was the old routing when a gate stood at /. Redirect
+                any bookmarks to the portfolio, which is what it always meant. */}
+            <Route path="/classic" element={<Navigate to="/" replace />} />
             <Route path="/experience" element={<Experience />} />
             <Route path="/projects/:slug" element={<ProjectDetail />} />
 

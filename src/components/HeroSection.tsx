@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
-import { ArrowDown, Download, Github, Linkedin, Mail } from "lucide-react";
+import { ArrowDown, Download, Github, Headphones, Linkedin, Mail } from "lucide-react";
+import { Link } from "react-router-dom";
 import MagneticButton from "@/components/visuals/MagneticButton";
 import { adminData } from "@/lib/admin-data";
 import { CV_URL } from "@/lib/cv";
@@ -159,10 +160,35 @@ const HeroSection = () => {
             {hero.description}
           </motion.p>
 
+          {/* The guided tour lives in its own row, styled distinctively so a
+              recruiter reads it as an invitation rather than a fourth button.
+              Clicking it also gives the browser the user gesture the tour
+              needs to unlock audio autoplay — same reason the old entry gate
+              was clickable. */}
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.75 }}
+            transition={{ duration: 0.8, delay: 0.7 }}
+            className="mb-6"
+          >
+            <Link
+              to="/experience"
+              className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full border border-accent/40 bg-accent/10 px-5 py-2.5 text-sm font-semibold text-accent transition-colors hover:border-accent/70 hover:bg-accent/15"
+            >
+              <Headphones size={15} />
+              <span>Prefer a guided tour? I'll walk you through it.</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-accent/70">
+                with sound
+              </span>
+              {/* Sheen sweep on hover, same trick as the primary CTA. */}
+              <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-accent/15 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+            </Link>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.8 }}
             className="flex flex-wrap items-center justify-center gap-4"
           >
             <MagneticButton
