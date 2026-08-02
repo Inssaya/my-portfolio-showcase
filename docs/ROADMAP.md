@@ -37,13 +37,15 @@ This is the differentiator. A recruiter who opens it remembers it.
 Full spec: `AI_VOICE_GUIDE_PLAN.md`. Design briefs: `DESIGN_BRIEFS.md`.
 
 ### A0 · Inputs *(blocked on owner)*
-- [ ] **OpenAI API key** → voice generation via `gpt-4o-mini-tts`, alignment via
-      `whisper-1` word timestamps. Full tour costs cents, not dollars.
+- [x] OpenAI key provided. Note: the project lacks access to `gpt-4o-mini-tts`;
+      the script falls back to `tts-1` automatically.
 - [ ] **Project screenshots** — one folder per project, each image named after
-      the interface it shows. The interface names become narration.
-- [ ] **Script sign-off** before any TTS spend.
-- [ ] **Language decision** — Arabic greeting then English body, or English
-      throughout.
+      the interface it shows. The interface names become narration. Confirmed
+      absent from all three repos, including full git history.
+- [ ] **Script sign-off** before spending on the full generation.
+- [ ] **Language decision** — the script currently opens with a transliterated
+      "Marhaban" then runs in English, so one voice can speak the whole thing.
+      Say if you want real Arabic for the greeting instead.
 
 ### A1 · Script — **done**, pending sign-off
 - [x] `src/lib/tour/script.ts` — 18 segments.
@@ -52,18 +54,20 @@ Full spec: `AI_VOICE_GUIDE_PLAN.md`. Design briefs: `DESIGN_BRIEFS.md`.
 - [ ] Deep-dives for Nexora AI, the stock platform and the medical multi-agent
       system — blocked on source material for those three.
 
-### A2 · Voice pipeline
-- [ ] `scripts/generate-voices.ts` — TTS per segment, then Whisper word
-      timestamps, then character interpolation. Hash-guarded so unchanged
-      segments never re-spend.
-- [ ] Generate 2–3 voice candidates → owner picks → generate all.
+### A2 · Voice pipeline — **built**, needs one local run
+- [x] `scripts/generate-voices.mjs` plus the Windows one-shot `.bat`.
+      Negotiates model access, falls back to estimated timings when no
+      transcription model is available, hash-guarded per segment.
+- [ ] **Owner: run `scripts\generate-voices.bat`, pick a voice, push
+      `public/tour/`.** This cannot run from the Claude sandbox —
+      `api.openai.com` is blocked there by network policy.
 
-### A3 · Tour engine
-- [ ] `src/lib/tour/engine.ts` state machine: `idle → playing → checkpoint →
-      interrupted → ended`, with `pause()`, `getStatusReport()`, `resume()`.
-- [ ] Caption renderer driven by `audio.currentTime` against alignment data.
-- [ ] Entry gate routing: `/` gate, `/classic`, `/experience`.
-- [ ] Unit tests for the state machine and timing math.
+### A3 · Tour engine — **done**
+- [x] State machine with injected audio, `pause()`, `interrupt()`,
+      `getStatusReport()`, `resume()`.
+- [x] Caption reveal driven by `audio.currentTime` against character timings.
+- [x] Entry gate routing.
+- [x] 38 unit tests covering playback, checkpoints, detours and teardown.
 
 ### A4 · Experience UI — **working, awaiting design**
 - [x] Gate, stage, captions, chooser, controls, paused state.
@@ -78,9 +82,10 @@ Full spec: `AI_VOICE_GUIDE_PLAN.md`. Design briefs: `DESIGN_BRIEFS.md`.
       widget shows a friendly "not switched on" state rather than failing.
 
 ### A6 · Ship
-- [ ] Playwright E2E: gate → tour → checkpoint → deep-dive → interrupt → ask →
-      resume → CV download.
-- [ ] Mobile audio behaviour, slow-network buffering, Vercel config.
+- [x] `vercel.json` so deep links resolve without swallowing `/api`.
+- [x] Player driven end-to-end in a browser against a fixture manifest.
+- [ ] Commit that run as a Playwright E2E test once real audio exists.
+- [ ] Mobile audio behaviour on real iOS Safari, slow-network buffering.
 
 ---
 
@@ -132,10 +137,17 @@ Start only after Track A ships. Agreed shape when it does:
 
 ## Order of work
 
-1. **A1 script** — unblocked, and it is the input everything else waits on.
-2. **Claude Design Brief A** (entry gate) in parallel.
-3. **A2 voice pipeline** once the key arrives.
-4. **A3 engine**, then **A4 UI** once designs land.
-5. **A5 widget** — parallelizable after A3's interrupt contract exists.
-6. **Track B** items as filler between blocking waits.
-7. **Track C** after Track A ships.
+Everything buildable without you has been built. What remains needs your
+machine, your accounts, or your judgement:
+
+1. **Run the voice generation** (`scripts\generate-voices.bat`) and push
+   `public/tour/`. This turns `/experience` from an explanation into the real
+   thing, and it is the single highest-value action left.
+2. **Read `src/lib/tour/script.ts`** and correct anything you would say
+   differently. It is your voice, literally.
+3. **Send the Aptiv screenshots**, and source material for the other three
+   projects so they can get deep-dives too.
+4. **Set `ASSISTANT_API_KEY`** in Vercel to switch the assistant on.
+5. **Claude Design Brief A** (`docs/DESIGN_BRIEFS.md`) — the entry gate is
+   built and functional, so design is now a restyle rather than a blocker.
+6. Track B leftovers, then Track C.
