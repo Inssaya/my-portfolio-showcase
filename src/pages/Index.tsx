@@ -13,6 +13,7 @@ import CursorGlow from "@/components/visuals/CursorGlow";
 import ScrollProgress from "@/components/visuals/ScrollProgress";
 import TechMarquee from "@/components/visuals/TechMarquee";
 import StatsBand from "@/components/visuals/StatsBand";
+import AssistantWidget from "@/components/assistant/AssistantWidget";
 
 const Index = () => {
   return (
@@ -36,6 +37,12 @@ const Index = () => {
         <ProjectsSection />
         <ContactSection />
       </main>
+
+      <AssistantWidget
+        getContext={() =>
+          `The visitor is reading the portfolio page (classic mode), not the guided tour.`
+        }
+      />
 
       <footer className="relative z-10 border-t border-border/30 py-8 pb-24 text-center text-xs text-muted-foreground xl:pb-8">
         © 2026 Yassine Sinif. Tous droits réservés.

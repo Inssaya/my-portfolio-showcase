@@ -7,6 +7,7 @@ import TourCaption from "@/components/tour/TourCaption";
 import TourStage from "@/components/tour/TourStage";
 import ProjectChooser from "@/components/tour/ProjectChooser";
 import TourControls from "@/components/tour/TourControls";
+import AssistantWidget from "@/components/assistant/AssistantWidget";
 import { useTour, useTourManifest } from "@/lib/tour/useTour";
 import { PROJECT_CHAINS } from "@/lib/tour/script";
 import { TourManifest } from "@/lib/tour/types";
@@ -161,6 +162,29 @@ const TourPlayer = ({ manifest }: { manifest: TourManifest }) => {
         onPlayPause={() => (tour.state?.status === "playing" ? tour.pause() : tour.resume())}
         onSkip={tour.skip}
         onToggleMute={() => tour.setMuted(!tour.muted)}
+      />
+
+      <AssistantWidget
+        onOpen={tour.interrupt}
+        onResumeTour={tour.resume}
+        pausedLabel={
+          tour.state?.status === "interrupted" ? "Tour paused — ask me anything." : undefined
+        }
+        getContext={() => {
+          const report = tour.getStatusReport();
+          return [
+            `The visitor is in the guided tour.`,
+            report.currentText ? `They just heard: "${report.currentText}"` : null,
+            report.activeProject ? `They are exploring the project: ${report.activeProject}` : null,
+            report.visitedProjects.length
+              ? `Projects they have already seen: ${report.visitedProjects.join(", ")}`
+              : null,
+            `Tour progress: ${report.progressPct}%.`,
+            `If they ask to continue or resume, call resume_tour.`,
+          ]
+            .filter(Boolean)
+            .join(" ");
+        }}
       />
 
       <Link
