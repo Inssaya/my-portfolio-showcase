@@ -86,11 +86,12 @@
     background-image: var(--gradient-accent);
   }
 
-  /* True glass: very low opacity so the coloured nebulae bleed through, high
-     blur so anything sharp behind (mesh nodes, stars) reads as a soft wash
-     rather than distinct specks. */
+  /* True glass: bg-card/8 is barely a tint — the coloured nebulae read
+     through almost as if the card weren't there. backdrop-blur-2xl carries
+     legibility: it smears whatever sharp thing (mesh node, star) is behind
+     into a soft wash, so text stays crisp against a diffuse background. */
   .glass-card {
-    @apply bg-card/15 backdrop-blur-2xl border border-border/50 rounded-xl;
+    @apply bg-card/[0.08] backdrop-blur-2xl border border-border/50 rounded-xl;
   }
 
   /* Faint blueprint grid, fading out toward the bottom of the viewport. */

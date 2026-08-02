@@ -229,13 +229,14 @@ const HeroSection = () => {
 
           {/* --- portrait column ---
               Larger than the old centred avatar because it now anchors its
-              own column. The conic ring stays, and two dots orbit at wider
-              radii to echo the starfield behind. */}
+              own column. Hidden on phones: the narrow viewport can't hold a
+              big name and a big photo side by side, and stacking them costs
+              more vertical space than the photo earns above the fold. */}
           <motion.div
             initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1, delay: 0.2, ease: [0.33, 1, 0.68, 1] }}
-            className="order-1 flex justify-center md:order-2 md:justify-end"
+            className="hidden md:order-2 md:flex md:justify-end"
           >
             <div className="relative">
               {/* Slowly rotating conic-gradient ring around the portrait. */}
