@@ -48,25 +48,12 @@ const HeroSection = () => {
             mobile the photo moves above the text so the identity marker
             remains the first thing seen. */}
         <div className="mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-[1.15fr_0.85fr] md:gap-14 lg:gap-20">
-          {/* --- text column --- */}
-          <div className="order-2 text-center md:order-1 md:text-left">
-            {/* Editorial byline metadata rather than the pulsing-dot
-                "available" pill every AI template ships with. Reads like
-                the standfirst of a magazine profile: who / where / when,
-                nothing shouting, no animated notification dot. Uses tabular
-                numerals so the year lines up cleanly with the labels. */}
-            <motion.p
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.15 }}
-              className="mb-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-sora text-[11px] uppercase tracking-[0.22em] text-muted-foreground md:justify-start"
-            >
-              <span>Casablanca</span>
-              <span aria-hidden="true" className="text-muted-foreground/50">/</span>
-              <span>Seeking PFE</span>
-              <span aria-hidden="true" className="text-muted-foreground/50">/</span>
-              <span className="tabular-nums text-accent">Feb&nbsp;2027</span>
-            </motion.p>
+          {/* --- text column ---
+              Left-aligned on every viewport (centered text with a drop cap
+              would fight itself). The byline lives at the end of the intro
+              paragraph now, as a signed-letter close, rather than as a
+              chip at the top. */}
+          <div className="order-2 text-left md:order-1">
 
             {/* The name in Playfair Display, matching the CV. Roman for the
                 first name, italic for the last — an editorial pairing that
@@ -77,7 +64,7 @@ const HeroSection = () => {
                 The word `italic` in Tailwind clashes with the framer-motion
                 animate props on the span, hence the explicit `not-italic` /
                 `italic` classes rather than a variant. */}
-            <h1 className="mb-5 whitespace-nowrap font-playfair text-5xl font-medium leading-[0.95] tracking-tight sm:text-6xl md:text-7xl lg:text-8xl">
+            <h1 className="mb-6 whitespace-nowrap font-playfair text-5xl font-medium leading-[0.95] tracking-tight sm:text-6xl md:text-7xl lg:text-8xl">
               {[
                 { word: "Yassine", italic: false },
                 { word: "Sinif", italic: true },
@@ -104,32 +91,40 @@ const HeroSection = () => {
               ))}
             </h1>
 
-            {/* Static specialty line — one honest description of what you
-                do, three things separated by long dividers. The rotating
-                "I build X ... I build Y ..." variant that used to sit here
-                is a pattern every AI-generated portfolio ships with and
-                it doesn't tell a recruiter anything a static line couldn't. */}
-            <motion.p
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.55 }}
-              className="mb-7 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 font-sora text-base font-medium text-foreground/85 md:justify-start md:text-lg"
-            >
-              <span>Data&nbsp;pipelines</span>
-              <span aria-hidden="true" className="h-px w-6 bg-accent/60" />
-              <span>RAG&nbsp;systems</span>
-              <span aria-hidden="true" className="h-px w-6 bg-accent/60" />
-              <span>Full‑stack&nbsp;apps</span>
-            </motion.p>
+            {/* The description is the whole introduction now — the
+                specialty triptych and byline chip that used to sit around
+                it were both saying what this paragraph already says. Two
+                editorial print touches that AI-generated pages don't do:
 
+                1. A drop cap on the first letter (big serif Playfair in
+                   accent colour, floated left, text wraps around it).
+                2. A signed-letter close underneath: a short accent rule
+                   plus a location + availability line in italic serif.
+
+                Together they read as a personal note rather than an app
+                landing hero. */}
             <motion.p
-              initial={{ opacity: 0, y: 18 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.65 }}
-              className="mx-auto mb-8 max-w-xl text-sm leading-relaxed text-muted-foreground md:mx-0 md:text-base"
+              transition={{ duration: 0.8, delay: 0.55 }}
+              className="mb-6 max-w-xl text-[15px] leading-[1.65] text-foreground/85 md:text-base
+                         first-letter:me-2 first-letter:mt-1 first-letter:float-left
+                         first-letter:font-playfair first-letter:text-[3.5rem]
+                         first-letter:font-medium first-letter:leading-[0.85]
+                         first-letter:text-accent md:first-letter:text-[4rem]"
             >
               {hero.description}
             </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.7, delay: 0.7 }}
+              className="mb-8 flex items-center gap-3 font-playfair text-sm italic text-muted-foreground"
+            >
+              <span aria-hidden="true" className="h-px w-10 bg-accent/60" />
+              <span>Casablanca — available February 2027</span>
+            </motion.div>
 
             {/* The tour invitation. Deliberately styled as a quiet link
                 rather than a fourth button — a text-link with a hand-drawn
@@ -141,7 +136,7 @@ const HeroSection = () => {
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.7 }}
-              className="mb-7 flex justify-center md:justify-start"
+              className="mb-8 flex justify-start"
             >
               <Link
                 to="/experience"
@@ -164,7 +159,7 @@ const HeroSection = () => {
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.8 }}
-              className="flex flex-wrap items-center justify-center gap-4 md:justify-start"
+              className="flex flex-wrap items-center gap-4"
             >
               <MagneticButton
                 href="#contact"
@@ -200,7 +195,7 @@ const HeroSection = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.9 }}
-              className="mt-10 flex items-center justify-center gap-6 md:justify-start"
+              className="mt-10 flex items-center gap-6"
             >
               {socials.map(({ href, icon: Icon, label }) => (
                 <a
