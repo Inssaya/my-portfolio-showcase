@@ -77,169 +77,207 @@ const HeroSection = () => {
       />
 
       <motion.div style={{ y, opacity, scale }} className="container mx-auto relative z-20">
-        <div className="flex flex-col items-center text-center max-w-3xl mx-auto">
-          {/* Portrait inside a slowly rotating conic ring. */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.9, ease: [0.33, 1, 0.68, 1] }}
-            className="relative mb-8"
-          >
+        {/* Two-column asymmetric layout: text takes more room than the photo,
+            so the name still reads as the anchor of the composition. On
+            mobile the photo moves above the text so the identity marker
+            remains the first thing seen. */}
+        <div className="mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-[1.15fr_0.85fr] md:gap-14 lg:gap-20">
+          {/* --- text column --- */}
+          <div className="order-2 text-center md:order-1 md:text-left">
             <motion.div
-              aria-hidden="true"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-              className="absolute -inset-1.5 rounded-full"
-              style={{
-                background:
-                  "conic-gradient(from 0deg, transparent, hsl(var(--accent)), transparent 55%)",
-              }}
-            />
-            <div className="absolute -inset-1 rounded-full bg-background" />
-            <img
-              src={profileImage}
-              alt="Yassine Sinif"
-              loading="eager"
-              className="relative w-24 h-24 md:w-28 md:h-28 rounded-full object-cover border border-border/60"
-            />
-          </motion.div>
+              initial={{ opacity: 0, y: -14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.15 }}
+              className="mb-6 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-1.5"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
+              </span>
+              <span className="font-sora text-[11px] uppercase tracking-[0.2em] text-accent">
+                Open to a PFE internship — Feb 2027
+              </span>
+            </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: -14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.15 }}
-            className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-1.5 mb-6"
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
-            </span>
-            <span className="font-sora text-[11px] tracking-[0.2em] uppercase text-accent">
-              Open to a PFE internship — Feb 2027
-            </span>
-          </motion.div>
-
-          {/* The name, each word rising out of its own mask. */}
-          <h1 className="font-sora text-5xl md:text-7xl lg:text-8xl font-bold leading-[0.95] mb-5 tracking-tight">
-            {["Yassine", "Sinif"].map((word, wordIndex) => (
-              <span key={word} className="inline-block overflow-hidden align-bottom">
-                <motion.span
-                  initial={{ y: "110%" }}
-                  animate={{ y: 0 }}
-                  transition={{
-                    duration: 1,
-                    delay: 0.25 + wordIndex * 0.12,
-                    ease: [0.33, 1, 0.68, 1],
-                  }}
-                  className={`inline-block ${wordIndex === 1 ? "text-gradient-accent" : ""}`}
+            {/* The name, each word rising out of its own mask. */}
+            <h1 className="mb-5 font-sora text-5xl font-bold leading-[0.95] tracking-tight md:text-6xl lg:text-7xl xl:text-8xl">
+              {["Yassine", "Sinif"].map((word, wordIndex) => (
+                <span
+                  key={word}
+                  // A real space between the masks — putting it inside
+                  // overflow-hidden would collapse against the mask edge and
+                  // "Yassine Sinif" would render as "YassineSinif".
+                  className="inline-block overflow-hidden align-bottom [&+&]:ml-[0.25em]"
                 >
-                  {wordIndex === 0 ? `${word} ` : word}
-                </motion.span>
+                  <motion.span
+                    initial={{ y: "110%" }}
+                    animate={{ y: 0 }}
+                    transition={{
+                      duration: 1,
+                      delay: 0.25 + wordIndex * 0.12,
+                      ease: [0.33, 1, 0.68, 1],
+                    }}
+                    className={`inline-block ${wordIndex === 1 ? "text-gradient-accent" : ""}`}
+                  >
+                    {word}
+                  </motion.span>
+                </span>
+              ))}
+            </h1>
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.7, delay: 0.55 }}
+              className="mb-6 flex flex-wrap items-baseline justify-center gap-2 font-sora text-lg md:justify-start md:text-2xl"
+            >
+              <span className="text-muted-foreground">I build</span>
+              <span className="font-semibold text-accent">
+                <RotatingRole />
               </span>
-            ))}
-          </h1>
+            </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.7, delay: 0.55 }}
-            className="font-sora text-lg md:text-2xl mb-6 flex items-baseline gap-2 justify-center flex-wrap"
-          >
-            <span className="text-muted-foreground">I build</span>
-            <span className="text-accent font-semibold">
-              <RotatingRole />
-            </span>
-          </motion.div>
-
-          <motion.p
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.65 }}
-            className="text-muted-foreground text-sm md:text-base max-w-xl mb-10 leading-relaxed"
-          >
-            {hero.description}
-          </motion.p>
-
-          {/* The guided tour lives in its own row, styled distinctively so a
-              recruiter reads it as an invitation rather than a fourth button.
-              Clicking it also gives the browser the user gesture the tour
-              needs to unlock audio autoplay — same reason the old entry gate
-              was clickable. */}
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.7 }}
-            className="mb-6"
-          >
-            <Link
-              to="/experience"
-              className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full border border-accent/40 bg-accent/10 px-5 py-2.5 text-sm font-semibold text-accent transition-colors hover:border-accent/70 hover:bg-accent/15"
+            <motion.p
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.65 }}
+              className="mx-auto mb-8 max-w-xl text-sm leading-relaxed text-muted-foreground md:mx-0 md:text-base"
             >
-              <Headphones size={15} />
-              <span>Prefer a guided tour? I'll walk you through it.</span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-accent/70">
-                with sound
-              </span>
-              {/* Sheen sweep on hover, same trick as the primary CTA. */}
-              <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-accent/15 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-            </Link>
-          </motion.div>
+              {hero.description}
+            </motion.p>
 
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.8 }}
-            className="flex flex-wrap items-center justify-center gap-4"
-          >
-            <MagneticButton
-              href="#contact"
-              onClick={scrollTo("#contact")}
-              className="group relative overflow-hidden rounded-full bg-accent px-8 py-3.5 font-semibold text-accent-foreground shadow-[var(--shadow-glow)]"
+            {/* The tour invitation, styled distinctively so a recruiter reads
+                it as an invitation rather than a fourth button. Clicking it
+                is also the user gesture that unlocks audio autoplay for the
+                tour — same reason the old entry gate was clickable. */}
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.7 }}
+              className="mb-6 flex justify-center md:justify-start"
             >
-              <span className="relative z-10">Get In Touch</span>
-              {/* Sheen that sweeps across on hover. */}
-              <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-            </MagneticButton>
-
-            <MagneticButton
-              href="#projects"
-              onClick={scrollTo("#projects")}
-              className="rounded-full border border-foreground/20 px-8 py-3.5 font-semibold text-foreground transition-colors hover:border-accent hover:text-accent"
-            >
-              View Projects
-            </MagneticButton>
-
-            <a
-              href={CV_URL}
-              download
-              className="group inline-flex items-center gap-2 px-2 py-3.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-accent"
-            >
-              <Download
-                size={16}
-                className="transition-transform duration-300 group-hover:translate-y-0.5"
-              />
-              Download CV
-            </a>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.9 }}
-            className="mt-10 flex items-center gap-6"
-          >
-            {socials.map(({ href, icon: Icon, label }) => (
-              <a
-                key={label}
-                href={href}
-                aria-label={label}
-                target={href.startsWith("http") ? "_blank" : undefined}
-                rel={href.startsWith("http") ? "noreferrer" : undefined}
-                className="text-muted-foreground transition-colors hover:text-accent"
+              <Link
+                to="/experience"
+                className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full border border-accent/40 bg-accent/10 px-5 py-2.5 text-sm font-semibold text-accent transition-colors hover:border-accent/70 hover:bg-accent/15"
               >
-                <Icon size={20} />
+                <Headphones size={15} />
+                <span>Prefer a guided tour? I'll walk you through it.</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-accent/70">
+                  with sound
+                </span>
+                {/* Sheen sweep on hover, same trick as the primary CTA. */}
+                <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-accent/15 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.8 }}
+              className="flex flex-wrap items-center justify-center gap-4 md:justify-start"
+            >
+              <MagneticButton
+                href="#contact"
+                onClick={scrollTo("#contact")}
+                className="group relative overflow-hidden rounded-full bg-accent px-8 py-3.5 font-semibold text-accent-foreground shadow-[var(--shadow-glow)]"
+              >
+                <span className="relative z-10">Get In Touch</span>
+                <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+              </MagneticButton>
+
+              <MagneticButton
+                href="#projects"
+                onClick={scrollTo("#projects")}
+                className="rounded-full border border-foreground/20 px-8 py-3.5 font-semibold text-foreground transition-colors hover:border-accent hover:text-accent"
+              >
+                View Projects
+              </MagneticButton>
+
+              <a
+                href={CV_URL}
+                download
+                className="group inline-flex items-center gap-2 px-2 py-3.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-accent"
+              >
+                <Download
+                  size={16}
+                  className="transition-transform duration-300 group-hover:translate-y-0.5"
+                />
+                Download CV
               </a>
-            ))}
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.9 }}
+              className="mt-10 flex items-center justify-center gap-6 md:justify-start"
+            >
+              {socials.map(({ href, icon: Icon, label }) => (
+                <a
+                  key={label}
+                  href={href}
+                  aria-label={label}
+                  target={href.startsWith("http") ? "_blank" : undefined}
+                  rel={href.startsWith("http") ? "noreferrer" : undefined}
+                  className="text-muted-foreground transition-colors hover:text-accent"
+                >
+                  <Icon size={20} />
+                </a>
+              ))}
+            </motion.div>
+          </div>
+
+          {/* --- portrait column ---
+              Larger than the old centred avatar because it now anchors its
+              own column. The conic ring stays, and two dots orbit at wider
+              radii to echo the starfield behind. */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1, delay: 0.2, ease: [0.33, 1, 0.68, 1] }}
+            className="order-1 flex justify-center md:order-2 md:justify-end"
+          >
+            <div className="relative">
+              {/* Slowly rotating conic-gradient ring around the portrait. */}
+              <motion.div
+                aria-hidden="true"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
+                className="absolute -inset-2 rounded-full"
+                style={{
+                  background:
+                    "conic-gradient(from 0deg, transparent, hsl(var(--accent)), transparent 55%)",
+                }}
+              />
+              <div className="absolute -inset-1.5 rounded-full bg-background" />
+
+              <img
+                src={profileImage}
+                alt="Yassine Sinif"
+                loading="eager"
+                className="relative h-52 w-52 rounded-full border border-border/60 object-cover md:h-64 md:w-64 lg:h-72 lg:w-72"
+              />
+
+              {/* Two orbiting dots, opposite directions, that visually echo
+                  the starfield. Slow enough to feel alive, subtle enough not
+                  to distract from the portrait. */}
+              <motion.div
+                aria-hidden="true"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
+                className="absolute -inset-6 rounded-full"
+              >
+                <span className="absolute left-1/2 top-0 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-sky-300 shadow-[0_0_10px_hsl(200_98%_74%/0.9)]" />
+              </motion.div>
+              <motion.div
+                aria-hidden="true"
+                animate={{ rotate: -360 }}
+                transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+                className="absolute -inset-10 rounded-full"
+              >
+                <span className="absolute left-1/2 top-0 h-1 w-1 -translate-x-1/2 rounded-full bg-sky-200/80 shadow-[0_0_8px_hsl(200_100%_86%/0.7)]" />
+              </motion.div>
+            </div>
           </motion.div>
         </div>
       </motion.div>
