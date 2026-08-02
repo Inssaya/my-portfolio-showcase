@@ -3,6 +3,11 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowDown, Download, Github, Headphones, Linkedin, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
 import MagneticButton from "@/components/visuals/MagneticButton";
+import {
+  CurvedFlourish,
+  MarginDoodles,
+  WavyUnderline,
+} from "@/components/visuals/Handdrawn";
 import { adminData } from "@/lib/admin-data";
 import { CV_URL } from "@/lib/cv";
 import profileImage from "@/assets/profile.jpg";
@@ -43,11 +48,17 @@ const HeroSection = () => {
       />
 
       <motion.div style={{ y, opacity, scale }} className="container mx-auto relative z-20">
-        {/* Two-column asymmetric layout: text takes more room than the photo,
-            so the name still reads as the anchor of the composition. On
-            mobile the photo moves above the text so the identity marker
-            remains the first thing seen. */}
-        <div className="mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-[1.15fr_0.85fr] md:gap-14 lg:gap-20">
+        {/* Ambient hand-drawn marks that fade in, hold, and fade out on their
+            own schedules. They orbit the whole composition so the page never
+            fully "settles" — something is always coming or going. */}
+        <div className="relative mx-auto max-w-6xl">
+          <MarginDoodles className="hidden md:block" />
+
+          {/* Two-column asymmetric layout: text takes more room than the
+              photo, so the name still reads as the anchor of the composition.
+              On mobile the photo moves above the text so the identity marker
+              remains the first thing seen. */}
+          <div className="grid items-center gap-10 md:grid-cols-[1.15fr_0.85fr] md:gap-14 lg:gap-20">
           {/* --- text column ---
               Left-aligned on every viewport (centered text with a drop cap
               would fight itself). The byline lives at the end of the intro
@@ -73,7 +84,11 @@ const HeroSection = () => {
                   key={word}
                   // A real space between the masks — putting it inside
                   // overflow-hidden would collapse against the mask edge.
-                  className="inline-block overflow-hidden align-bottom [&+&]:ml-[0.28em]"
+                  // `relative` is what lets the WavyUnderline sit against
+                  // the "Sinif" mask specifically rather than the whole H1.
+                  className={`relative inline-block overflow-hidden align-bottom [&+&]:ml-[0.28em] ${
+                    italic ? "overflow-visible" : ""
+                  }`}
                 >
                   <motion.span
                     initial={{ y: "110%" }}
@@ -87,6 +102,13 @@ const HeroSection = () => {
                   >
                     {word}
                   </motion.span>
+                  {/* Hand-drawn wavy underline traces itself under the last
+                      name shortly after the mask reveal finishes. Draws in
+                      once, then re-draws slowly on a loop so the line
+                      breathes rather than sitting still. */}
+                  {italic && (
+                    <WavyUnderline delay={1.4} duration={1.6} loop strokeWidth={2.5} />
+                  )}
                 </span>
               ))}
             </h1>
@@ -122,7 +144,11 @@ const HeroSection = () => {
               transition={{ duration: 0.7, delay: 0.7 }}
               className="mb-8 flex items-center gap-3 font-playfair text-sm italic text-muted-foreground"
             >
-              <span aria-hidden="true" className="h-px w-10 bg-accent/60" />
+              {/* Was a ruler-straight h-px rule; now a hand-drawn curved
+                  flourish that traces itself in and finishes with a small
+                  curl. Same signature-off role, less machine-generated
+                  feel. */}
+              <CurvedFlourish delay={1.6} />
               <span>Casablanca — available February 2027</span>
             </motion.div>
 
@@ -143,11 +169,16 @@ const HeroSection = () => {
                 className="group inline-flex items-baseline gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
                 <Headphones size={13} className="translate-y-0.5 text-accent" />
-                <span className="border-b border-dashed border-accent/50 pb-0.5 font-medium transition-colors group-hover:border-accent">
+                {/* The label sits above a hand-drawn wavy underline rather
+                    than a CSS dashed border — matches the wave under the
+                    name. `relative` and `overflow-visible` are what let the
+                    underline anchor to the label's baseline. */}
+                <span className="relative font-medium">
                   <span className="md:hidden">Take the guided tour</span>
                   <span className="hidden md:inline">
                     Prefer to be walked through it? Take the guided tour
                   </span>
+                  <WavyUnderline delay={2.2} duration={1.2} strokeWidth={1.5} />
                 </span>
                 <span className="font-sora text-[10px] uppercase tracking-[0.15em] text-muted-foreground/70">
                   with&nbsp;sound
@@ -265,6 +296,7 @@ const HeroSection = () => {
               </motion.div>
             </div>
           </motion.div>
+          </div>
         </div>
       </motion.div>
 
