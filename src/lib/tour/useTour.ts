@@ -122,7 +122,12 @@ export function useTour({ manifest, chains, closingSegmentId }: UseTourOptions) 
   }, [engine]);
 
   const start = useCallback(async () => {
-    await audioRef.current?.unlock();
+    // Unlocking is opportunistic; the tour must start either way.
+    try {
+      await audioRef.current?.unlock();
+    } catch {
+      // Ignored on purpose — see HtmlAudio.unlock.
+    }
     engine.start();
   }, [engine]);
 

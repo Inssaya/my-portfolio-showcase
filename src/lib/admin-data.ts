@@ -125,6 +125,17 @@ const defaultProjects: Project[] = [
     status: "Terminé",
     category: "Personnel",
   },
+  {
+    id: "16",
+    title: "Aptiv Maintenance Platform",
+    tech: ["FastAPI", "PostgreSQL", "SQLAlchemy", "Alembic", "React", "TypeScript", "Docker"],
+    description:
+      "Maintenance intervention tracking and KPI platform for a wire-harness plant, replacing a manual Excel workflow.",
+    longDescription:
+      "A centralized, multi-user platform for a wire-harness plant's maintenance department. Technicians log machine breakdowns from any phone or PC on the plant network; supervisors get MTTR, MTBF, availability, downtime rate, Pareto charts and trends computed automatically. Repair timing is anchored to the server clock and persisted the moment a repair starts, so a technician who loses their phone mid-repair resumes on exactly the right elapsed time, and the database enforces at most one open intervention per technician. Downtime and repair time are always derived from timestamps rather than typed in, so the KPIs cannot be edited into looking better. Weekly KPI inputs are precomputed in a materialized view while the raw interventions table stays the source of truth. JWT auth with technician/admin roles, all permissions enforced server-side, and the whole stack ships as Docker Compose so it runs on a single plant PC and survives a reboot.",
+    status: "En cours",
+    category: "Personnel",
+  },
 ];
 
 const defaultSocialLinks: SocialLinks = {
