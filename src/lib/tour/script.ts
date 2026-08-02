@@ -103,9 +103,10 @@ export const TOUR_SCRIPT: ScriptSegment[] = [
   },
 
   // ------------------------------------------- Aptiv maintenance platform --
-  // Grounded in ANTIV-COMPANY-PROJECT/README.md. Slide segments below expect
-  // screenshots at /tour/projects/aptiv-maintenance-platform/<name>.jpg —
-  // filenames are wired in once the images arrive.
+  // Grounded in ANTIV-COMPANY-PROJECT/README.md. Screenshots live at
+  // /tour/projects/aptiv-maintenance-platform/<name> — filenames match the
+  // brief report's `report/brief/figures/` (see its README for the mapping
+  // back to the sections they illustrate).
   {
     id: "aptiv-intro",
     kind: "project-intro",
@@ -122,6 +123,14 @@ export const TOUR_SCRIPT: ScriptSegment[] = [
     text:
       "So I built them a platform. A technician anywhere on the plant network " +
       "opens it on a phone or a PC and logs a breakdown as it happens.",
+    cues: [
+      {
+        afterWord: 1,
+        type: "image",
+        src: "/tour/projects/aptiv-maintenance-platform/01-repair-tech.jpeg",
+        label: "Technician repair view",
+      },
+    ],
     next: "aptiv-slide-2",
   },
   {
@@ -132,6 +141,14 @@ export const TOUR_SCRIPT: ScriptSegment[] = [
       "The detail I'm proudest of is the chronometer. When a technician starts " +
       "a repair, the start time is written to the database on the server clock " +
       "— never just held in the browser.",
+    cues: [
+      {
+        afterWord: 1,
+        type: "image",
+        src: "/tour/projects/aptiv-maintenance-platform/02-mobile-profile.jpeg",
+        label: "Technician profile on mobile",
+      },
+    ],
     next: "aptiv-slide-3",
   },
   {
@@ -142,6 +159,14 @@ export const TOUR_SCRIPT: ScriptSegment[] = [
       "So if their phone dies mid-repair, they log back in and the timer is " +
       "still running from where it really started. And the database enforces " +
       "that one technician can only have one repair open at a time.",
+    cues: [
+      {
+        afterWord: 1,
+        type: "image",
+        src: "/tour/projects/aptiv-maintenance-platform/06-correction-audit.png",
+        label: "Correction audit trail",
+      },
+    ],
     next: "aptiv-slide-4",
   },
   {
@@ -153,6 +178,12 @@ export const TOUR_SCRIPT: ScriptSegment[] = [
       "time to repair, mean time between failures, availability, downtime " +
       "rate, Pareto charts and trends.",
     cues: [
+      {
+        afterWord: 1,
+        type: "image",
+        src: "/tour/projects/aptiv-maintenance-platform/03-dashboard-kpis.png",
+        label: "KPI dashboard",
+      },
       { afterWord: 9, type: "stat", label: "MTTR" },
       { afterWord: 13, type: "stat", label: "MTBF" },
       { afterWord: 19, type: "stat", label: "Availability" },
@@ -167,6 +198,14 @@ export const TOUR_SCRIPT: ScriptSegment[] = [
       "Repair time and downtime are always derived from timestamps, never " +
       "typed in by hand. That's deliberate: a KPI you can edit is a KPI nobody " +
       "trusts.",
+    cues: [
+      {
+        afterWord: 1,
+        type: "image",
+        src: "/tour/projects/aptiv-maintenance-platform/05-intervention-list.png",
+        label: "Intervention list",
+      },
+    ],
     next: "aptiv-slide-6",
   },
   {
@@ -177,6 +216,23 @@ export const TOUR_SCRIPT: ScriptSegment[] = [
       "I also added a predictive module that ranks machines by failure risk, " +
       "and an agentic assistant that searches past maintenance reports to " +
       "surface similar cases and suggest likely causes.",
+    cues: [
+      {
+        afterWord: 1,
+        // Image swaps mid-segment: risk-list while talking about ranking,
+        // assistant once the sentence turns to the agentic RAG helper.
+        removeAfterWord: 12,
+        type: "image",
+        src: "/tour/projects/aptiv-maintenance-platform/07-risk-list.png",
+        label: "Failure risk ranking",
+      },
+      {
+        afterWord: 13,
+        type: "image",
+        src: "/tour/projects/aptiv-maintenance-platform/09-assistant.png",
+        label: "Agentic RAG assistant",
+      },
+    ],
     next: "aptiv-outro",
   },
   {
@@ -189,6 +245,12 @@ export const TOUR_SCRIPT: ScriptSegment[] = [
       "I validated the whole pipeline on synthetic data before it ever touched " +
       "production — the real data stays on-premise.",
     cues: [
+      {
+        afterWord: 1,
+        type: "image",
+        src: "/tour/projects/aptiv-maintenance-platform/12-architecture.png",
+        label: "System architecture",
+      },
       { afterWord: 1, type: "tech", label: "FastAPI" },
       { afterWord: 3, type: "tech", label: "PostgreSQL" },
       { afterWord: 8, type: "tech", label: "React + TypeScript" },
