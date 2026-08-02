@@ -20,7 +20,7 @@ export const TOUR_SCRIPT: ScriptSegment[] = [
   {
     id: "greeting",
     kind: "greeting",
-    text: "Marhaban. Hello, and welcome.",
+    text: "Hi. Welcome in.",
     next: "intro-1",
   },
   {

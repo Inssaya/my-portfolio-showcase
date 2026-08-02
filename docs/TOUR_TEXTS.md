@@ -13,13 +13,16 @@ writes `public/tour/manifest.json`. The tour picks it up on the next load.
 ## Notes for the voice
 
 - All clips are **one voice**, one delivery — no character switches.
-- Speak like a confident, warm engineer showing their own work to someone
-  they respect. Natural pace. Never salesy.
-- The opening greeting is transliterated Arabic ("Marhaban") followed by
-  English. Pronounce it *mar-ha-ban*. If the voice can't pronounce it
-  naturally, ask me for an English-only replacement line.
+- **Male, English-only.** On ElevenLabs the best fits for this tone are
+  **Adam**, **Josh** or **Brian** — natural, warm, unpolished. Avoid the
+  "narrator" or "presenter" voices — they read too formally for something
+  that's supposed to sound like the person himself talking.
+- Deliver like a confident engineer showing his own work to someone he
+  respects. Not selling, not narrating. Natural conversational pace.
 - Every sentence stands alone — pauses between clips are fine, the tour
   chains them itself.
+- Try segment 1 (`greeting.mp3`) first. If the delivery feels right there,
+  the same voice with the same settings will carry the rest.
 
 ---
 
@@ -27,7 +30,7 @@ writes `public/tour/manifest.json`. The tour picks it up on the next load.
 
 | # | Filename                 | Text                                                                                                                                                                                                                              |
 |---|--------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1 | `greeting.mp3`           | Marhaban. Hello, and welcome.                                                                                                                                                                                                     |
+| 1 | `greeting.mp3`           | Hi. Welcome in.                                                                                                                                                                                                                   |
 | 2 | `intro-1.mp3`            | Let me introduce myself. I'm Yassine Sinif, a final-year engineering student in Artificial Intelligence and Data Science at EMSI Casablanca.                                                                                       |
 | 3 | `intro-2.mp3`            | Right now I'm an AI Data Engineer intern at Aptiv, in Tangier, working inside the maintenance department of a wire-harness plant.                                                                                                 |
 | 4 | `intro-3.mp3`            | And I'm looking for a six-month final-year internship starting February 2027, with the chance to stay on afterwards.                                                                                                              |
@@ -50,10 +53,17 @@ writes `public/tour/manifest.json`. The tour picks it up on the next load.
 
 ## If you'd rather use ElevenLabs' UI
 
-They let you paste text and pick a voice. Do it 18 times, name each download
-after the Filename column, and that's it. Recommended voices for this tone:
-**Rachel**, **Dorothy** or **Adam** (warm, conversational). Avoid the
-"newscaster" voices — they sound too polished for a personal introduction.
+Paste each text, pick a voice, download, name it as shown. Do it 18 times.
+
+**Voice:** male, English. Try **Adam**, **Josh** or **Brian**.
+**Model:** `eleven_multilingual_v2` if available (better prosody),
+otherwise `eleven_turbo_v2_5`.
+**Settings:** stability around 0.4, similarity 0.75, style 0.15 —
+lower stability lets the voice breathe; higher stability sounds like it's
+reading a form.
+
+Preview one segment (start with `greeting.mp3` — it's the shortest) before
+committing to the voice.
 
 ## If you regenerate one line later
 

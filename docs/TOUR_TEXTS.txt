@@ -1,5 +1,5 @@
 === 01. greeting.mp3 ===
-Marhaban. Hello, and welcome.
+Hi. Welcome in.
 
 === 02. intro-1.mp3 ===
 Let me introduce myself. I'm Yassine Sinif, a final-year engineering student in Artificial Intelligence and Data Science at EMSI Casablanca.

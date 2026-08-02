@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import SectionHeading from "@/components/visuals/SectionHeading";
+import TiltCard from "@/components/visuals/TiltCard";
 import { adminData, Experience } from "@/lib/admin-data";
 
 const ExperienceSection = () => {
@@ -42,8 +43,14 @@ const ExperienceSection = () => {
                   <span className="relative h-3 w-3 rounded-full border-2 border-accent bg-background md:h-3.5 md:w-3.5" />
                 </span>
 
-                <div className="glass-card p-6 transition-colors duration-300 hover:border-accent/50 md:p-8">
-                  <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                {/* Wrapped in TiltCard purely for its 3D stacking context —
+                    it establishes a `perspective` layer that keeps the
+                    glass card's backdrop-filter alive across framer-motion
+                    animations on mobile. `max={4}` keeps the tilt very
+                    subtle since these cards are wide. */}
+                <TiltCard max={4}>
+                  <div className="glass-card p-6 transition-colors duration-300 hover:border-accent/50 md:p-8">
+                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h3 className="font-sora text-lg font-bold">
                         {exp.title} <span className="text-accent">— {exp.company}</span>
@@ -70,7 +77,8 @@ const ExperienceSection = () => {
                       </motion.li>
                     ))}
                   </ul>
-                </div>
+                  </div>
+                </TiltCard>
               </motion.div>
             ))}
           </div>
