@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { LayoutGrid, Loader2, Play, Volume2, VolumeX } from "lucide-react";
 import MorphingCore from "@/components/visuals/MorphingCore";
+import Starfield from "@/components/visuals/Starfield";
 import TourCaption from "@/components/tour/TourCaption";
 import TourStage from "@/components/tour/TourStage";
 import ProjectChooser from "@/components/tour/ProjectChooser";
@@ -16,6 +17,7 @@ import { CV_URL } from "@/lib/cv";
 /** Shown while the manifest loads, and if it turns out not to exist yet. */
 const Shell = ({ children }: { children: React.ReactNode }) => (
   <div className="relative min-h-[100svh] overflow-hidden">
+    <Starfield />
     <MorphingCore />
     <div aria-hidden="true" className="grid-overlay" />
     <div className="relative z-10 flex min-h-[100svh] items-center justify-center px-6">

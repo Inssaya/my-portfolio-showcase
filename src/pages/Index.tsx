@@ -8,6 +8,7 @@ import EducationSection from "@/components/EducationSection";
 import ProjectsSection from "@/components/ProjectsSection";
 import ContactSection from "@/components/ContactSection";
 import MorphingCore from "@/components/visuals/MorphingCore";
+import Starfield from "@/components/visuals/Starfield";
 import Preloader from "@/components/visuals/Preloader";
 import CursorGlow from "@/components/visuals/CursorGlow";
 import ScrollProgress from "@/components/visuals/ScrollProgress";
@@ -19,6 +20,9 @@ const Index = () => {
   return (
     <div className="relative">
       <Preloader />
+      {/* Two background layers, painted in this order: cool stars far back,
+          warm mesh in front. The grid sits above both for a blueprint feel. */}
+      <Starfield />
       <MorphingCore />
       <div aria-hidden="true" className="grid-overlay" />
       <ScrollProgress />

@@ -86,9 +86,10 @@
     background-image: var(--gradient-accent);
   }
 
-  /* Opaque enough to stay legible over the animated background mesh. */
+  /* True glass: low opacity so the mesh and stars show through, high blur so
+     what shows through reads as a soft glow rather than sharp specks. */
   .glass-card {
-    @apply bg-card/75 backdrop-blur-xl border border-border/50 rounded-xl;
+    @apply bg-card/30 backdrop-blur-2xl border border-border/50 rounded-xl;
   }
 
   /* Faint blueprint grid, fading out toward the bottom of the viewport. */
