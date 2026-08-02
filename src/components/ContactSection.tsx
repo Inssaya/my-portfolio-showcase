@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
-import { Mail, Phone, MapPin, Send } from "lucide-react";
+import { Download, Mail, MapPin, Phone, Send } from "lucide-react";
 import { useState, FormEvent } from "react";
 import { adminData } from "@/lib/admin-data";
+import { CV_URL } from "@/lib/cv";
 
 const fadeIn = (delay: number) => ({
   hidden: { y: 40, opacity: 0 },
@@ -71,6 +72,18 @@ const ContactSection = () => {
                 </div>
                 <span className="text-sm">Casablanca, Morocco</span>
               </div>
+
+              <a
+                href={CV_URL}
+                download
+                className="group mt-2 inline-flex items-center gap-3 self-start rounded-full border border-accent/30 bg-accent/10 px-5 py-3 text-sm font-semibold text-accent transition-colors hover:border-accent/60 hover:bg-accent/15"
+              >
+                <Download
+                  size={16}
+                  className="transition-transform duration-300 group-hover:translate-y-0.5"
+                />
+                Download my CV
+              </a>
             </div>
           </motion.div>
 

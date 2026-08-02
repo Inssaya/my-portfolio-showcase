@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
-import { ArrowDown, Github, Linkedin, Mail } from "lucide-react";
+import { ArrowDown, Download, Github, Linkedin, Mail } from "lucide-react";
 import MagneticButton from "@/components/visuals/MagneticButton";
 import { adminData } from "@/lib/admin-data";
+import { CV_URL } from "@/lib/cv";
 import profileImage from "@/assets/profile.jpg";
 
 const ROLES = [
@@ -181,6 +182,18 @@ const HeroSection = () => {
             >
               View Projects
             </MagneticButton>
+
+            <a
+              href={CV_URL}
+              download
+              className="group inline-flex items-center gap-2 px-2 py-3.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-accent"
+            >
+              <Download
+                size={16}
+                className="transition-transform duration-300 group-hover:translate-y-0.5"
+              />
+              Download CV
+            </a>
           </motion.div>
 
           <motion.div

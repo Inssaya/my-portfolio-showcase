@@ -10,6 +10,7 @@ import TourControls from "@/components/tour/TourControls";
 import { useTour, useTourManifest } from "@/lib/tour/useTour";
 import { PROJECT_CHAINS } from "@/lib/tour/script";
 import { TourManifest } from "@/lib/tour/types";
+import { CV_URL } from "@/lib/cv";
 
 /** Shown while the manifest loads, and if it turns out not to exist yet. */
 const Shell = ({ children }: { children: React.ReactNode }) => (
@@ -130,7 +131,7 @@ const TourPlayer = ({ manifest }: { manifest: TourManifest }) => {
               <p className="font-sora text-2xl font-bold">Thanks for watching.</p>
               <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                 <a
-                  href="/cv/yassine-sinif-cv.pdf"
+                  href={CV_URL}
                   download
                   className="rounded-full bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground"
                 >
