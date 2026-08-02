@@ -61,6 +61,10 @@ export default {
       fontFamily: {
         sora: ["Sora", "sans-serif"],
         poppins: ["Poppins", "sans-serif"],
+        // Playfair Display is the same serif the CV uses for the name — pulling
+        // it into the hero gives the site and the CV a shared typographic voice
+        // and dodges the AI-portfolio gradient-text cliché in one move.
+        playfair: ["'Playfair Display'", "serif"],
       },
       borderRadius: {
         lg: "var(--radius)",

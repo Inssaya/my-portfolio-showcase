@@ -99,18 +99,25 @@ const HeroSection = () => {
               </span>
             </motion.div>
 
-            {/* The name, each word rising out of its own mask.
-                whitespace-nowrap keeps "Yassine Sinif" on one line even at
-                narrow phone widths — the size scales down instead of the
-                composition breaking into two stacked words. */}
-            <h1 className="mb-5 whitespace-nowrap font-sora text-4xl font-bold leading-[0.95] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl">
-              {["Yassine", "Sinif"].map((word, wordIndex) => (
+            {/* The name in Playfair Display, matching the CV. Roman for the
+                first name, italic for the last — an editorial pairing that
+                reads as designed rather than as a generic gradient effect.
+                whitespace-nowrap keeps both words on one line even at narrow
+                phone widths — size scales instead of the composition breaking.
+
+                The word `italic` in Tailwind clashes with the framer-motion
+                animate props on the span, hence the explicit `not-italic` /
+                `italic` classes rather than a variant. */}
+            <h1 className="mb-5 whitespace-nowrap font-playfair text-5xl font-medium leading-[0.95] tracking-tight sm:text-6xl md:text-7xl lg:text-8xl">
+              {[
+                { word: "Yassine", italic: false },
+                { word: "Sinif", italic: true },
+              ].map(({ word, italic }, wordIndex) => (
                 <span
                   key={word}
                   // A real space between the masks — putting it inside
-                  // overflow-hidden would collapse against the mask edge and
-                  // "Yassine Sinif" would render as "YassineSinif".
-                  className="inline-block overflow-hidden align-bottom [&+&]:ml-[0.25em]"
+                  // overflow-hidden would collapse against the mask edge.
+                  className="inline-block overflow-hidden align-bottom [&+&]:ml-[0.28em]"
                 >
                   <motion.span
                     initial={{ y: "110%" }}
@@ -120,7 +127,7 @@ const HeroSection = () => {
                       delay: 0.25 + wordIndex * 0.12,
                       ease: [0.33, 1, 0.68, 1],
                     }}
-                    className={`inline-block ${wordIndex === 1 ? "text-gradient-accent" : ""}`}
+                    className={`inline-block ${italic ? "italic" : "not-italic"}`}
                   >
                     {word}
                   </motion.span>
@@ -149,34 +156,32 @@ const HeroSection = () => {
               {hero.description}
             </motion.p>
 
-            {/* The tour invitation, styled distinctively so a recruiter reads
-                it as an invitation rather than a fourth button. Clicking it
-                is also the user gesture that unlocks audio autoplay for the
-                tour — same reason the old entry gate was clickable. */}
+            {/* The tour invitation. Deliberately styled as a quiet link
+                rather than a fourth button — a text-link with a hand-drawn
+                dashed underline reads as an aside ("here's another way to
+                see this if you want") rather than as a CTA competing with
+                Get In Touch. The click still counts as the user gesture the
+                tour needs to unlock audio autoplay. */}
             <motion.div
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.7 }}
-              className="mb-6 flex justify-center md:justify-start"
+              className="mb-7 flex justify-center md:justify-start"
             >
               <Link
                 to="/experience"
-                className="group relative inline-flex items-center gap-2.5 overflow-hidden rounded-full border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent transition-colors hover:border-accent/70 hover:bg-accent/15 md:gap-3 md:px-5"
+                className="group inline-flex items-baseline gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
-                <Headphones size={15} />
-                {/* Short form on phones so the pill stays a single line;
-                    full sentence on desktop where there's room. The headphone
-                    icon already tells the visitor it makes sound, which is
-                    why the WITH SOUND chip is desktop-only too. */}
-                <span className="md:hidden">Take the guided tour</span>
-                <span className="hidden md:inline">
-                  Prefer a guided tour? I'll walk you through it.
+                <Headphones size={13} className="translate-y-0.5 text-accent" />
+                <span className="border-b border-dashed border-accent/50 pb-0.5 font-medium transition-colors group-hover:border-accent">
+                  <span className="md:hidden">Take the guided tour</span>
+                  <span className="hidden md:inline">
+                    Prefer to be walked through it? Take the guided tour
+                  </span>
                 </span>
-                <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-accent/70 md:inline">
-                  with sound
+                <span className="font-sora text-[10px] uppercase tracking-[0.15em] text-muted-foreground/70">
+                  with&nbsp;sound
                 </span>
-                {/* Sheen sweep on hover, same trick as the primary CTA. */}
-                <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-accent/15 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
               </Link>
             </motion.div>
 
