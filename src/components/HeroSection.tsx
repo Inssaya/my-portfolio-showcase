@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion"
 import { ArrowDown, Github, Linkedin, Mail } from "lucide-react";
 import MagneticButton from "@/components/visuals/MagneticButton";
 import { adminData } from "@/lib/admin-data";
-import profileImage from "@/assets/profile.jpeg";
+import profileImage from "@/assets/profile.jpg";
 
 const ROLES = [
   "AI & Data Engineer",
