@@ -1,45 +1,11 @@
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowDown, Download, Github, Headphones, Linkedin, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
 import MagneticButton from "@/components/visuals/MagneticButton";
 import { adminData } from "@/lib/admin-data";
 import { CV_URL } from "@/lib/cv";
 import profileImage from "@/assets/profile.jpg";
-
-const ROLES = [
-  "AI & Data Engineer",
-  "RAG & LLM Systems",
-  "Full-Stack Developer",
-  "Data Pipelines at Scale",
-];
-
-/** Cycles through the role list, one line swapping out for the next. */
-const RotatingRole = () => {
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => setIndex((i) => (i + 1) % ROLES.length), 2600);
-    return () => clearInterval(id);
-  }, []);
-
-  return (
-    <span className="relative inline-flex h-[1.4em] overflow-hidden align-bottom">
-      <AnimatePresence mode="wait">
-        <motion.span
-          key={ROLES[index]}
-          initial={{ y: "100%", opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: "-100%", opacity: 0 }}
-          transition={{ duration: 0.5, ease: [0.33, 1, 0.68, 1] }}
-          className="whitespace-nowrap"
-        >
-          {ROLES[index]}
-        </motion.span>
-      </AnimatePresence>
-    </span>
-  );
-};
 
 const scrollTo = (selector: string) => (e: React.MouseEvent) => {
   e.preventDefault();
@@ -84,20 +50,23 @@ const HeroSection = () => {
         <div className="mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-[1.15fr_0.85fr] md:gap-14 lg:gap-20">
           {/* --- text column --- */}
           <div className="order-2 text-center md:order-1 md:text-left">
-            <motion.div
-              initial={{ opacity: 0, y: -14 }}
+            {/* Editorial byline metadata rather than the pulsing-dot
+                "available" pill every AI template ships with. Reads like
+                the standfirst of a magazine profile: who / where / when,
+                nothing shouting, no animated notification dot. Uses tabular
+                numerals so the year lines up cleanly with the labels. */}
+            <motion.p
+              initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.15 }}
-              className="mb-6 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-1.5"
+              className="mb-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-sora text-[11px] uppercase tracking-[0.22em] text-muted-foreground md:justify-start"
             >
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
-              </span>
-              <span className="font-sora text-[11px] uppercase tracking-[0.2em] text-accent">
-                Open to a PFE internship — Feb 2027
-              </span>
-            </motion.div>
+              <span>Casablanca</span>
+              <span aria-hidden="true" className="text-muted-foreground/50">/</span>
+              <span>Seeking PFE</span>
+              <span aria-hidden="true" className="text-muted-foreground/50">/</span>
+              <span className="tabular-nums text-accent">Feb&nbsp;2027</span>
+            </motion.p>
 
             {/* The name in Playfair Display, matching the CV. Roman for the
                 first name, italic for the last — an editorial pairing that
@@ -135,17 +104,23 @@ const HeroSection = () => {
               ))}
             </h1>
 
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+            {/* Static specialty line — one honest description of what you
+                do, three things separated by long dividers. The rotating
+                "I build X ... I build Y ..." variant that used to sit here
+                is a pattern every AI-generated portfolio ships with and
+                it doesn't tell a recruiter anything a static line couldn't. */}
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.55 }}
-              className="mb-6 flex flex-wrap items-baseline justify-center gap-2 font-sora text-lg md:justify-start md:text-2xl"
+              className="mb-7 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 font-sora text-base font-medium text-foreground/85 md:justify-start md:text-lg"
             >
-              <span className="text-muted-foreground">I build</span>
-              <span className="font-semibold text-accent">
-                <RotatingRole />
-              </span>
-            </motion.div>
+              <span>Data&nbsp;pipelines</span>
+              <span aria-hidden="true" className="h-px w-6 bg-accent/60" />
+              <span>RAG&nbsp;systems</span>
+              <span aria-hidden="true" className="h-px w-6 bg-accent/60" />
+              <span>Full‑stack&nbsp;apps</span>
+            </motion.p>
 
             <motion.p
               initial={{ opacity: 0, y: 18 }}
