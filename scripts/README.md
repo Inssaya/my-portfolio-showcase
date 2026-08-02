@@ -36,6 +36,21 @@ npm run voices:sample
 npm run voices
 ```
 
+## If a model is not enabled on your project
+
+OpenAI answers `403 model_not_found` when a project has not been granted a
+model, and does not fall back on its own. The script handles this: it tries
+`gpt-4o-mini-tts`, then `tts-1-hd`, then `tts-1`, and keeps the first that
+works. Pin one explicitly with `TOUR_TTS_MODEL` if you prefer.
+
+The same applies to timing. If no transcription model (`whisper-1`) is
+available, the script still produces the tour — it reads the real clip length
+out of the MP3 frame headers and distributes the caption reveal across it,
+weighted by word length. The sync drifts slightly rather than being exact, and
+the run prints which segments were affected. Enabling `whisper-1` in the
+OpenAI dashboard under Project → Limits and re-running upgrades them; unchanged
+segments are skipped, so only the timing is recomputed.
+
 ## What happens
 
 1. `--sample` writes `public/tour/audio/_sample-<voice>.mp3` for four voices
