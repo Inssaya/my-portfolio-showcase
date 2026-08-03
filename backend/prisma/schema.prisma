@@ -1,0 +1,140 @@
+// Schema for the portfolio backend.
+//
+// The frontend admin panel currently keeps every piece of content in
+// localStorage. This schema mirrors that shape 1:1 so migrating the client
+// from local storage to real API calls is a straight substitution.
+//
+// Singletons (Hero, SocialLinks) are single-row tables keyed on id = 1 rather
+// than a generic key/value settings table — that gives us typed columns in the
+// generated Prisma client without JSON casts at every read site.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// A person who can sign into the admin panel. Only one is created by the
+/// seed script, but the table is designed to support more if you ever add
+/// team members. Passwords are stored as bcrypt hashes — never plaintext.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         String   @default("admin")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Project {
+  id              String   @id @default(cuid())
+  /// URL-safe identifier derived from title, but stored so external links stay
+  /// stable even if the title is later edited.
+  slug            String   @unique
+  title           String
+  description     String
+  longDescription String?
+  tech            String[]
+  /// "En cours" | "Terminé"
+  status          String
+  /// "Personnel" | "Académique" | "Internship"
+  category        String
+  image           String?
+  demoUrl         String?
+  githubUrl       String?
+  /// Manual ordering — lowest first. Ties broken by createdAt desc.
+  position        Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([position])
+}
+
+model AboutCard {
+  id       String @id @default(cuid())
+  /// "Briefcase" | "Globe" | "Award" — one of the fixed lucide icon names.
+  icon     String
+  title    String
+  content  String
+  position Int    @default(0)
+
+  @@index([position])
+}
+
+model Education {
+  id          String @id @default(cuid())
+  period      String
+  title       String
+  institution String
+  description String
+  position    Int    @default(0)
+
+  @@index([position])
+}
+
+model Experience {
+  id       String   @id @default(cuid())
+  period   String
+  title    String
+  company  String
+  location String
+  bullets  String[]
+  position Int      @default(0)
+
+  @@index([position])
+}
+
+model SkillCategory {
+  id       String   @id @default(cuid())
+  title    String
+  skills   String[]
+  position Int      @default(0)
+
+  @@index([position])
+}
+
+model Certificate {
+  id       String @id @default(cuid())
+  name     String
+  issuer   String
+  position Int    @default(0)
+
+  @@index([position])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([read])
+}
+
+/// Single-row table (id is forced to 1). Represents the hero block on the
+/// landing page. GET returns the row (or a 404 the client can fall back to
+/// defaults on); PUT upserts.
+model Hero {
+  id             Int    @id @default(1)
+  subtitle       String
+  title          String
+  titleHighlight String
+  description    String
+}
+
+/// Single-row table (id forced to 1). Contact links displayed across the site.
+model SocialLinks {
+  id       Int    @id @default(1)
+  github   String
+  linkedin String
+  email    String
+  phone    String
+  location String
+}

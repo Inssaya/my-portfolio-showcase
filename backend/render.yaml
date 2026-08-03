@@ -1,0 +1,45 @@
+# Render "Blueprint" — one file that provisions the web service + database
+# together. Push the branch, click "New → Blueprint" in the Render dashboard,
+# point it at this file, and everything below is created in one go.
+#
+# The web service is scoped to the ./backend directory of the monorepo via
+# `rootDir`, so pushing changes anywhere else in the repo doesn't rebuild it.
+
+databases:
+  - name: portfolio-db
+    plan: free
+    # Postgres 16 — matches the Prisma schema's provider and stays inside
+    # Render's free-tier ceiling.
+    postgresMajorVersion: "16"
+    ipAllowList: [] # No external DB access; only the linked web service reaches it.
+
+services:
+  - type: web
+    name: portfolio-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    branch: main # Change to `claude/portfolio-ai-voice-guide-affxgu` if you deploy the working branch first.
+    # `prisma migrate deploy` applies migrations non-destructively — never
+    # `db push` in production, that would drop columns without prompting.
+    buildCommand: npm ci && npm run build && npx prisma migrate deploy
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: portfolio-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true # Render fills this with a random 256-bit hex on first deploy.
+      # Set these in the dashboard so they're not in git. They must be filled
+      # in before the first deploy or the service will fail to start.
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
