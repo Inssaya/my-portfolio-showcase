@@ -15,6 +15,7 @@ const ProjectDetail = lazy(() => import("./pages/ProjectDetail.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 const AdminLayout = lazy(() => import("./components/admin/AdminLayout.tsx"));
+const AdminLogin = lazy(() => import("./pages/admin/AdminLogin.tsx"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard.tsx"));
 const AdminProjects = lazy(() => import("./pages/admin/AdminProjects.tsx"));
 const AdminMessages = lazy(() => import("./pages/admin/AdminMessages.tsx"));
@@ -24,6 +25,7 @@ const AdminSkills = lazy(() => import("./pages/admin/AdminSkills.tsx"));
 const AdminEducation = lazy(() => import("./pages/admin/AdminEducation.tsx"));
 const AdminCertificates = lazy(() => import("./pages/admin/AdminCertificates.tsx"));
 const AdminLinks = lazy(() => import("./pages/admin/AdminLinks.tsx"));
+const ProtectedRoute = lazy(() => import("./components/admin/ProtectedRoute.tsx"));
 
 const queryClient = new QueryClient();
 
@@ -45,7 +47,18 @@ const App = () => (
             <Route path="/experience" element={<Experience />} />
             <Route path="/projects/:slug" element={<ProjectDetail />} />
 
-            <Route path="/admin" element={<AdminLayout />}>
+            {/* Login sits outside the guard — otherwise a bounced visitor
+                would ping-pong between /admin and /admin/login forever. */}
+            <Route path="/admin/login" element={<AdminLogin />} />
+
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
               <Route index element={<AdminDashboard />} />
               <Route path="projects" element={<AdminProjects />} />
               <Route path="messages" element={<AdminMessages />} />
