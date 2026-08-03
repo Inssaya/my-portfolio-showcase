@@ -39,7 +39,15 @@ const HeroSection = () => {
   ].filter((social) => social.href);
 
   return (
-    <section id="home" className="relative min-h-[100svh] flex items-center overflow-hidden">
+    // py-* is load-bearing, not decoration: with only min-height and centred
+    // flex content, a phone whose viewport is barely taller than the copy puts
+    // the name hard against the top edge with nothing above it. The padding
+    // guarantees breathing room and lets the section grow and scroll instead of
+    // clipping when the content is genuinely taller than the screen.
+    <section
+      id="home"
+      className="relative flex min-h-[100svh] items-center overflow-hidden py-28 sm:py-32 md:py-24"
+    >
       {/* Warm bloom behind the composition, anchoring the centre of the screen. */}
       <div
         aria-hidden="true"
@@ -75,7 +83,14 @@ const HeroSection = () => {
                 The word `italic` in Tailwind clashes with the framer-motion
                 animate props on the span, hence the explicit `not-italic` /
                 `italic` classes rather than a variant. */}
-            <h1 className="mb-6 whitespace-nowrap font-playfair text-5xl font-medium leading-[0.95] tracking-tight sm:text-6xl md:text-7xl lg:text-8xl">
+            {/* Fluid base size rather than a fixed text-5xl. `whitespace-nowrap`
+                keeps both words on one line, so on a 360px phone — 296px once
+                the container's 2rem gutters are removed — a fixed 48px set
+                "Yassine Sinif" wider than the column and the section's
+                overflow-hidden quietly sliced the end off. The clamp scales the
+                name to the viewport, so it fills the width on a large phone and
+                still fits on a small one. */}
+            <h1 className="mb-7 whitespace-nowrap font-playfair text-[clamp(2.25rem,10vw,3rem)] font-medium leading-[0.95] tracking-tight sm:text-6xl md:text-7xl lg:text-8xl">
               {[
                 { word: "Yassine", italic: false },
                 { word: "Sinif", italic: true },
@@ -129,7 +144,12 @@ const HeroSection = () => {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.55 }}
-              className="mb-6 max-w-xl text-[15px] leading-[1.65] text-foreground/85 md:text-base
+              // Looser leading and a slightly wider measure: 1.65 on a 15px
+              // serif-adjacent paragraph is tight for sustained reading on a
+              // dark background, which is where "hard on the eyes" usually
+              // comes from. 1.75 with a 34rem measure keeps lines in the
+              // comfortable 60–75 character range.
+              className="mb-7 max-w-[34rem] text-[15.5px] leading-[1.75] text-foreground/85 md:text-base
                          first-letter:me-2 first-letter:mt-1 first-letter:float-left
                          first-letter:font-playfair first-letter:text-[3.5rem]
                          first-letter:font-medium first-letter:leading-[0.85]
@@ -164,24 +184,51 @@ const HeroSection = () => {
               transition={{ duration: 0.8, delay: 0.7 }}
               className="mb-8 flex justify-start"
             >
+              {/* This was a muted text link, which read as an aside and got
+                  missed entirely. It is now a bordered invitation with an
+                  accent tint — enough weight to be seen before the buttons
+                  below it, without becoming the gradient pill CTA that was
+                  deliberately retired. The three animated bars do the real
+                  work: motion in the periphery is what the eye catches, and
+                  they say "this makes sound" faster than the label does. */}
               <Link
                 to="/experience"
-                className="group inline-flex items-baseline gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                className="group inline-flex items-center gap-3 rounded-xl border border-accent/30 bg-accent/[0.07] py-2.5 pl-3.5 pr-4 transition-colors hover:border-accent/60 hover:bg-accent/[0.12]"
               >
-                <Headphones size={13} className="translate-y-0.5 text-accent" />
-                {/* The label sits above a hand-drawn wavy underline rather
-                    than a CSS dashed border — matches the wave under the
-                    name. `relative` and `overflow-visible` are what let the
-                    underline anchor to the label's baseline. */}
-                <span className="relative font-medium">
-                  <span className="md:hidden">Take the guided tour</span>
-                  <span className="hidden md:inline">
+                <span className="flex items-center gap-2 text-accent">
+                  <Headphones size={15} />
+                  {/* Equaliser bars: a cheap, honest "there is audio here". */}
+                  <span aria-hidden="true" className="flex items-end gap-[2px]">
+                    {[0, 0.15, 0.3].map((delay, i) => (
+                      <motion.span
+                        key={delay}
+                        animate={{ scaleY: [0.4, 1, 0.4] }}
+                        transition={{
+                          duration: 1.1,
+                          repeat: Infinity,
+                          delay,
+                          ease: "easeInOut",
+                        }}
+                        className="w-[2.5px] origin-bottom rounded-full bg-accent"
+                        style={{ height: i === 1 ? 13 : 9 }}
+                      />
+                    ))}
+                  </span>
+                </span>
+
+                <span className="text-sm font-medium text-foreground/90 transition-colors group-hover:text-foreground">
+                  <span className="sm:hidden">Take the guided tour</span>
+                  <span className="hidden sm:inline">
                     Prefer to be walked through it? Take the guided tour
                   </span>
-                  <WavyUnderline delay={2.2} duration={1.2} strokeWidth={1.5} />
                 </span>
-                <span className="font-sora text-[10px] uppercase tracking-[0.15em] text-muted-foreground/70">
-                  with&nbsp;sound
+
+                {/* 2.9 min of audio played at 1.2x ≈ 2.4 min of listening.
+                    Stating the real number matters: a visitor deciding whether
+                    to start will not forgive a tour that runs longer than the
+                    badge promised. */}
+                <span className="font-sora text-[10px] uppercase tracking-[0.15em] text-accent/80">
+                  2½&nbsp;min
                 </span>
               </Link>
             </motion.div>

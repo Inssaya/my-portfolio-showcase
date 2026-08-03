@@ -1,4 +1,5 @@
 import { Suspense, lazy } from "react";
+import { MotionConfig } from "framer-motion";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -30,8 +31,20 @@ const queryClient = new QueryClient();
 /** Deliberately blank: a spinner that flashes for 80ms is worse than nothing. */
 const RouteFallback = () => <div className="min-h-[100svh] bg-background" />;
 
+/**
+ * `reducedMotion="user"` makes every framer-motion animation on the site obey
+ * the visitor's OS "reduce motion" setting.
+ *
+ * The CSS block in index.css already neutralises CSS animations, but it cannot
+ * touch framer-motion, which drives transforms from JavaScript — the portrait's
+ * rotating ring, the orbiting dots and the marquee all kept spinning for
+ * visitors who had explicitly asked the system for less movement. Perpetual
+ * motion in the periphery is a common source of "this page is tiring to look
+ * at", and it is exactly what that setting exists to switch off.
+ */
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <MotionConfig reducedMotion="user">
     <TooltipProvider>
       <Toaster />
       <Sonner />
@@ -62,6 +75,7 @@ const App = () => (
         </Suspense>
       </BrowserRouter>
     </TooltipProvider>
+    </MotionConfig>
   </QueryClientProvider>
 );
 
