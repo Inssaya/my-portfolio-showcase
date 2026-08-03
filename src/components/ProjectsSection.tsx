@@ -6,13 +6,20 @@ import SectionHeading from "@/components/visuals/SectionHeading";
 import TiltCard from "@/components/visuals/TiltCard";
 import { adminData, Project, slugify } from "@/lib/admin-data";
 
-type Filter = "All" | "Personnel" | "Académique";
+type Filter = "All" | "Internship" | "Personnel" | "Académique";
 
 const FILTERS: Array<{ id: Filter; label: string }> = [
   { id: "All", label: "All" },
+  { id: "Internship", label: "Internship" },
   { id: "Personnel", label: "Personal" },
   { id: "Académique", label: "Academic" },
 ];
+
+const CATEGORY_LABELS: Record<Project["category"], string> = {
+  Internship: "Internship",
+  Personnel: "Personal",
+  Académique: "Academic",
+};
 
 const ProjectsSection = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -91,8 +98,14 @@ const ProjectsSection = () => {
                         >
                           {project.status === "En cours" ? "In Progress" : "Completed"}
                         </span>
-                        <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          {project.category === "Personnel" ? "Personal" : "Academic"}
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                            project.category === "Internship"
+                              ? "bg-accent/15 text-accent"
+                              : "bg-secondary text-muted-foreground"
+                          }`}
+                        >
+                          {CATEGORY_LABELS[project.category]}
                         </span>
                       </div>
                       <ArrowUpRight

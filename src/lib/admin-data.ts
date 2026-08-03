@@ -7,7 +7,7 @@ export interface Project {
   longDescription?: string;
   tech: string[];
   status: "En cours" | "Terminé";
-  category: "Personnel" | "Académique";
+  category: "Personnel" | "Académique" | "Internship";
   image?: string;
   demoUrl?: string;
   githubUrl?: string;
@@ -130,11 +130,11 @@ const defaultProjects: Project[] = [
     title: "Aptiv Maintenance Platform",
     tech: ["FastAPI", "PostgreSQL", "SQLAlchemy", "Alembic", "React", "TypeScript", "Docker"],
     description:
-      "Maintenance intervention tracking and KPI platform for a wire-harness plant, replacing a manual Excel workflow.",
+      "Maintenance intervention tracking, KPI platform and failure-risk analysis for a wire-harness plant, replacing a manual Excel workflow.",
     longDescription:
-      "A centralized, multi-user platform for a wire-harness plant's maintenance department. Technicians log machine breakdowns from any phone or PC on the plant network; supervisors get MTTR, MTBF, availability, downtime rate, Pareto charts and trends computed automatically. Repair timing is anchored to the server clock and persisted the moment a repair starts, so a technician who loses their phone mid-repair resumes on exactly the right elapsed time, and the database enforces at most one open intervention per technician. Downtime and repair time are always derived from timestamps rather than typed in, so the KPIs cannot be edited into looking better. Weekly KPI inputs are precomputed in a materialized view while the raw interventions table stays the source of truth. JWT auth with technician/admin roles, all permissions enforced server-side, and the whole stack ships as Docker Compose so it runs on a single plant PC and survives a reboot.",
+      "A multi-user web platform for the maintenance department of a wire-harness plant, replacing a shared Excel workbook that was the only source of truth for the team's performance indicators. Technicians open the app on any phone or PC on the plant network and log a breakdown as it happens: the repair timer runs on the server, so a reload, a dead battery or a closed browser never distorts the recorded time, and a repair that spans two shifts is handed over and taken over without being split — actual hands-on time and waiting time are separated automatically. Supervisors get MTTR, MTBF, availability, downtime rate, Pareto charts of the most costly machines and weekly trends, all derived automatically from the technicians' records for any period or scope; targets can be set per machine, line, project or globally, with the most specific applicable target displayed. Two design properties protect the indicators: durations are never stored, only derived from timestamps every time they are displayed, so they cannot silently disagree with the underlying record; and every correction is attributed and kept, so the history stays both accurate and auditable. On top of the recorded history, a failure-risk module scores every machine nightly for its risk of failing within a defined horizon — Level 1 is a Weibull survival model (classical reliability statistics, fully transparent), Level 2 is a logistic-regression / random-forest classifier, and a rolling backtest picks the champion; on a 24-month simulated validation set the statistical model reaches ~2.2x lift and the ML model ~2.4x lift, both measured with a strict no-leak protocol. An agentic assistant is grounded on a fixed set of tools onto the department's own database (KPIs, Pareto and failure-type breakdowns, spare-part consumption, past-case retrieval with the action that fixed each, per-machine clustering) and may answer only from what those tools return — so every answer is traceable to recorded data. Weekly PDF reports, bilingual FR/EN interface, role-based access enforced centrally, 110 automated tests covering indicator formulas, state transitions, access control, imports and query behaviour, versioned migrations applied at startup, and the whole stack packaged as a single-command container deployment (application + PostgreSQL + nightly backup) that runs on-premise so no maintenance data leaves the plant.",
     status: "En cours",
-    category: "Personnel",
+    category: "Internship",
   },
 ];
 

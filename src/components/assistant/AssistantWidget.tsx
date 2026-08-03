@@ -80,7 +80,12 @@ const AssistantWidget = ({ onOpen, pausedLabel, ...handlers }: AssistantWidgetPr
             transition={{ duration: 0.28, ease: [0.33, 1, 0.68, 1] }}
             role="dialog"
             aria-label="Ask about Yassine"
-            className="glass-card fixed bottom-24 right-4 z-50 flex h-[min(32rem,70svh)] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden md:right-6"
+            // The panel needs a real, opaque surface — the ambient .glass-card
+            // background is nearly transparent by design (it lets the mesh nebulae
+            // show through cards on the page), which would leave the chat body
+            // unreadable on top of the starfield. Solid card fill + heavy blur,
+            // with the border and shadow the design language uses everywhere else.
+            className="fixed bottom-24 right-4 z-50 flex h-[min(32rem,70svh)] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border/60 bg-card/95 shadow-2xl shadow-black/40 backdrop-blur-xl md:right-6"
           >
             <header className="flex items-center justify-between border-b border-border/50 px-4 py-3">
               <div className="flex items-center gap-2">
@@ -212,7 +217,7 @@ const AssistantWidget = ({ onOpen, pausedLabel, ...handlers }: AssistantWidgetPr
         aria-label={open ? "Close the assistant" : "Ask about Yassine"}
         aria-expanded={open}
         whileTap={{ scale: 0.94 }}
-        className="glass-card fixed bottom-6 right-4 z-50 flex h-13 items-center gap-2 rounded-full px-4 py-3.5 transition-colors hover:border-accent/50 md:right-6"
+        className="fixed bottom-6 right-4 z-50 flex h-13 items-center gap-2 rounded-full border border-border/60 bg-card/90 px-4 py-3.5 shadow-xl shadow-black/30 backdrop-blur-md transition-colors hover:border-accent/50 md:right-6"
       >
         <span className="relative flex h-2 w-2">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60" />

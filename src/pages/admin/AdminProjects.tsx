@@ -73,6 +73,7 @@ const AdminProjects = () => {
               <select value={editing.category} onChange={(e) => setEditing({ ...editing, category: e.target.value as Project["category"] })} className="flex-1 px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none">
                 <option value="Personnel">Personnel</option>
                 <option value="Académique">Académique</option>
+                <option value="Internship">Internship</option>
               </select>
             </div>
 

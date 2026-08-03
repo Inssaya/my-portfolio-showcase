@@ -6,10 +6,12 @@ import ParticlesBackground from "@/components/ParticlesBackground";
 import Navigation from "@/components/Navigation";
 import MobileNav from "@/components/MobileNav";
 import { adminData, Project, slugify } from "@/lib/admin-data";
+import { PROJECT_GALLERIES } from "@/lib/project-galleries";
 
 const ProjectDetail = () => {
   const { slug } = useParams();
   const [project, setProject] = useState<Project | null | undefined>(undefined);
+  const gallery = slug ? PROJECT_GALLERIES[slug] : undefined;
 
   useEffect(() => {
     const projects = adminData.getProjects();
@@ -38,7 +40,7 @@ const ProjectDetail = () => {
       <Navigation />
       <MobileNav />
       <main className="relative z-10 min-h-screen py-24">
-        <div className="container mx-auto max-w-3xl">
+        <div className={`container mx-auto ${gallery ? "max-w-5xl" : "max-w-3xl"}`}>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -73,8 +75,18 @@ const ProjectDetail = () => {
               >
                 {project.status === "En cours" ? "In Progress" : "Completed"}
               </span>
-              <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
-                {project.category === "Personnel" ? "Personal" : "Academic"}
+              <span
+                className={`text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full ${
+                  project.category === "Internship"
+                    ? "bg-accent/15 text-accent"
+                    : "bg-primary/15 text-primary"
+                }`}
+              >
+                {project.category === "Personnel"
+                  ? "Personal"
+                  : project.category === "Académique"
+                    ? "Academic"
+                    : "Internship"}
               </span>
             </div>
 
@@ -117,6 +129,59 @@ const ProjectDetail = () => {
               </div>
             )}
           </motion.div>
+
+          {gallery && (
+            <div className="mt-16 space-y-16">
+              {gallery.intro && (
+                <p className="text-base leading-relaxed text-muted-foreground max-w-3xl">
+                  {gallery.intro}
+                </p>
+              )}
+              {gallery.sections.map((section, sIdx) => (
+                <motion.section
+                  key={section.title}
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-80px" }}
+                  transition={{ duration: 0.5, delay: Math.min(sIdx * 0.05, 0.2) }}
+                  className="space-y-6"
+                >
+                  <div className="max-w-3xl">
+                    <h2 className="font-sora text-2xl md:text-3xl font-semibold mb-3">
+                      {section.title}
+                    </h2>
+                    {section.body && (
+                      <p className="text-sm md:text-base leading-relaxed text-muted-foreground">
+                        {section.body}
+                      </p>
+                    )}
+                  </div>
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    {section.shots.map((shot) => (
+                      <figure
+                        key={shot.src}
+                        className={`glass-card overflow-hidden ${
+                          shot.span === "wide" ? "sm:col-span-2" : ""
+                        }`}
+                      >
+                        <div className="bg-secondary/40 p-3">
+                          <img
+                            src={shot.src}
+                            alt={shot.alt}
+                            loading="lazy"
+                            className="w-full h-auto rounded-lg border border-border/40"
+                          />
+                        </div>
+                        <figcaption className="px-4 py-3 text-xs md:text-sm text-muted-foreground border-t border-border/40">
+                          {shot.caption}
+                        </figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                </motion.section>
+              ))}
+            </div>
+          )}
         </div>
       </main>
       <footer className="relative z-10 py-6 text-center text-muted-foreground text-xs border-t border-border/30 pb-20 xl:pb-6">
