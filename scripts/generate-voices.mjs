@@ -49,10 +49,19 @@ let transcribeUnavailable = false;
 const SAMPLE_VOICES = ["alloy", "onyx", "nova", "shimmer"];
 const VOICE = process.env.TOUR_VOICE ?? "onyx";
 
-// Steering prompt for the TTS model — tone, not content.
+/**
+ * Steering prompt for the TTS model — tone and pronunciation, never content.
+ *
+ * EMSI is École Marocaine des Sciences de l'Ingénieur, and Moroccans say it as
+ * a word: "em-see". Left alone the model spells it out, E-M-S-I, which is
+ * immediately wrong to anyone who knows the school — including most of the
+ * recruiters this tour is aimed at.
+ */
 const DELIVERY =
   "Speak like a confident, warm engineer introducing their own work to " +
-  "someone they respect. Natural pace, clear articulation, never salesy.";
+  "someone they respect. Natural pace, clear articulation, never salesy. " +
+  "Pronounce the acronym EMSI as a single word, \"em-see\", never as " +
+  "separate letters. Aptiv is \"AP-tiv\".";
 
 const apiKey = process.env.OPENAI_API_KEY;
 if (!apiKey) {

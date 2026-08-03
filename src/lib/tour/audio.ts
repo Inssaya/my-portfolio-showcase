@@ -28,6 +28,21 @@ const SILENT_WAV =
 /** Never let the unlock stall the tour, however the browser behaves. */
 const UNLOCK_TIMEOUT_MS = 800;
 
+/**
+ * The generated narration is a touch slow for someone skimming a portfolio, so
+ * it plays slightly fast.
+ *
+ * This is done here rather than by regenerating at a higher TTS speed for two
+ * reasons: it costs nothing and needs no new audio, and it leaves the caption
+ * timings alone. `currentTime` is measured in *media* time, not wall-clock, so
+ * every millisecond in the manifest still points at the same word however fast
+ * the clip is played — speeding up the audio cannot desynchronise the reveal.
+ *
+ * `preservesPitch` is the default in current browsers but is set explicitly:
+ * without it the voice would rise in pitch and sound comical.
+ */
+const PLAYBACK_RATE = 1.2;
+
 export class HtmlAudio implements AudioPort {
   private readonly el: HTMLAudioElement;
   private endedHandler: (() => void) | null = null;
@@ -35,7 +50,17 @@ export class HtmlAudio implements AudioPort {
   constructor() {
     this.el = new Audio();
     this.el.preload = "auto";
+    this.applyRate();
     this.el.addEventListener("ended", () => this.endedHandler?.());
+  }
+
+  /**
+   * Some browsers reset the rate when a new source is selected, so this is
+   * reapplied on every load rather than set once in the constructor.
+   */
+  private applyRate() {
+    this.el.preservesPitch = true;
+    this.el.playbackRate = PLAYBACK_RATE;
   }
 
   /**
@@ -70,6 +95,7 @@ export class HtmlAudio implements AudioPort {
   load(src: string) {
     this.el.src = src;
     this.el.currentTime = 0;
+    this.applyRate();
   }
 
   async play() {

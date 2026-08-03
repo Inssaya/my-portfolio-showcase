@@ -150,7 +150,10 @@ const defaultHero: HeroContent = {
   subtitle: "AI & Data Engineering",
   title: "I Build Systems That",
   titleHighlight: "Actually Scale",
-  description: "Final-year engineering student in AI & Data Science at EMSI Casablanca, currently interning as an AI Data Engineer at Aptiv. I build AI-powered and full-stack systems — from RAG pipelines to production-ready web apps — and I'm looking for a 6-month PFE internship starting February 2027.",
+  // "I've interned" rather than "currently interning": the Aptiv internship
+  // ends 21 August 2026, and the one thing worse than an out-of-date portfolio
+  // is one that states something a recruiter can check and find false.
+  description: "Final-year engineering student in AI & Data Science at EMSI Casablanca. I've interned as an AI Data Engineer at Aptiv, and I build AI-powered and full-stack systems — from RAG pipelines to production-ready web apps. I'm looking for a 6-month PFE internship starting February 2027.",
 };
 
 const defaultAbout: AboutCard[] = [
@@ -166,7 +169,7 @@ const defaultEducation: Education[] = [
 const defaultExperience: Experience[] = [
   {
     id: "1",
-    period: "Jun 2026 – Present",
+    period: "Jun 2026 – Aug 2026",
     title: "AI Data Engineer Intern",
     company: "Aptiv",
     location: "Tangier, Morocco · Maintenance Department",

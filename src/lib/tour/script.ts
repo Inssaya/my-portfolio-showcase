@@ -35,10 +35,15 @@ export const TOUR_SCRIPT: ScriptSegment[] = [
   {
     id: "intro-2",
     kind: "narration",
+    // Deliberately present perfect rather than "Right now I'm an intern at
+    // Aptiv". The internship ends 21 August 2026, and a recruiter who opens
+    // this in November would otherwise be told something untrue by a recording
+    // nobody remembered to regenerate. "I've been" is accurate both during the
+    // internship and for the whole hiring window after it.
     text:
-      "Right now I'm an AI Data Engineer intern at Aptiv, in Tangier, working " +
+      "I've been an AI Data Engineer intern at Aptiv, in Tangier, working " +
       "inside the maintenance department of a wire-harness plant.",
-    cues: [{ afterWord: 7, type: "fact", label: "Aptiv — Tangier" }],
+    cues: [{ afterWord: 9, type: "fact", label: "Aptiv — Tangier" }],
     next: "intro-3",
   },
   {
