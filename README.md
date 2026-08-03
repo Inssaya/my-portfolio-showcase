@@ -4,7 +4,7 @@ Personal portfolio with two ways in: a conventional scrollable site, and a
 voice-guided tour where pre-generated narration plays while the caption reveals
 character by character in sync with it.
 
-Live: <https://sinif-yassine.vercel.app>
+Live: <https://yassine-sinif.vercel.app>
 
 ## Stack
 
