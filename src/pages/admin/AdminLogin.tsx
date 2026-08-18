@@ -3,44 +3,74 @@ import { motion } from "framer-motion";
 import { Loader2, Lock } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { WavyUnderline } from "@/components/visuals/Handdrawn";
-import { getToken, login, LoginError } from "@/lib/auth";
+import { supabase, supabaseEnabled } from "@/lib/supabase";
 
 /**
- * The login screen sitting in front of the admin panel.
+ * Login screen for the admin panel.
  *
- * If a valid token already exists in localStorage we redirect straight through
- * — no reason to make the owner re-authenticate every time they open a tab.
- * On failure we surface the server's error code as a plain-english message
- * (never the raw string), because "invalid_credentials" reads like a bug.
+ * Uses Supabase Auth's signInWithPassword. Session token persistence and
+ * refresh are handled inside the supabase-js client — we just call
+ * signInWithPassword and read back the session below.
+ *
+ * If a session already exists in localStorage the page redirects straight
+ * through, so re-opening a tab doesn't force a re-login while the JWT is
+ * still valid.
  */
 const AdminLogin = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [alreadyIn, setAlreadyIn] = useState(false);
 
   const from = (location.state as { from?: string } | null)?.from ?? "/admin";
 
-  if (getToken()) return <Navigate to={from} replace />;
-
   useEffect(() => {
     document.title = "Admin — Sign in";
+    // Skip straight through if the user already has a live session — but
+    // don't Navigate on first render (that would fight React Router).
+    if (!supabase) {
+      setCheckingSession(false);
+      return;
+    }
+    supabase.auth.getSession().then(({ data }) => {
+      setAlreadyIn(Boolean(data.session));
+      setCheckingSession(false);
+    });
   }, []);
+
+  if (checkingSession) {
+    return <div className="min-h-[100svh] bg-background" />;
+  }
+
+  if (alreadyIn) {
+    return <Navigate to={from} replace />;
+  }
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (busy) return;
+    if (!supabaseEnabled || !supabase) {
+      setError("The admin backend isn't configured yet. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+      return;
+    }
     setBusy(true);
     setError(null);
-    try {
-      await login(username.trim(), password);
-      navigate(from, { replace: true });
-    } catch (loginError) {
-      setError(messageFor(loginError));
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    if (signInError) {
+      // Supabase returns "Invalid login credentials" for both wrong email and
+      // wrong password — surface it as one clear line.
+      setError(messageFor(signInError.message));
       setBusy(false);
+      return;
     }
+    navigate(from, { replace: true });
   };
 
   return (
@@ -69,15 +99,15 @@ const AdminLogin = () => {
         <form onSubmit={onSubmit} className="space-y-4">
           <label className="block">
             <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Username
+              Email
             </span>
             <input
-              type="text"
+              type="email"
               autoComplete="username"
               autoFocus
               required
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
               disabled={busy}
               className="w-full rounded-lg border border-border/60 bg-secondary/50 px-3 py-2.5 text-sm outline-none transition-colors focus:border-accent/50 disabled:opacity-60"
             />
@@ -109,7 +139,7 @@ const AdminLogin = () => {
 
           <button
             type="submit"
-            disabled={busy || !username.trim() || !password}
+            disabled={busy || !email.trim() || !password}
             className="flex w-full items-center justify-center gap-2 rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
@@ -118,31 +148,19 @@ const AdminLogin = () => {
         </form>
 
         <p className="mt-6 text-center text-[11px] italic text-muted-foreground">
-          Session lasts 7 days on this device.
+          Session persists on this device until you sign out.
         </p>
       </motion.div>
     </div>
   );
 };
 
-/** Server error codes → user-facing strings. Anything unknown falls to a
- *  generic message rather than leaking the raw code. */
-function messageFor(error: unknown): string {
-  if (error instanceof LoginError) {
-    switch (error.code) {
-      case "invalid_credentials":
-        return "Wrong username or password.";
-      case "missing_credentials":
-        return "Both fields are required.";
-      case "not_configured":
-        return "The admin login isn't configured on the server yet.";
-      case "invalid_json":
-      case "malformed_response":
-        return "Something went wrong reaching the server. Try again.";
-      default:
-        return "Sign-in failed. Please try again.";
-    }
-  }
+/** Supabase error strings → plain english. */
+function messageFor(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes("invalid login credentials")) return "Wrong email or password.";
+  if (lower.includes("email not confirmed")) return "This account hasn't been confirmed yet.";
+  if (lower.includes("network") || lower.includes("fetch")) return "Couldn't reach the server. Try again.";
   return "Sign-in failed. Please try again.";
 }
 

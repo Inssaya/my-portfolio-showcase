@@ -6,13 +6,20 @@ const AdminDashboard = () => {
   const [stats, setStats] = useState({ projects: 0, messages: 0, unread: 0 });
 
   useEffect(() => {
-    const projects = adminData.getProjects();
-    const messages = adminData.getMessages();
-    setStats({
-      projects: projects.length,
-      messages: messages.length,
-      unread: messages.filter((m) => !m.read).length,
+    let cancelled = false;
+    const projects = adminData.getProjects(); // sync — reads from localStorage cache
+    // Messages come straight from Supabase (fresh); everything else is cached.
+    adminData.getMessages().then((messages) => {
+      if (cancelled) return;
+      setStats({
+        projects: projects.length,
+        messages: messages.length,
+        unread: messages.filter((m) => !m.read).length,
+      });
     });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const cards = [

@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { getToken, verify } from "@/lib/auth";
+import { supabase, supabaseEnabled } from "@/lib/supabase";
 
 type Status = "checking" | "authorized" | "denied";
 
@@ -11,29 +11,41 @@ interface ProtectedRouteProps {
 /**
  * Route gate for /admin/*.
  *
- * Two checks: a cheap local `exp` check that clears obviously-dead tokens
- * before any UI renders, and a server verify against /api/admin/verify — the
- * latter is the real trust boundary, since the signing secret only lives on
- * the server. While the verify is in flight the whole subtree is suspended
- * on a blank surface, so the admin UI never flashes to a bystander.
+ * Backed by Supabase Auth. On mount we ask supabase-js for the current
+ * session (from localStorage, refreshed if the token is close to expiry).
+ * We also subscribe to auth state changes so a sign-out or a token
+ * expiry in another tab kicks the panel back to /admin/login live.
+ *
+ * The subtree is suspended on a blank surface during the check so the
+ * admin UI never flashes to a bystander before the redirect fires.
  */
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const [status, setStatus] = useState<Status>("checking");
   const location = useLocation();
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) {
+    if (!supabaseEnabled || !supabase) {
+      // No backend configured — treat as denied. The login page will show
+      // a helpful "not configured" message rather than an unfixable spinner.
       setStatus("denied");
       return;
     }
+    const client = supabase;
     let cancelled = false;
-    verify(token).then((ok) => {
+
+    client.auth.getSession().then(({ data }) => {
       if (cancelled) return;
-      setStatus(ok ? "authorized" : "denied");
+      setStatus(data.session ? "authorized" : "denied");
     });
+
+    const { data: sub } = client.auth.onAuthStateChange((_event, session) => {
+      if (cancelled) return;
+      setStatus(session ? "authorized" : "denied");
+    });
+
     return () => {
       cancelled = true;
+      sub.subscription.unsubscribe();
     };
   }, []);
 

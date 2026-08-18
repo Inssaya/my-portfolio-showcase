@@ -1,4 +1,24 @@
-// Local storage based admin data management (will be replaced with Supabase later)
+// Data layer for the portfolio.
+//
+// Reads: synchronous, from localStorage. localStorage is hydrated once on
+// boot (see hydrateFromSupabase below) from the real source of truth — the
+// Supabase project. Keeping reads sync means every consumer component
+// (`adminData.getProjects()` inside JSX, useEffect, useMemo, whatever) stays
+// as it was — no async plumbing spreading across the tree.
+//
+// Writes: async, Supabase first, localStorage second. If Supabase isn't
+// configured (VITE_SUPABASE_* env vars empty), writes fall through to
+// localStorage only — the app keeps working, just per-browser.
+//
+// Messages are the one exception: getMessages/addMessage are async and go
+// straight to Supabase. A visitor writing on their phone must reach the admin
+// reading on their laptop, and a localStorage cache can't bridge browsers.
+//
+// The shapes exported here are the frontend's camelCase view. The mappers
+// (mapProject, unmapProject, etc.) translate between them and the database's
+// snake_case columns.
+
+import { supabase, supabaseEnabled } from "./supabase";
 
 export interface Project {
   id: string;
@@ -84,7 +104,10 @@ export interface Certificate {
   issuer: string;
 }
 
-// Default data
+// -------------------------------------------------------------------- defaults
+// Kept as the fallback for a fresh browser that hasn't hydrated yet — first
+// paint shouldn't be empty just because Supabase is still answering.
+
 const defaultProjects: Project[] = [
   { id: "1", title: "Multi-Vendor E-commerce SaaS Platform", tech: ["React", "Next.js", "Express", "MongoDB", "Redis", "Kafka"], description: "Microservices architecture with Firebase, websockets and cloud deployment (AWS).", status: "En cours", category: "Personnel" },
   { id: "2", title: "Gym Management App", tech: ["Java", "NFC", "Face Recognition", "Fingerprint", "QR Code"], description: "Full-featured gym management with biometric check-in: NFC, facial recognition, fingerprint and QR code.", status: "Terminé", category: "Personnel" },
@@ -98,33 +121,9 @@ const defaultProjects: Project[] = [
   { id: "10", title: "Car Locator Platform", tech: ["PHP", "Laravel", "JavaScript"], description: "Vehicle location platform with interactive map.", status: "Terminé", category: "Académique" },
   { id: "11", title: "To-Do List Web App", tech: ["React", "TypeScript", "Tailwind CSS"], description: "Task management app with reactive UI.", status: "Terminé", category: "Personnel" },
   { id: "12", title: "AI Chatbot", tech: ["Python", "NLP", "Flask", "OpenAI API"], description: "Intelligent chatbot using natural language processing.", status: "Terminé", category: "Académique" },
-  {
-    id: "13",
-    title: "Nexora AI",
-    tech: ["FastAPI", "React", "TypeScript", "PostgreSQL", "ChromaDB", "Sentence-Transformers", "Ollama"],
-    description: "Call-center SaaS with on-premise RAG for automated ticket handling.",
-    longDescription: "A call-center SaaS platform that automates ticket handling with an on-premise Retrieval-Augmented Generation pipeline — embeddings and retrieval stay fully self-hosted (ChromaDB, sentence-transformers, Ollama) so no support data leaves the client's infrastructure. FastAPI backend, React/TypeScript frontend, PostgreSQL for persistence.",
-    status: "Terminé",
-    category: "Personnel",
-  },
-  {
-    id: "14",
-    title: "Stock Market Analytics Platform",
-    tech: ["Python", "Kafka", "MySQL", "Docker", "Streamlit"],
-    description: "Real-time streaming ingestion and processing for stock market data.",
-    longDescription: "A real-time analytics platform that ingests and processes streaming stock market data through Kafka pipelines, persists it to MySQL, and surfaces live dashboards through Streamlit. Fully containerized with Docker for reproducible deployment.",
-    status: "Terminé",
-    category: "Personnel",
-  },
-  {
-    id: "15",
-    title: "Medical Multi-Agent System",
-    tech: ["LangGraph", "LangChain", "FastAPI", "MCP", "React", "Flutter"],
-    description: "Coordinated LLM agents for clinical workflows.",
-    longDescription: "A multi-agent system coordinating specialized LLM agents (via LangGraph/LangChain) over clinical workflows, exposed through an MCP tool interface with a FastAPI backend and both React (web) and Flutter (mobile) clients.",
-    status: "Terminé",
-    category: "Personnel",
-  },
+  { id: "13", title: "Nexora AI", tech: ["FastAPI", "React", "TypeScript", "PostgreSQL", "ChromaDB", "Sentence-Transformers", "Ollama"], description: "Call-center SaaS with on-premise RAG for automated ticket handling.", longDescription: "A call-center SaaS platform that automates ticket handling with an on-premise Retrieval-Augmented Generation pipeline — embeddings and retrieval stay fully self-hosted (ChromaDB, sentence-transformers, Ollama) so no support data leaves the client's infrastructure. FastAPI backend, React/TypeScript frontend, PostgreSQL for persistence.", status: "Terminé", category: "Personnel" },
+  { id: "14", title: "Stock Market Analytics Platform", tech: ["Python", "Kafka", "MySQL", "Docker", "Streamlit"], description: "Real-time streaming ingestion and processing for stock market data.", longDescription: "A real-time analytics platform that ingests and processes streaming stock market data through Kafka pipelines, persists it to MySQL, and surfaces live dashboards through Streamlit. Fully containerized with Docker for reproducible deployment.", status: "Terminé", category: "Personnel" },
+  { id: "15", title: "Medical Multi-Agent System", tech: ["LangGraph", "LangChain", "FastAPI", "MCP", "React", "Flutter"], description: "Coordinated LLM agents for clinical workflows.", longDescription: "A multi-agent system coordinating specialized LLM agents (via LangGraph/LangChain) over clinical workflows, exposed through an MCP tool interface with a FastAPI backend and both React (web) and Flutter (mobile) clients.", status: "Terminé", category: "Personnel" },
   {
     id: "16",
     title: "Aptiv Maintenance Platform",
@@ -206,48 +205,372 @@ const defaultCertificates: Certificate[] = [
   { id: "4", name: "La recherche documentaire", issuer: "École Polytechnique" },
 ];
 
-// Helper
+// ------------------------------------------------------- localStorage helpers
+
+const K = {
+  projects: "admin_projects",
+  hero: "admin_hero",
+  social: "admin_social",
+  about: "admin_about",
+  education: "admin_education",
+  experience: "admin_experience",
+  skills: "admin_skills",
+  certificates: "admin_certificates",
+  messages: "admin_messages",
+} as const;
+
 function get<T>(key: string, fallback: T): T {
   try {
     const v = localStorage.getItem(key);
     return v ? JSON.parse(v) : fallback;
   } catch { return fallback; }
 }
-function set(key: string, value: unknown) {
-  localStorage.setItem(key, JSON.stringify(value));
+
+function setLocal(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Storage full or disabled — the write succeeded server-side, we just
+    // can't cache it. Next hydrate will refresh from Supabase anyway.
+  }
 }
 
-// API
-export const adminData = {
-  getProjects: (): Project[] => get("admin_projects", defaultProjects),
-  setProjects: (p: Project[]) => set("admin_projects", p),
+// ------------------------------------------------- row ↔ frontend mappers
 
-  getMessages: (): Message[] => get("admin_messages", []),
-  setMessages: (m: Message[]) => set("admin_messages", m),
-  addMessage: (m: Omit<Message, "id" | "date" | "read">) => {
-    const msgs = adminData.getMessages();
-    msgs.unshift({ ...m, id: crypto.randomUUID(), date: new Date().toISOString(), read: false });
-    adminData.setMessages(msgs);
+type Row = Record<string, unknown>;
+
+const mapProject = (row: Row): Project => ({
+  id: String(row.id),
+  title: String(row.title ?? ""),
+  description: String(row.description ?? ""),
+  longDescription: (row.long_description as string | null) ?? undefined,
+  tech: (row.tech as string[]) ?? [],
+  status: row.status as Project["status"],
+  category: row.category as Project["category"],
+  image: (row.image as string | null) ?? undefined,
+  demoUrl: (row.demo_url as string | null) ?? undefined,
+  githubUrl: (row.github_url as string | null) ?? undefined,
+});
+
+const unmapProject = (p: Project, position: number): Row => ({
+  slug: slugify(p.title),
+  title: p.title,
+  description: p.description,
+  long_description: p.longDescription ?? null,
+  tech: p.tech,
+  status: p.status,
+  category: p.category,
+  image: p.image ?? null,
+  demo_url: p.demoUrl ?? null,
+  github_url: p.githubUrl ?? null,
+  position,
+});
+
+const mapHero = (row: Row): HeroContent => ({
+  subtitle: String(row.subtitle ?? ""),
+  title: String(row.title ?? ""),
+  titleHighlight: String(row.title_highlight ?? ""),
+  description: String(row.description ?? ""),
+});
+
+const unmapHero = (h: HeroContent): Row => ({
+  id: 1,
+  subtitle: h.subtitle,
+  title: h.title,
+  title_highlight: h.titleHighlight,
+  description: h.description,
+});
+
+const mapSocial = (row: Row): SocialLinks => ({
+  github: String(row.github ?? ""),
+  linkedin: String(row.linkedin ?? ""),
+  email: String(row.email ?? ""),
+  phone: String(row.phone ?? ""),
+  location: String(row.location ?? ""),
+});
+
+const unmapSocial = (s: SocialLinks): Row => ({ id: 1, ...s });
+
+const mapAbout = (row: Row): AboutCard => ({
+  id: String(row.id),
+  icon: row.icon as AboutCard["icon"],
+  title: String(row.title ?? ""),
+  content: String(row.content ?? ""),
+});
+
+const unmapAbout = (a: AboutCard, position: number): Row => ({
+  icon: a.icon, title: a.title, content: a.content, position,
+});
+
+const mapEducation = (row: Row): Education => ({
+  id: String(row.id),
+  period: String(row.period ?? ""),
+  title: String(row.title ?? ""),
+  institution: String(row.institution ?? ""),
+  description: String(row.description ?? ""),
+});
+
+const unmapEducation = (e: Education, position: number): Row => ({
+  period: e.period, title: e.title, institution: e.institution, description: e.description, position,
+});
+
+const mapExperience = (row: Row): Experience => ({
+  id: String(row.id),
+  period: String(row.period ?? ""),
+  title: String(row.title ?? ""),
+  company: String(row.company ?? ""),
+  location: String(row.location ?? ""),
+  bullets: (row.bullets as string[]) ?? [],
+});
+
+const unmapExperience = (e: Experience, position: number): Row => ({
+  period: e.period, title: e.title, company: e.company, location: e.location,
+  bullets: e.bullets, position,
+});
+
+const mapSkillCategory = (row: Row): SkillCategory => ({
+  id: String(row.id),
+  title: String(row.title ?? ""),
+  skills: (row.skills as string[]) ?? [],
+});
+
+const unmapSkillCategory = (s: SkillCategory, position: number): Row => ({
+  title: s.title, skills: s.skills, position,
+});
+
+const mapCertificate = (row: Row): Certificate => ({
+  id: String(row.id),
+  name: String(row.name ?? ""),
+  issuer: String(row.issuer ?? ""),
+});
+
+const unmapCertificate = (c: Certificate, position: number): Row => ({
+  name: c.name, issuer: c.issuer, position,
+});
+
+const mapMessage = (row: Row): Message => ({
+  id: String(row.id),
+  name: String(row.name ?? ""),
+  email: String(row.email ?? ""),
+  subject: String(row.subject ?? ""),
+  message: String(row.message ?? ""),
+  date: String(row.created_at ?? new Date().toISOString()),
+  read: Boolean(row.read),
+});
+
+// -------------------------------------------------- write-back helpers
+// The admin panel "save" flow hands us the entire array to persist. Simplest
+// correct mapping to Supabase for a portfolio-scale dataset: replace the
+// whole table. Wrapped in a safety guard so an accidental empty-array save
+// can't nuke the content silently.
+
+async function replaceTable(table: string, rows: Row[], allowEmpty = false) {
+  if (!supabase) return;
+  if (rows.length === 0 && !allowEmpty) {
+    // Empty save is almost always a bug in the calling code, not intent.
+    // Bail out loud rather than wipe the table.
+    console.warn(`Refusing to replace ${table} with empty array — pass allowEmpty=true if that's really intended.`);
+    return;
+  }
+  // Deleting all rows requires a WHERE clause under RLS; a always-true id
+  // filter satisfies it without limiting scope.
+  const del = await supabase.from(table).delete().not("id", "is", null);
+  if (del.error) throw del.error;
+  if (rows.length > 0) {
+    const ins = await supabase.from(table).insert(rows);
+    if (ins.error) throw ins.error;
+  }
+}
+
+// ------------------------------------------------------- hydrate on boot
+
+/**
+ * Overwrite localStorage with fresh Supabase data — public content only.
+ * Called once from main.tsx before the app mounts. If Supabase isn't
+ * configured we return immediately and the app uses whatever localStorage
+ * already has (previous visit's data, or the defaults above).
+ *
+ * Errors are swallowed on purpose: the app must render even if the network
+ * or Supabase is momentarily down. Users just see the cached content until
+ * next hydrate.
+ */
+export async function hydrateFromSupabase(): Promise<void> {
+  if (!supabaseEnabled || !supabase) return;
+  try {
+    const client = supabase;
+    const [projects, hero, social, about, education, experience, skills, certificates] =
+      await Promise.all([
+        client.from("projects").select("*").order("position").order("created_at", { ascending: false }),
+        client.from("hero").select("*").eq("id", 1).maybeSingle(),
+        client.from("social_links").select("*").eq("id", 1).maybeSingle(),
+        client.from("about_cards").select("*").order("position"),
+        client.from("education").select("*").order("position"),
+        client.from("experience").select("*").order("position"),
+        client.from("skill_categories").select("*").order("position"),
+        client.from("certificates").select("*").order("position"),
+      ]);
+    if (projects.data) setLocal(K.projects, projects.data.map(mapProject));
+    if (hero.data) setLocal(K.hero, mapHero(hero.data));
+    if (social.data) setLocal(K.social, mapSocial(social.data));
+    if (about.data) setLocal(K.about, about.data.map(mapAbout));
+    if (education.data) setLocal(K.education, education.data.map(mapEducation));
+    if (experience.data) setLocal(K.experience, experience.data.map(mapExperience));
+    if (skills.data) setLocal(K.skills, skills.data.map(mapSkillCategory));
+    if (certificates.data) setLocal(K.certificates, certificates.data.map(mapCertificate));
+  } catch (error) {
+    console.error("hydrateFromSupabase failed — falling back to cached content", error);
+  }
+}
+
+// -------------------------------------------------- public API
+
+export const adminData = {
+  // -- Projects ----------------------------------------------------------------
+  getProjects: (): Project[] => get(K.projects, defaultProjects),
+  setProjects: async (projects: Project[]): Promise<void> => {
+    setLocal(K.projects, projects);
+    if (supabase) {
+      await replaceTable("projects", projects.map((p, i) => unmapProject(p, i)));
+    }
   },
 
-  getSocialLinks: (): SocialLinks => get("admin_social", defaultSocialLinks),
-  setSocialLinks: (s: SocialLinks) => set("admin_social", s),
+  // -- Hero (singleton) --------------------------------------------------------
+  getHero: (): HeroContent => get(K.hero, defaultHero),
+  setHero: async (hero: HeroContent): Promise<void> => {
+    setLocal(K.hero, hero);
+    if (supabase) {
+      const { error } = await supabase.from("hero").upsert(unmapHero(hero), { onConflict: "id" });
+      if (error) throw error;
+    }
+  },
 
-  getHero: (): HeroContent => get("admin_hero", defaultHero),
-  setHero: (h: HeroContent) => set("admin_hero", h),
+  // -- SocialLinks (singleton) -------------------------------------------------
+  getSocialLinks: (): SocialLinks => get(K.social, defaultSocialLinks),
+  setSocialLinks: async (social: SocialLinks): Promise<void> => {
+    setLocal(K.social, social);
+    if (supabase) {
+      const { error } = await supabase.from("social_links").upsert(unmapSocial(social), { onConflict: "id" });
+      if (error) throw error;
+    }
+  },
 
-  getAbout: (): AboutCard[] => get("admin_about", defaultAbout),
-  setAbout: (a: AboutCard[]) => set("admin_about", a),
+  // -- About -------------------------------------------------------------------
+  getAbout: (): AboutCard[] => get(K.about, defaultAbout),
+  setAbout: async (about: AboutCard[]): Promise<void> => {
+    setLocal(K.about, about);
+    if (supabase) {
+      await replaceTable("about_cards", about.map((a, i) => unmapAbout(a, i)));
+    }
+  },
 
-  getEducation: (): Education[] => get("admin_education", defaultEducation),
-  setEducation: (e: Education[]) => set("admin_education", e),
+  // -- Education ---------------------------------------------------------------
+  getEducation: (): Education[] => get(K.education, defaultEducation),
+  setEducation: async (education: Education[]): Promise<void> => {
+    setLocal(K.education, education);
+    if (supabase) {
+      await replaceTable("education", education.map((e, i) => unmapEducation(e, i)));
+    }
+  },
 
-  getExperience: (): Experience[] => get("admin_experience", defaultExperience),
-  setExperience: (e: Experience[]) => set("admin_experience", e),
+  // -- Experience --------------------------------------------------------------
+  getExperience: (): Experience[] => get(K.experience, defaultExperience),
+  setExperience: async (experience: Experience[]): Promise<void> => {
+    setLocal(K.experience, experience);
+    if (supabase) {
+      await replaceTable("experience", experience.map((e, i) => unmapExperience(e, i)));
+    }
+  },
 
-  getSkills: (): SkillCategory[] => get("admin_skills", defaultSkills),
-  setSkills: (s: SkillCategory[]) => set("admin_skills", s),
+  // -- Skills ------------------------------------------------------------------
+  getSkills: (): SkillCategory[] => get(K.skills, defaultSkills),
+  setSkills: async (skills: SkillCategory[]): Promise<void> => {
+    setLocal(K.skills, skills);
+    if (supabase) {
+      await replaceTable("skill_categories", skills.map((s, i) => unmapSkillCategory(s, i)));
+    }
+  },
 
-  getCertificates: (): Certificate[] => get("admin_certificates", defaultCertificates),
-  setCertificates: (c: Certificate[]) => set("admin_certificates", c),
+  // -- Certificates ------------------------------------------------------------
+  getCertificates: (): Certificate[] => get(K.certificates, defaultCertificates),
+  setCertificates: async (certificates: Certificate[]): Promise<void> => {
+    setLocal(K.certificates, certificates);
+    if (supabase) {
+      await replaceTable("certificates", certificates.map((c, i) => unmapCertificate(c, i)));
+    }
+  },
+
+  // -- Messages ---------------------------------------------------------------
+  // Async on both sides — messages are the one thing where a stale localStorage
+  // cache would be actively wrong (visitor writes on phone, admin reads on
+  // laptop). Fresh read every time, direct write every time.
+
+  getMessages: async (): Promise<Message[]> => {
+    if (!supabase) return get<Message[]>(K.messages, []);
+    const { data, error } = await supabase.from("messages").select("*").order("created_at", { ascending: false });
+    if (error) {
+      console.error("getMessages failed", error);
+      return get<Message[]>(K.messages, []);
+    }
+    return (data ?? []).map(mapMessage);
+  },
+
+  addMessage: async (message: Omit<Message, "id" | "date" | "read">): Promise<void> => {
+    if (!supabase) {
+      const msgs = get<Message[]>(K.messages, []);
+      msgs.unshift({ ...message, id: crypto.randomUUID(), date: new Date().toISOString(), read: false });
+      setLocal(K.messages, msgs);
+      return;
+    }
+    const { error } = await supabase.from("messages").insert({
+      name: message.name,
+      email: message.email,
+      subject: message.subject,
+      message: message.message,
+    });
+    if (error) throw error;
+  },
+
+  setMessages: async (messages: Message[]): Promise<void> => {
+    // Only used by mark-read and delete. Compute the set of ids that should
+    // exist after this write, and delete anything else on the server.
+    setLocal(K.messages, messages);
+    if (!supabase) return;
+    const keepIds = messages.map((m) => m.id);
+    if (keepIds.length === 0) {
+      // Delete everything on the server — this is a real intent (Clear inbox).
+      const { error } = await supabase.from("messages").delete().not("id", "is", null);
+      if (error) throw error;
+    } else {
+      const { error: delError } = await supabase
+        .from("messages")
+        .delete()
+        .not("id", "in", `(${keepIds.map((id) => `"${id}"`).join(",")})`);
+      if (delError) throw delError;
+    }
+    // Update `read` flags on rows that remain.
+    for (const m of messages.filter((m) => m.read)) {
+      await supabase.from("messages").update({ read: true }).eq("id", m.id);
+    }
+  },
+
+  markMessageRead: async (id: string): Promise<void> => {
+    // Preferred API for AdminMessages — surgical, avoids the whole-array dance.
+    if (!supabase) {
+      const msgs = get<Message[]>(K.messages, []);
+      setLocal(K.messages, msgs.map((m) => (m.id === id ? { ...m, read: true } : m)));
+      return;
+    }
+    const { error } = await supabase.from("messages").update({ read: true }).eq("id", id);
+    if (error) throw error;
+  },
+
+  deleteMessage: async (id: string): Promise<void> => {
+    if (!supabase) {
+      const msgs = get<Message[]>(K.messages, []);
+      setLocal(K.messages, msgs.filter((m) => m.id !== id));
+      return;
+    }
+    const { error } = await supabase.from("messages").delete().eq("id", id);
+    if (error) throw error;
+  },
 };
