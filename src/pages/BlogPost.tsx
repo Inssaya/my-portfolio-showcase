@@ -1,6 +1,6 @@
 import { useParams, Link, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Clock, ChevronDown, ChevronUp, Home } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getPostBySlug } from "@/lib/blog-data";
 import Navigation from "@/components/Navigation";
@@ -75,23 +75,29 @@ const BlogPost = () => {
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">
-      <div className="grid-overlay" />
       <Navigation />
       <MobileNav />
 
       <main className="mx-auto max-w-2xl px-6 py-20 md:py-28">
-        {/* Back */}
+        {/* Navigation breadcrumb */}
         <motion.div
           initial={{ opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.3 }}
-          className="mb-10"
+          className="mb-10 flex items-center gap-4"
         >
           <Link
-            to="/blog"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors"
+            to="/"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-accent transition-colors"
           >
-            <ArrowLeft size={14} /> Blog
+            <Home size={13} /> Portfolio
+          </Link>
+          <span className="text-border/60 text-xs">/</span>
+          <Link
+            to="/blog"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-accent transition-colors"
+          >
+            <ArrowLeft size={13} /> Blog
           </Link>
         </motion.div>
 
@@ -130,10 +136,8 @@ const BlogPost = () => {
           transition={{ duration: 0.4, delay: 0.1 }}
           className="mb-10 rounded-xl border border-border/50 bg-secondary/30 px-5 py-4 text-sm text-muted-foreground italic"
         >
-          This article reflects my personal experience and perspective as someone
-          currently learning and working in software engineering. My views will
-          continue to evolve as I gain experience. Take what is useful, question
-          what you disagree with.
+          This article reflects my personal experience and ongoing learning in software and AI engineering.
+          My views evolve as I build more systems and read more research. Take what is useful; question what you disagree with.
         </motion.div>
 
         {/* TL;DR */}
@@ -208,7 +212,7 @@ const BlogPost = () => {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.35 }}
-          className="mt-16 glass-card p-6 flex flex-col sm:flex-row gap-4"
+          className="mt-16 rounded-xl border border-border/50 bg-secondary/20 p-6 flex flex-col sm:flex-row gap-4"
         >
           <div className="h-12 w-12 shrink-0 rounded-full bg-accent/15 flex items-center justify-center font-sora font-bold text-accent text-lg">
             Y
@@ -217,8 +221,8 @@ const BlogPost = () => {
             <p className="font-sora font-semibold text-sm">{post.author}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{post.authorRole}</p>
             <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-              Building AI-powered and full-stack systems, from RAG pipelines to
-              production web apps. Writing about what I learn along the way.
+              Building AI-powered and full-stack systems — from RAG pipelines and maintenance platforms
+              to production web apps. Writing about what I learn along the way.
             </p>
           </div>
         </motion.div>
@@ -235,12 +239,20 @@ const BlogPost = () => {
           ))}
         </div>
 
-        <div className="mt-12">
+        {/* Bottom nav */}
+        <div className="mt-12 flex items-center gap-6">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors"
+          >
+            <Home size={14} /> Back to Portfolio
+          </Link>
+          <span className="text-border/40">·</span>
           <Link
             to="/blog"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors"
           >
-            <ArrowLeft size={14} /> Back to Blog
+            <ArrowLeft size={14} /> All Articles
           </Link>
         </div>
       </main>
