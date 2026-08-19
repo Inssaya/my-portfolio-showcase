@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, ChevronDown, X } from "lucide-react";
+import { ArrowUp, BookOpen, ChevronDown, X } from "lucide-react";
 
 /**
  * Mobile navigation.
@@ -81,6 +82,7 @@ const MobileNav = () => {
   const activeId = useActiveSection();
   const active = NAV_ITEMS.find((item) => item.id === activeId) ?? NAV_ITEMS[0];
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
 
   // Any navigation intent closes the sheet — Escape, backdrop tap, section
   // click. Keeping it open after a jump would sit on top of the content the
@@ -174,6 +176,14 @@ const MobileNav = () => {
                 >
                   <ArrowUp size={12} />
                   Back to top
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setOpen(false); navigate("/blog"); }}
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-accent"
+                >
+                  <BookOpen size={12} />
+                  Blog
                 </button>
                 <span className="flex-1" />
                 <button

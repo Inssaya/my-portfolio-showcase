@@ -74,6 +74,7 @@ const AdminLayout = () => {
               // ProtectedRoute subscription picks up the change and would
               // redirect on its own, but calling navigate keeps the URL
               // change immediate rather than one frame late.
+              localStorage.removeItem("portfolio_admin_static");
               await supabase?.auth.signOut();
               navigate("/admin/login", { replace: true });
             }}

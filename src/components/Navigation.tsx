@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Home, User, Code, FolderOpen, Mail, GraduationCap, Briefcase } from "lucide-react";
+import { Home, User, Code, FolderOpen, Mail, GraduationCap, Briefcase, BookOpen } from "lucide-react";
 
 const navItems = [
   { name: "Home", icon: Home, href: "#home" },
@@ -45,6 +46,22 @@ const Navigation = () => {
             </motion.div>
           </button>
         ))}
+
+        {/* Blog — navigates to /blog, outside the scroll-section model */}
+        <Link to="/blog" className="relative group flex items-center">
+          <div className="absolute right-full mr-4 hidden group-hover:flex items-center">
+            <div className="bg-foreground text-background text-xs font-semibold px-3 py-1.5 rounded-md whitespace-nowrap">
+              Blog
+            </div>
+            <div className="border-l-foreground border-l-8 border-y-transparent border-y-[5px] border-r-0" />
+          </div>
+          <motion.div
+            whileHover={{ scale: 1.2 }}
+            className="text-xl transition-colors duration-300 text-foreground/60 hover:text-accent"
+          >
+            <BookOpen size={20} />
+          </motion.div>
+        </Link>
       </div>
     </nav>
   );

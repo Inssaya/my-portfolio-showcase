@@ -25,9 +25,8 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   useEffect(() => {
     if (!supabaseEnabled || !supabase) {
-      // No backend configured — treat as denied. The login page will show
-      // a helpful "not configured" message rather than an unfixable spinner.
-      setStatus("denied");
+      // No Supabase — fall back to the static localStorage flag set by AdminLogin.
+      setStatus(localStorage.getItem("portfolio_admin_static") === "1" ? "authorized" : "denied");
       return;
     }
     const client = supabase;

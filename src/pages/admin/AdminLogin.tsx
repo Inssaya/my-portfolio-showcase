@@ -33,6 +33,7 @@ const AdminLogin = () => {
     // Skip straight through if the user already has a live session — but
     // don't Navigate on first render (that would fight React Router).
     if (!supabase) {
+      setAlreadyIn(localStorage.getItem("portfolio_admin_static") === "1");
       setCheckingSession(false);
       return;
     }
@@ -54,7 +55,17 @@ const AdminLogin = () => {
     event.preventDefault();
     if (busy) return;
     if (!supabaseEnabled || !supabase) {
-      setError("The admin backend isn't configured yet. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+      // Static fallback: hardcoded credentials when Supabase is not yet configured.
+      if (
+        email.trim().toLowerCase() === "yassinsinif4@gmail.com" &&
+        password === "YaSsine2004@gmail.com"
+      ) {
+        localStorage.setItem("portfolio_admin_static", "1");
+        navigate(from, { replace: true });
+      } else {
+        setError("Wrong email or password.");
+        setBusy(false);
+      }
       return;
     }
     setBusy(true);

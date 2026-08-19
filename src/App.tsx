@@ -13,6 +13,8 @@ import Index from "./pages/Index.tsx";
 // not weigh down that first paint either.
 const Experience = lazy(() => import("./pages/Experience.tsx"));
 const ProjectDetail = lazy(() => import("./pages/ProjectDetail.tsx"));
+const Blog = lazy(() => import("./pages/Blog.tsx"));
+const BlogPost = lazy(() => import("./pages/BlogPost.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 const AdminLayout = lazy(() => import("./components/admin/AdminLayout.tsx"));
@@ -59,6 +61,8 @@ const App = () => (
             <Route path="/classic" element={<Navigate to="/" replace />} />
             <Route path="/experience" element={<Experience />} />
             <Route path="/projects/:slug" element={<ProjectDetail />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
 
             {/* Login sits outside the guard — otherwise a bounced visitor
                 would ping-pong between /admin and /admin/login forever. */}
