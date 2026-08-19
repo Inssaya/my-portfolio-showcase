@@ -129,17 +129,6 @@ const BlogPost = () => {
           </div>
         </motion.header>
 
-        {/* Disclaimer */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-          className="mb-10 rounded-xl border border-border/50 bg-secondary/30 px-5 py-4 text-sm text-muted-foreground italic"
-        >
-          This article reflects my personal experience and ongoing learning in software and AI engineering.
-          My views evolve as I build more systems and read more research. Take what is useful; question what you disagree with.
-        </motion.div>
-
         {/* TL;DR */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -238,6 +227,14 @@ const BlogPost = () => {
             </span>
           ))}
         </div>
+
+        {/* Optional author's note (only for personal reflections) */}
+        {post.authorNote && (
+          <p className="mt-10 text-xs text-muted-foreground/70 italic leading-relaxed border-t border-border/30 pt-6">
+            <span className="font-semibold text-muted-foreground not-italic">Author&rsquo;s note — </span>
+            {post.authorNote}
+          </p>
+        )}
 
         {/* Bottom nav */}
         <div className="mt-12 flex items-center gap-6">
