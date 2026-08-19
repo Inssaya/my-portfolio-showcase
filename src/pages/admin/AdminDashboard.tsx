@@ -10,73 +10,81 @@ interface Gap {
   why: string;
 }
 
-/**
- * Everything on this page is derived from the data actually stored — no
- * placeholder metrics. The gaps list is the useful half: it names the content
- * that is missing and links straight to the screen that fixes it.
- */
-function readState() {
-  const projects = adminData.getProjects();
-  const messages = adminData.getMessages();
-  const links = adminData.getSocialLinks();
-
-  const missingDetail = projects.filter((p) => !p.longDescription?.trim());
-  const missingLinks = projects.filter((p) => !p.githubUrl?.trim() && !p.demoUrl?.trim());
-  const missingImage = projects.filter((p) => !p.image?.trim());
-  const unread = messages.filter((m) => !m.read);
-
-  const gaps: Gap[] = [
-    {
-      label: "Lien LinkedIn absent",
-      count: links.linkedin.trim() ? 0 : 1,
-      to: "/admin/links",
-      why: "L'icône est masquée partout sur le site tant qu'il est vide.",
-    },
-    {
-      label: "Projets sans description détaillée",
-      count: missingDetail.length,
-      to: "/admin/projects",
-      why: "Leur page de détail reste quasi vide.",
-    },
-    {
-      label: "Projets sans lien GitHub ni démo",
-      count: missingLinks.length,
-      to: "/admin/projects",
-      why: "Un recruteur ne peut pas vérifier le code.",
-    },
-    {
-      label: "Projets sans image",
-      count: missingImage.length,
-      to: "/admin/projects",
-      why: "Les cartes s'affichent sans visuel.",
-    },
-    {
-      label: "Messages non lus",
-      count: unread.length,
-      to: "/admin/messages",
-      why: "En attente de réponse.",
-    },
-  ];
-
-  return {
-    projects: projects.length,
-    inProgress: projects.filter((p) => p.status === "En cours").length,
-    messages: messages.length,
-    unread: unread.length,
-    gaps: gaps.filter((g) => g.count > 0),
-  };
+interface DashState {
+  projects: number;
+  inProgress: number;
+  messages: number;
+  unread: number;
+  gaps: Gap[];
 }
 
 const AdminDashboard = () => {
-  const [state, setState] = useState({
+  const [state, setState] = useState<DashState>({
     projects: 0,
     inProgress: 0,
     messages: 0,
     unread: 0,
-    gaps: [] as Gap[],
+    gaps: [],
   });
 
-  useEffect(() => setState(readState()), []);
+  useEffect(() => {
+    let cancelled = false;
+    const projects = adminData.getProjects();
+    const links = adminData.getSocialLinks();
+
+    const missingDetail = projects.filter((p) => !p.longDescription?.trim());
+    const missingLinks = projects.filter((p) => !p.githubUrl?.trim() && !p.demoUrl?.trim());
+    const missingImage = projects.filter((p) => !p.image?.trim());
+
+    adminData.getMessages().then((messages) => {
+      if (cancelled) return;
+      const unread = messages.filter((m) => !m.read);
+      const gaps: Gap[] = [
+        {
+          label: "Lien LinkedIn absent",
+          count: links.linkedin.trim() ? 0 : 1,
+          to: "/admin/links",
+          why: "L'icône est masquée partout sur le site tant qu'il est vide.",
+        },
+        {
+          label: "Projets sans description détaillée",
+          count: missingDetail.length,
+          to: "/admin/projects",
+          why: "Leur page de détail reste quasi vide.",
+        },
+        {
+          label: "Projets sans lien GitHub ni démo",
+          count: missingLinks.length,
+          to: "/admin/projects",
+          why: "Un recruteur ne peut pas vérifier le code.",
+        },
+        {
+          label: "Projets sans image",
+          count: missingImage.length,
+          to: "/admin/projects",
+          why: "Les cartes s'affichent sans visuel.",
+        },
+        {
+          label: "Messages non lus",
+          count: unread.length,
+          to: "/admin/messages",
+          why: "En attente de réponse.",
+        },
+      ];
+
+      setState({
+        projects: projects.length,
+        inProgress: projects.filter((p) => p.status === "En cours").length,
+        messages: messages.length,
+        unread: unread.length,
+        gaps: gaps.filter((g) => g.count > 0),
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const cards = [
     { label: "Projets", value: state.projects, icon: FolderKanban, color: "text-accent" },

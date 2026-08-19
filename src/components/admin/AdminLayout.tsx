@@ -4,6 +4,7 @@ import {
   LayoutDashboard, FolderKanban, MessageSquare, FileText,
   Link2, GraduationCap, Award, Wrench, Home, LogOut, Menu, X,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 const navItems = [
   { to: "/admin", icon: LayoutDashboard, label: "Dashboard", end: true },
@@ -68,7 +69,14 @@ const AdminLayout = () => {
             <Home size={18} /> Voir le Site
           </button>
           <button
-            onClick={() => navigate("/")}
+            onClick={async () => {
+              // signOut clears the persisted session in localStorage. The
+              // ProtectedRoute subscription picks up the change and would
+              // redirect on its own, but calling navigate keeps the URL
+              // change immediate rather than one frame late.
+              await supabase?.auth.signOut();
+              navigate("/admin/login", { replace: true });
+            }}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 w-full transition-colors"
           >
             <LogOut size={18} /> Déconnexion

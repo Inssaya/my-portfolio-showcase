@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Download, Mail, MapPin, Phone, Send } from "lucide-react";
+import { Download, Loader2, Mail, MapPin, Phone, Send } from "lucide-react";
 import { useState, FormEvent } from "react";
 import { adminData } from "@/lib/admin-data";
 import { CV_URL } from "@/lib/cv";
@@ -12,16 +12,28 @@ const fadeIn = (delay: number) => ({
   },
 });
 
+type SubmitState = "idle" | "sending" | "sent" | "error";
+
 const ContactSection = () => {
-  const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState<SubmitState>("idle");
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    adminData.addMessage(form);
-    setForm({ name: "", email: "", subject: "", message: "" });
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3000);
+    if (status === "sending") return;
+    setStatus("sending");
+    try {
+      await adminData.addMessage(form);
+      setForm({ name: "", email: "", subject: "", message: "" });
+      setStatus("sent");
+      setTimeout(() => setStatus("idle"), 3000);
+    } catch (error) {
+      // Real network / RLS error — tell the visitor rather than pretend it
+      // worked. They can retry, or fall back to the email link above.
+      console.error("Failed to send message", error);
+      setStatus("error");
+      setTimeout(() => setStatus("idle"), 5000);
+    }
   };
 
   return (
@@ -130,11 +142,13 @@ const ContactSection = () => {
             />
             <button
               type="submit"
-              className="w-full py-3 rounded-full bg-accent text-accent-foreground font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+              disabled={status === "sending"}
+              className="w-full py-3 rounded-full bg-accent text-accent-foreground font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-60"
             >
-              {submitted ? "Message Sent ✓" : (
-                <>Send Message <Send size={16} /></>
-              )}
+              {status === "sending" && <><Loader2 size={16} className="animate-spin" /> Sending…</>}
+              {status === "sent" && "Message Sent ✓"}
+              {status === "error" && "Send failed — try again"}
+              {status === "idle" && <>Send Message <Send size={16} /></>}
             </button>
           </motion.form>
         </div>
