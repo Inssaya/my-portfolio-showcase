@@ -1,7 +1,7 @@
 import { useParams, Link, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Clock, ChevronDown, ChevronUp } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getPostBySlug } from "@/lib/blog-data";
 import Navigation from "@/components/Navigation";
 import MobileNav from "@/components/MobileNav";
@@ -9,6 +9,61 @@ import MobileNav from "@/components/MobileNav";
 const BlogPost = () => {
   const { slug } = useParams<{ slug: string }>();
   const post = getPostBySlug(slug ?? "");
+
+  useEffect(() => {
+    if (!post) return;
+    const base = "https://yassine-sinif.vercel.app";
+    const url = `${base}/blog/${post.slug}`;
+
+    document.title = `${post.title} — Yassine Sinif`;
+
+    const schema = {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "@id": url,
+      "headline": post.title,
+      "description": post.summary,
+      "datePublished": post.date,
+      "dateModified": post.date,
+      "url": url,
+      "mainEntityOfPage": url,
+      "image": `${base}/og.jpg`,
+      "inLanguage": "en",
+      "keywords": post.tags.join(", "),
+      "author": {
+        "@type": "Person",
+        "@id": `${base}/#person`,
+        "name": post.author,
+        "url": base,
+        "jobTitle": post.authorRole,
+      },
+      "publisher": {
+        "@type": "Person",
+        "@id": `${base}/#person`,
+        "name": post.author,
+        "url": base,
+      },
+      "isPartOf": {
+        "@type": "Blog",
+        "@id": `${base}/blog`,
+        "name": "Yassine Sinif — Writing",
+        "url": `${base}/blog`,
+      },
+    };
+
+    const existing = document.getElementById("__blog-post-schema");
+    if (existing) existing.remove();
+    const el = document.createElement("script");
+    el.type = "application/ld+json";
+    el.id = "__blog-post-schema";
+    el.text = JSON.stringify(schema);
+    document.head.appendChild(el);
+
+    return () => {
+      document.getElementById("__blog-post-schema")?.remove();
+      document.title = "Yassine Sinif — AI & Data Engineer | Portfolio";
+    };
+  }, [post]);
 
   if (!post) return <Navigate to="/blog" replace />;
 

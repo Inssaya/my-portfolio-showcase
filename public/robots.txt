@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /admin
 
-Sitemap: https://sinif-yassine.vercel.app/sitemap.xml
+Sitemap: https://yassine-sinif.vercel.app/sitemap.xml

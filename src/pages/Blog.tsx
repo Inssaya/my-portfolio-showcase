@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { ArrowRight, Clock, Tag } from "lucide-react";
@@ -7,6 +8,13 @@ import MobileNav from "@/components/MobileNav";
 
 const Blog = () => {
   const posts = getAllPosts();
+
+  useEffect(() => {
+    document.title = "Blog — Yassine Sinif";
+    return () => {
+      document.title = "Yassine Sinif — AI & Data Engineer | Portfolio";
+    };
+  }, []);
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">
