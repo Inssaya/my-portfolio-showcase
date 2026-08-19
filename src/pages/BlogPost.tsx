@@ -129,24 +129,37 @@ const BlogPost = () => {
           </div>
         </motion.header>
 
-        {/* TL;DR */}
+        {/* TL;DR — collapsible. Content stays in the DOM for AI crawlers (AEO). */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.15 }}
-          className="mb-12 rounded-xl border border-accent/25 bg-accent/5 px-5 py-5"
+          className="mb-12"
         >
-          <p className="font-sora text-xs font-bold uppercase tracking-widest text-accent mb-3">
-            TL;DR
-          </p>
-          <ul className="space-y-2">
-            {post.tldr.map((point, i) => (
-              <li key={i} className="flex gap-3 text-sm leading-relaxed">
-                <span className="text-accent font-bold shrink-0">→</span>
-                <span>{point}</span>
-              </li>
-            ))}
-          </ul>
+          <details className="group rounded-xl border border-accent/25 bg-accent/5 overflow-hidden [&_summary::-webkit-details-marker]:hidden">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3.5 select-none hover:bg-accent/10 transition-colors">
+              <div className="flex items-center gap-3">
+                <span className="font-sora text-xs font-bold uppercase tracking-widest text-accent">
+                  TL;DR
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {post.tldr.length} key takeaways
+                </span>
+              </div>
+              <ChevronDown
+                size={15}
+                className="text-accent shrink-0 transition-transform duration-200 group-open:rotate-180"
+              />
+            </summary>
+            <ul className="space-y-2 px-5 pb-5 pt-2 border-t border-accent/15">
+              {post.tldr.map((point, i) => (
+                <li key={i} className="flex gap-3 text-sm leading-relaxed">
+                  <span className="text-accent font-bold shrink-0">→</span>
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
         </motion.div>
 
         {/* Article sections */}
