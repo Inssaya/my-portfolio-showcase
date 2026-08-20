@@ -1,0 +1,39 @@
+# Yassine Sinif — AI & Data Engineer
+
+> Yassine Sinif is an AI & Data Engineer based in Casablanca, Morocco. He builds RAG pipelines, LLM-powered systems, data engineering infrastructure, and full-stack web applications. Contact: yassinsinif4@gmail.com | +212 6 23 84 25 35
+
+## Portfolio
+- https://yassine-sinif.vercel.app/ — Main portfolio: projects, skills, experience, contact
+
+## Experience
+- https://yassine-sinif.vercel.app/experience — Full career experience with AI voice tour
+
+## Blog — Engineering articles on AI, data, and software
+- https://yassine-sinif.vercel.app/blog — All articles
+- https://yassine-sinif.vercel.app/blog/ai-makes-coding-easier-engineering-is-still-hard — AI makes coding easier, engineering is still hard
+- https://yassine-sinif.vercel.app/blog/what-makes-a-good-engineer-2026-2027 — What makes a good engineer in 2026–2027
+- https://yassine-sinif.vercel.app/blog/pen-and-paper-in-software-engineering — Pen and paper in software engineering
+- https://yassine-sinif.vercel.app/blog/what-you-dont-know-about-rag — What you don't know about RAG
+- https://yassine-sinif.vercel.app/blog/engineer-job-vs-own-business — Engineer job vs own business
+- https://yassine-sinif.vercel.app/blog/will-ai-be-expensive-in-the-future — Will AI be expensive in the future
+- https://yassine-sinif.vercel.app/blog/why-big-data-still-matters — Why big data still matters
+- https://yassine-sinif.vercel.app/blog/learn-to-code-not-to-prompt — Learn to code, not to prompt
+- https://yassine-sinif.vercel.app/blog/software-engineer-vs-ai-data-engineer — Software engineer vs AI & data engineer
+
+## Projects
+- https://yassine-sinif.vercel.app/projects/aptiv-maintenance-platform — Aptiv Maintenance Platform (predictive maintenance, KPI dashboards, agentic RAG)
+- https://yassine-sinif.vercel.app/projects/nexora-ai — Nexora AI (call-center SaaS with on-premise RAG, ChromaDB, Ollama, FastAPI, React)
+- https://yassine-sinif.vercel.app/projects/medical-multi-agent-system — Medical Multi-Agent System (LangGraph, LangChain, FastAPI, MCP, React, Flutter)
+- https://yassine-sinif.vercel.app/projects/stock-market-analytics-platform — Stock Market Analytics Platform (Kafka, MySQL, Docker, Streamlit)
+- https://yassine-sinif.vercel.app/projects/multi-vendor-e-commerce-saas-platform — Multi-Vendor E-commerce SaaS Platform (React, Next.js, Express, MongoDB, Kafka)
+- https://yassine-sinif.vercel.app/projects/gym-management-app — Gym Management App (Java, NFC, Face Recognition, Fingerprint, QR Code)
+- https://yassine-sinif.vercel.app/projects/optic-management-app — Optic Management App (Java, MySQL, Swing)
+- https://yassine-sinif.vercel.app/projects/pos-system-app — POS System App (Java, JavaFX, MySQL)
+- https://yassine-sinif.vercel.app/projects/rag-chatbot — RAG Chatbot (Python, LangChain, FAISS, OpenAI API, Flask)
+- https://yassine-sinif.vercel.app/projects/ai-based-enterprise-ticket-management — AI-Based Enterprise Ticket Management (Python, NLP, Django, PostgreSQL)
+- https://yassine-sinif.vercel.app/projects/mobile-transport-app — Mobile Transport App (React Native)
+- https://yassine-sinif.vercel.app/projects/plagiarism-detection-system — Plagiarism Detection System (Python, TF-IDF, SBERT, Django)
+- https://yassine-sinif.vercel.app/projects/flight-management-system — Flight Management System (Python, Django, Tailwind CSS)
+- https://yassine-sinif.vercel.app/projects/car-locator-platform — Car Locator Platform (PHP, Laravel, JavaScript)
+- https://yassine-sinif.vercel.app/projects/to-do-list-web-app — To-Do List Web App (React, TypeScript, Tailwind CSS)
+- https://yassine-sinif.vercel.app/projects/ai-chatbot — AI Chatbot (Python, NLP, Flask, OpenAI API)
