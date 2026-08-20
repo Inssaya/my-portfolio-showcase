@@ -217,7 +217,7 @@ const Experience = () => {
     // Missing or broken manifest: say what is actually going on.
     return (
       <div className="max-w-md text-center">
-        <h1 className="font-sora text-2xl font-bold">The tour isn't recorded yet</h1>
+        <h2 className="font-sora text-2xl font-bold">The tour isn't recorded yet</h2>
         <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
           {manifestState.status === "error"
             ? `The tour data could not be loaded (${manifestState.message}).`
