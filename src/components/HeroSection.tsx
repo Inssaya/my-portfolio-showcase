@@ -306,7 +306,7 @@ const HeroSection = () => {
               <motion.div
                 aria-hidden="true"
                 animate={{ rotate: 360 }}
-                transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
+                transition={{ duration: 10.8, repeat: Infinity, ease: "linear" }}
                 className="absolute -inset-2 rounded-full"
                 style={{
                   background:
@@ -328,7 +328,7 @@ const HeroSection = () => {
               <motion.div
                 aria-hidden="true"
                 animate={{ rotate: 360 }}
-                transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
+                transition={{ duration: 16.9, repeat: Infinity, ease: "linear" }}
                 className="absolute -inset-6 rounded-full"
               >
                 <span className="absolute left-1/2 top-0 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-sky-300 shadow-[0_0_10px_hsl(200_98%_74%/0.9)]" />
@@ -336,7 +336,7 @@ const HeroSection = () => {
               <motion.div
                 aria-hidden="true"
                 animate={{ rotate: -360 }}
-                transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+                transition={{ duration: 23.1, repeat: Infinity, ease: "linear" }}
                 className="absolute -inset-10 rounded-full"
               >
                 <span className="absolute left-1/2 top-0 h-1 w-1 -translate-x-1/2 rounded-full bg-sky-200/80 shadow-[0_0_8px_hsl(200_100%_86%/0.7)]" />
