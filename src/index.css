@@ -120,12 +120,17 @@
   .grid-overlay {
     @apply fixed inset-0 -z-10 pointer-events-none;
     background-image:
-      linear-gradient(hsl(var(--border) / 0.35) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(var(--border) / 0.35) 1px, transparent 1px);
+      linear-gradient(hsl(var(--border) / 0.12) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.12) 1px, transparent 1px);
     background-size: 64px 64px;
     mask-image: radial-gradient(ellipse 100% 70% at 50% 0%, black 10%, transparent 75%);
     -webkit-mask-image: radial-gradient(ellipse 100% 70% at 50% 0%, black 10%, transparent 75%);
     opacity: 0.5;
+  }
+  @media (max-width: 767px) {
+    .grid-overlay {
+      opacity: 0.2;
+    }
   }
 }
 
