@@ -51,6 +51,49 @@
   }
 }
 
+/* Light theme — same red-orange accent, inverted surface colours. */
+[data-theme="light"] {
+  --background: 0 0% 97%;
+  --foreground: 230 25% 10%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 230 25% 10%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 230 25% 10%;
+
+  --primary: 0 0% 97%;
+  --primary-foreground: 230 25% 10%;
+
+  --secondary: 230 12% 91%;
+  --secondary-foreground: 230 25% 10%;
+
+  --muted: 230 12% 91%;
+  --muted-foreground: 230 10% 44%;
+
+  --accent: 6 90% 50%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 230 15% 84%;
+  --input: 230 15% 84%;
+  --ring: 6 90% 50%;
+
+  --gradient-dark: linear-gradient(135deg, hsl(0 0% 97%), hsl(230 15% 93%));
+  --shadow-glow: 0 0 40px -10px hsl(6 90% 50% / 0.25);
+
+  --sidebar-background: 0 0% 97%;
+  --sidebar-foreground: 230 25% 10%;
+  --sidebar-primary: 6 90% 50%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 230 12% 91%;
+  --sidebar-accent-foreground: 230 25% 10%;
+  --sidebar-border: 230 15% 84%;
+  --sidebar-ring: 6 90% 50%;
+}
+
 @layer base {
   * {
     @apply border-border;

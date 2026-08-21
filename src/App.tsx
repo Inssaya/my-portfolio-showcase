@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/lib/theme";
 import Index from "./pages/Index.tsx";
 
 // The portfolio is the entry point and stays in the main bundle so the first
@@ -47,6 +48,7 @@ const RouteFallback = () => <div className="min-h-[100svh] bg-background" />;
  * at", and it is exactly what that setting exists to switch off.
  */
 const App = () => (
+  <ThemeProvider>
   <QueryClientProvider client={queryClient}>
     <MotionConfig reducedMotion="user">
     <TooltipProvider>
@@ -94,6 +96,7 @@ const App = () => (
     </TooltipProvider>
     </MotionConfig>
   </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;

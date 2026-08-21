@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Home, User, Code, FolderOpen, Mail, GraduationCap, Briefcase, BookOpen } from "lucide-react";
+import { Home, User, Code, FolderOpen, Mail, GraduationCap, Briefcase, BookOpen, Moon, Sun } from "lucide-react";
+import { useTheme } from "@/lib/theme";
 
 const navItems = [
   { name: "Home", icon: Home, href: "#home" },
@@ -15,6 +16,7 @@ const navItems = [
 
 const Navigation = () => {
   const [active, setActive] = useState("#home");
+  const { theme, toggle } = useTheme();
 
   const handleClick = (href: string) => {
     setActive(href);
@@ -62,6 +64,27 @@ const Navigation = () => {
             <BookOpen size={20} />
           </motion.div>
         </Link>
+
+        {/* Theme toggle */}
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          className="relative group flex items-center"
+        >
+          <div className="absolute right-full mr-4 hidden group-hover:flex items-center">
+            <div className="bg-foreground text-background text-xs font-semibold px-3 py-1.5 rounded-md whitespace-nowrap">
+              {theme === "dark" ? "Light mode" : "Dark mode"}
+            </div>
+            <div className="border-l-foreground border-l-8 border-y-transparent border-y-[5px] border-r-0" />
+          </div>
+          <motion.div
+            whileHover={{ scale: 1.2 }}
+            className="text-xl transition-colors duration-300 text-foreground/60 hover:text-accent"
+          >
+            {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
+          </motion.div>
+        </button>
       </div>
     </nav>
   );

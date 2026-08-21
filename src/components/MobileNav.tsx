@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, BookOpen, ChevronDown, X } from "lucide-react";
+import { ArrowUp, BookOpen, ChevronDown, Moon, Sun, X } from "lucide-react";
+import { useTheme } from "@/lib/theme";
 
 /**
  * Mobile navigation.
@@ -83,6 +84,7 @@ const MobileNav = () => {
   const active = NAV_ITEMS.find((item) => item.id === activeId) ?? NAV_ITEMS[0];
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const { theme, toggle } = useTheme();
 
   // Any navigation intent closes the sheet — Escape, backdrop tap, section
   // click. Keeping it open after a jump would sit on top of the content the
@@ -184,6 +186,15 @@ const MobileNav = () => {
                 >
                   <BookOpen size={12} />
                   Blog
+                </button>
+                <button
+                  type="button"
+                  onClick={toggle}
+                  aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-accent"
+                >
+                  {theme === "dark" ? <Sun size={12} /> : <Moon size={12} />}
+                  {theme === "dark" ? "Light" : "Dark"}
                 </button>
                 <span className="flex-1" />
                 <button
