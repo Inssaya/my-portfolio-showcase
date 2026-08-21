@@ -85,7 +85,7 @@ const AssistantWidget = ({ onOpen, pausedLabel, ...handlers }: AssistantWidgetPr
             // show through cards on the page), which would leave the chat body
             // unreadable on top of the starfield. Solid card fill + heavy blur,
             // with the border and shadow the design language uses everywhere else.
-            className="fixed bottom-24 right-4 z-50 flex h-[min(32rem,70svh)] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border/60 bg-card/95 shadow-2xl shadow-black/40 backdrop-blur-xl md:right-6"
+            className="fixed bottom-24 left-2 right-2 z-50 flex h-[min(28rem,calc(100svh-7rem))] flex-col overflow-hidden rounded-xl border border-border/60 bg-card/95 shadow-2xl shadow-black/40 backdrop-blur-xl md:left-auto md:right-6 md:w-96 md:h-[min(32rem,70svh)]"
           >
             <header className="flex items-center justify-between border-b border-border/50 px-4 py-3">
               <div className="flex items-center gap-2">
