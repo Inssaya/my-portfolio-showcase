@@ -10,11 +10,19 @@ Two things live here:
 
 ## Before touching `cv-service/`
 
-**Read `cv-service/HANDOFF.md` first.** It records the architecture and the
-reasons behind it, ~18 bugs already found and fixed (with regression tests), the
-things that look like obvious simplifications but are load-bearing, and the
-Phase 2 plan. Several decisions there are counter-intuitive and re-deriving them
-costs a day.
+Two documents, and they do different jobs:
+
+- **`cv-service/HANDOFF.md`** — what exists and *why*. Architecture, ~18 bugs
+  already found and fixed (with regression tests), and the things that look like
+  obvious simplifications but are load-bearing. Several decisions are
+  counter-intuitive and re-deriving them costs a day. **Read this first.**
+- **`cv-service/NEXT.md`** — the work queue. Each step has files to touch,
+  schema where relevant, a "done when", and the traps already known. **Start
+  here if you are picking up work.**
+
+Phase 1 is complete and tested (222 tests). The immediate next actions are:
+deploy it (`NEXT.md` Step 0, ~30 min), then fix invented dates (Step 1), then
+Supabase auth + persistence (Step 2).
 
 Quick orientation:
 

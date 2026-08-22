@@ -208,6 +208,10 @@ removes the second permanently.
 
 ## 8. Phase 2 — the plan
 
+> **The actionable version is `NEXT.md`** — schema, files to touch, and a
+> "done when" for each step. What follows is the shape and the reasoning; go
+> there to actually work.
+
 Decided already: **Supabase Auth** (not a port of `projectAntiv`'s FastAPI auth,
 which is code-based while the requirement is verification *links*, and needs a
 persistent server). Supabase is already wired into the portfolio and does links,
