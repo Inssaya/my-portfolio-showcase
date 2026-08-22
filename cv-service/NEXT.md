@@ -34,36 +34,29 @@ it, the $7/mo Starter plan fixes the first and Step 2 below fixes the second.
 
 ---
 
-## Step 1 — Invented dates (correctness, do before real users)
+## Step 1 — Invented dates — DONE
 
-The highest-value remaining bug and the only one that can embarrass a user in
-front of a recruiter.
+Fixed in `app/cv/verify.py`, wired into `update_resume` in `app/tools.py`.
+15 tests in `tests/test_verify.py`. Verified live against OpenAI: replaying
+the exact "2nd year at ESM, no year given" input that used to produce
+`ESM · 2023` now produces `Student | ESM Ecole Scientifique Marocaine` with no
+year at all.
 
-**The problem.** Told "2nd year at ESM", the model wrote `ESM · 2023`. Nobody
-gave it a year. `app/cv/builder.py`'s placeholder scrubber cannot catch it —
-`2023` looks exactly like real data. The system prompt forbids it explicitly
-(`app/agent.py`, "NEVER WRITE A FACT THEY DID NOT GIVE YOU") and it still
-happens.
+**Why it runs at write time, not "after a turn" as originally planned here:**
+`POST /generate` (the Build button) renders straight from `session.draft` with
+no model call — that is the whole point of it. Checking only in the chat flow
+would leave that path unprotected, since a session could reach Build without
+ever passing back through a post-turn check. `update_resume` in `tools.py` is
+the one place both paths go through, so that is where `strip_invented_years`
+runs.
 
-**Approach that will actually work** — verify against the input rather than
-asking the model to behave:
-
-- After a turn, collect every 4-digit year in `session.draft`.
-- Compare against years present in what the visitor actually said
-  (`session.transcript` user messages, plus any seeded upload text).
-- A year in the draft that appears nowhere in the input is invented. Do not
-  silently delete it — surface it: strip it and add a note, or ask the visitor
-  to confirm.
-
-**Files:** new `app/cv/verify.py`; call it from `run_turn` in `app/agent.py`
-after the tool loop; tests in `tests/test_verify.py`.
-
-**Done when:** a session that says "final year at ESM" and never gives a year
-produces a CV with no year, and a test pins it.
-
-**Trap:** dates legitimately reach the draft from an *uploaded* CV the visitor
-never typed. The seeded upload text counts as input — check
-`session.transcript` entries with `kind: "upload"`, not just user messages.
+**Known limitation, accepted deliberately:** if the visitor reads back a
+year the model invented and says "yes, that's right", the confirmation text
+("yes") does not itself contain the digits, so `input_years` never learns
+them and a later edit to that same field would strip the year again. Fixing
+this needs detecting approval of a specific claim, not just presence of a
+year — left for whoever hits it in practice, since it has not shown up in
+testing yet.
 
 ---
 

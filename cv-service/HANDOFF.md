@@ -198,7 +198,6 @@ removes the second permanently.
 
 ## 7. Known-imperfect, not yet fixed
 
-* **Invented dates.** The model still occasionally produces a plausible year nobody gave it. Cannot be caught deterministically — `2023` looks like data. The prompt forbids it and it still happens. **The highest-value remaining correctness problem.**
 * **Skill invention on request.** Asked to "add some skills that fit", it does. Defensible, but the visitor may not realise they are now claiming them.
 * Projects render flat when pasted with `###` sub-headings.
 * Soft skills sometimes merge into the wrong skills group.
