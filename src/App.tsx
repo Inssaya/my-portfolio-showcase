@@ -16,6 +16,7 @@ const ProjectDetail = lazy(() => import("./pages/ProjectDetail.tsx"));
 const Blog = lazy(() => import("./pages/Blog.tsx"));
 const BlogPost = lazy(() => import("./pages/BlogPost.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
+const ResumeBuilder = lazy(() => import("./pages/ResumeBuilder.tsx"));
 
 const AdminLayout = lazy(() => import("./components/admin/AdminLayout.tsx"));
 const AdminLogin = lazy(() => import("./pages/admin/AdminLogin.tsx"));
@@ -61,6 +62,7 @@ const App = () => (
             <Route path="/classic" element={<Navigate to="/" replace />} />
             <Route path="/experience" element={<Experience />} />
             <Route path="/projects/:slug" element={<ProjectDetail />} />
+            <Route path="/cv-builder" element={<ResumeBuilder />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
 

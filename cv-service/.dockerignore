@@ -1,0 +1,13 @@
+# Never let a real key into an image layer — layers are readable by anyone who
+# can pull the image, and deleting the file in a later layer does not remove it.
+.env
+.env.*
+
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/
+README.md
+Dockerfile
+.dockerignore

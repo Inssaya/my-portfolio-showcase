@@ -1,0 +1,53 @@
+# Repository guide
+
+Two things live here:
+
+1. **The portfolio** — Vite + React + TypeScript, deployed to Vercel. Content is
+   editable through `/admin`, backed by Supabase.
+2. **The CV builder** (`cv-service/`) — a FastAPI + ReportLab service that
+   interviews a visitor and renders them a designed CV. Deployed separately to
+   Render, because it needs a long-lived container.
+
+## Before touching `cv-service/`
+
+**Read `cv-service/HANDOFF.md` first.** It records the architecture and the
+reasons behind it, ~18 bugs already found and fixed (with regression tests), the
+things that look like obvious simplifications but are load-bearing, and the
+Phase 2 plan. Several decisions there are counter-intuitive and re-deriving them
+costs a day.
+
+Quick orientation:
+
+- The CV draft lives in **server state**, not in the conversation. That single
+  decision is why a small model suffices, why history can be compacted, and why
+  the "Build my CV" button can bypass the model entirely.
+- `app/cv/_cvmodern.py` and `_cvdesign.py` are **vendored renderers** with
+  geometry measured off a reference PDF. Do not tidy them.
+- `cv/yassine-sinif-cv.tex` is the design authority. `tests/test_fidelity.py`
+  asserts the renderer still matches it.
+
+## Commands
+
+```bash
+# portfolio
+npm run dev            # :8080
+npm test               # vitest
+npm run build
+
+# cv-service (from cv-service/)
+docker compose up --build                            # :8000
+.venv/Scripts/python -m pytest -q                    # 222 tests, no network
+.venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
+```
+
+Python **3.13** for `cv-service` — 3.14 has no wheels for pydantic-core/pillow.
+
+Point the frontend at the service with `VITE_RESUME_API_URL` in `.env.local`
+(`http://localhost:8000` locally). Vite inlines env vars at build time, so
+changing one needs a rebuild.
+
+## Secrets
+
+`.env.local` and `cv-service/.env` hold live keys and are gitignored. Never
+commit them, and never add a `VITE_` prefix to a secret — that ships it to the
+browser bundle.

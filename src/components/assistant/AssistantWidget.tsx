@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp, Check, MessageSquare, Sparkles, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import ChatMarkdown from "@/components/ChatMarkdown";
 import { AssistantHandlers, useAssistant } from "@/lib/assistant/useAssistant";
 
 interface AssistantWidgetProps extends AssistantHandlers {
@@ -141,7 +142,7 @@ const AssistantWidget = ({ onOpen, pausedLabel, ...handlers }: AssistantWidgetPr
                         : "bg-secondary text-foreground/90"
                     }`}
                   >
-                    {turn.content}
+                    {turn.role === "assistant" ? <ChatMarkdown content={turn.content} /> : turn.content}
                     {turn.actions?.map((action) => (
                       <span
                         key={action}
