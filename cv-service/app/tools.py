@@ -16,6 +16,7 @@ import tempfile
 from contextlib import contextmanager, suppress
 
 from .cv.builder import RESUME_FIELDS, STYLES, build_resume, safe_filename
+from .cv.verify import input_years, strip_invented_years
 from .session import Session
 
 # Compressed on purpose. This text is re-sent on every request of every round,
@@ -152,12 +153,29 @@ def run_tool(session: Session, name: str, arguments: dict | None = None) -> str:
             )
         if not isinstance(content, str):
             return "content must be a string."
+
+        # Catches the failure the placeholder scrubber cannot: an invented
+        # year looks exactly like a real one, so it has to be checked against
+        # what the visitor actually said rather than how it reads. This runs
+        # here, at write time, because it is the only path into session.draft —
+        # the Build button renders from draft state without calling the model
+        # at all, so verifying "after a turn" would leave it unprotected.
+        content, removed_years = strip_invented_years(content, input_years(session.transcript))
+
         session.set_field(field, content)
         stored = session.draft.get(field, "")
         if not stored:
-            return f"Cleared {field}."
-        line_count = len([line for line in stored.splitlines() if line.strip()])
-        return f"Saved {field} ({line_count} line{'s' if line_count != 1 else ''})."
+            note = f"Cleared {field}."
+        else:
+            line_count = len([line for line in stored.splitlines() if line.strip()])
+            note = f"Saved {field} ({line_count} line{'s' if line_count != 1 else ''})."
+        if removed_years:
+            note += (
+                f" Removed unconfirmed year(s) {', '.join(sorted(removed_years))} — "
+                "the visitor never gave a year for this. Ask them if it matters; "
+                "do not guess another one."
+            )
+        return note
 
     if name == "review_draft":
         # State the file's existence as fact, every time. A live run had the
