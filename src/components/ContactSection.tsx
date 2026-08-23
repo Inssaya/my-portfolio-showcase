@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Download, Loader2, Mail, MapPin, Phone, Send } from "lucide-react";
-import { useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent } from "react";
 import { adminData } from "@/lib/admin-data";
 import { CV_URL } from "@/lib/cv";
 
@@ -17,6 +17,11 @@ type SubmitState = "idle" | "sending" | "sent" | "error";
 const ContactSection = () => {
   const [status, setStatus] = useState<SubmitState>("idle");
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
+  // Email/phone/location shown below were hardcoded, drifted independently
+  // of Liens & Contact in /admin — same class of bug as the Hero byline chip.
+  const [links, setLinks] = useState(() => adminData.getSocialLinks());
+
+  useEffect(() => { setLinks(adminData.getSocialLinks()); }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -64,25 +69,29 @@ const ContactSection = () => {
             </p>
 
             <div className="space-y-4">
-              <a href="mailto:yassinsinif4@gmail.com" className="flex items-center gap-4 text-foreground/80 hover:text-accent transition-colors group">
-                <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
-                  <Mail className="text-accent" size={18} />
-                </div>
-                <span className="text-sm">yassinsinif4@gmail.com</span>
-              </a>
+              {links.email && (
+                <a href={`mailto:${links.email}`} className="flex items-center gap-4 text-foreground/80 hover:text-accent transition-colors group">
+                  <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
+                    <Mail className="text-accent" size={18} />
+                  </div>
+                  <span className="text-sm">{links.email}</span>
+                </a>
+              )}
 
-              <a href="tel:+212623842535" className="flex items-center gap-4 text-foreground/80 hover:text-accent transition-colors group">
-                <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
-                  <Phone className="text-accent" size={18} />
-                </div>
-                <span className="text-sm">+212 6 23 84 25 35</span>
-              </a>
+              {links.phone && (
+                <a href={`tel:${links.phone.replace(/[^\d+]/g, "")}`} className="flex items-center gap-4 text-foreground/80 hover:text-accent transition-colors group">
+                  <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
+                    <Phone className="text-accent" size={18} />
+                  </div>
+                  <span className="text-sm">{links.phone}</span>
+                </a>
+              )}
 
               <div className="flex items-center gap-4 text-foreground/80">
                 <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center">
                   <MapPin className="text-accent" size={18} />
                 </div>
-                <span className="text-sm">Casablanca, Morocco</span>
+                <span className="text-sm">{links.location}</span>
               </div>
 
               <a
