@@ -225,3 +225,32 @@ def test_rate_limited_response_carries_session_state(monkeypatch, client: TestCl
     assert "message" in body["detail"]
     assert "try again" in body["detail"]["message"].lower()
     assert "usage" in body["detail"] and "pdf_version" in body["detail"]
+
+
+def test_ping_needs_no_auth(client: TestClient) -> None:
+    """The keep-warm endpoint has to be reachable by an external scheduled
+    job with no session and no bearer token."""
+    from app.auth import get_current_user
+
+    app.dependency_overrides.pop(get_current_user, None)
+    try:
+        response = client.get("/ping")
+        assert response.status_code == 200
+        assert response.json() == {"pong": True}
+    finally:
+        pass
+
+
+def test_ping_does_not_touch_settings_or_the_pool(monkeypatch, client: TestClient) -> None:
+    """The whole point of a separate endpoint from /health: this one must do
+    the least possible amount of work per call, since a scheduled job hits it
+    every few minutes indefinitely."""
+    import app.main as main_module
+
+    def explode(*a, **k):
+        raise AssertionError("/ping must not read settings or the key pool")
+
+    monkeypatch.setattr(main_module, "get_settings", explode)
+    monkeypatch.setattr(main_module, "get_pool", explode)
+
+    assert client.get("/ping").status_code == 200

@@ -25,7 +25,7 @@ const WARM_UP_MIN_INTERVAL_MS = 5 * 60 * 1000;
 let lastWarmUpAt = 0;
 
 /**
- * Fire-and-forget GET to /health, to wake a sleeping backend before the
+ * Fire-and-forget GET to /ping, to wake a sleeping backend before the
  * visitor's first real request needs it to already be awake.
  *
  * The frontend itself never waits on this — it is a static Vercel deploy the
@@ -37,9 +37,11 @@ let lastWarmUpAt = 0;
  * visitor spends reading the page, signing in or uploading a file as free
  * warm-up time instead.
  *
- * `/health` needs no auth and answers before any session or OpenAI key is
- * touched, so this never spends a token or creates state server-side — it is
- * genuinely just "is the process awake".
+ * `/ping` (not `/health`) on purpose: it needs no auth and does the smallest
+ * possible amount of work — no settings lookup, no key-pool read — since the
+ * only thing this call needs to prove is that the process is awake. A
+ * scheduled job (.github/workflows/keep-warm.yml) also hits the same
+ * endpoint independently of any visitor, for the same reason.
  */
 export function warmUpResumeService(): void {
   if (!resumeApiConfigured) return;
@@ -47,7 +49,7 @@ export function warmUpResumeService(): void {
   if (now - lastWarmUpAt < WARM_UP_MIN_INTERVAL_MS) return;
   lastWarmUpAt = now;
 
-  fetch(`${BASE_URL}/health`).catch(() => {
+  fetch(`${BASE_URL}/ping`).catch(() => {
     // Silent on purpose: this is opportunistic warming, not a real request.
     // Failure here changes nothing — the visitor's actual first message
     // would simply wait out the cold start itself, exactly as it always did.

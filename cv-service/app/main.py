@@ -143,6 +143,19 @@ def health() -> dict:
     }
 
 
+@app.get("/ping")
+def ping() -> dict:
+    """The keep-warm endpoint. Deliberately does nothing.
+
+    /health touches settings and the key pool to answer something useful for
+    a human debugging a deploy. A scheduled job hitting this every few minutes
+    for months needs the opposite property: the smallest possible amount of
+    work per call, since its entire purpose is spending a request, not
+    learning anything from the response. See .github/workflows/keep-warm.yml.
+    """
+    return {"pong": True}
+
+
 @app.get("/ops/keys")
 def ops_keys() -> dict:
     """Per-key health for operating the pool.

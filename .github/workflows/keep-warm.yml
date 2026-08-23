@@ -1,0 +1,36 @@
+name: Keep CV service warm
+
+# Render's free tier sleeps a service after ~15 minutes with no requests, and
+# takes up to about a minute to cold-start the next one. This job exists to
+# make that never happen during hours anyone is actually likely to visit,
+# independently of whether a visitor's own browser has pinged it recently
+# (see warmUpResumeService in src/lib/resume/api.ts, which covers the same
+# goal from the frontend side but only fires when someone is already on the
+# site).
+#
+# 10 minutes, not 15 or 16: the gap between pings has to stay safely under
+# Render's own sleep threshold. A 16-minute cadence sounds close enough but
+# is not — GitHub's scheduler is best-effort, not exact-to-the-minute, so an
+# occasional delayed run would land past 15 minutes and the "keep-warm" ping
+# would itself trigger the cold start it was meant to prevent.
+#
+# 06:00-23:59 UTC, not 24/7: covers roughly 7am-1am Morocco time (the country
+# shifts to UTC+0 for the month of Ramadan only; the window is a little wide
+# on both ends specifically to absorb that shift without needing two
+# schedules). Nobody is filling out a CV at 4am, and there is no reason to
+# spend requests proving that.
+on:
+  schedule:
+    - cron: '*/10 6-23 * * *'
+  # Trigger a run by hand from the Actions tab — the fastest way to prove
+  # this actually reaches Render without waiting for the schedule.
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the CV service
+        run: |
+          curl -fsS --max-time 70 \
+            "${{ vars.CV_SERVICE_URL || 'https://my-portfolio-showcase-0ty9.onrender.com' }}/ping"
