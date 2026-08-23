@@ -266,3 +266,33 @@ export async function generateResume(sessionId: string): Promise<ChatResponse> {
   });
   return parse(response);
 }
+
+export interface SessionSummary {
+  id: string;
+  name: string | null;
+  style: string;
+  language: string;
+  pdf_version: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+/**
+ * Every CV this visitor has started, for the "My Data" page.
+ *
+ * Backed by Postgres, not the in-memory store — see GET /sessions in
+ * cv-service. Returns [] on any failure (unconfigured deployment, network
+ * hiccup) rather than throwing: a listing page should show "nothing yet",
+ * never an error banner, when the honest answer is just "could not check".
+ */
+export async function fetchSessions(): Promise<SessionSummary[]> {
+  if (!resumeApiConfigured) return [];
+  try {
+    const response = await fetch(`${BASE_URL}/sessions`, { headers: await authHeader() });
+    if (!response.ok) return [];
+    const body = (await response.json()) as { sessions: SessionSummary[] };
+    return body.sessions;
+  } catch {
+    return [];
+  }
+}

@@ -1,10 +1,9 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, Check, Download, FileText, FileUp, LogOut, RotateCcw, Sparkles, X } from "lucide-react";
+import { ArrowUp, Check, Download, FileText, FileUp, RotateCcw, Sparkles, X } from "lucide-react";
 import ChatMarkdown from "@/components/ChatMarkdown";
-import Navigation from "@/components/Navigation";
-import MobileNav from "@/components/MobileNav";
-import { supabase } from "@/lib/supabase";
+import CvAppShell from "@/components/cv/CvAppShell";
 import { useResumeChat } from "@/lib/resume/useResumeChat";
 
 /**
@@ -28,6 +27,10 @@ const OPENERS = [
 const ACCEPTED = ".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp";
 
 const ResumeBuilder = () => {
+  // "Continue" from the My Data page links here with ?session=<id>, which
+  // must win over whatever session localStorage already had — see
+  // useResumeChat's initialSessionId doc comment.
+  const [searchParams] = useSearchParams();
   const {
     turns,
     status,
@@ -43,7 +46,7 @@ const ResumeBuilder = () => {
     download,
     dropPhoto,
     reset,
-  } = useResumeChat();
+  } = useResumeChat(searchParams.get("session"));
   const [draft, setDraft] = useState("");
   const [dragging, setDragging] = useState(false);
   const [longWait, setLongWait] = useState(false);
@@ -104,12 +107,9 @@ const ResumeBuilder = () => {
   const empty = turns.length === 0;
 
   return (
-    <div className="min-h-[100svh] bg-background">
-      <Navigation />
-      <MobileNav />
-
+    <CvAppShell>
       <main
-        className="mx-auto flex min-h-[100svh] w-full max-w-3xl flex-col px-4 pb-4 pt-24 md:pt-28"
+        className="mx-auto flex min-h-[calc(100svh-3.5rem)] w-full max-w-3xl flex-col px-4 pb-4 pt-6"
         onDragOver={(event) => {
           event.preventDefault();
           if (!busy && !unavailable) setDragging(true);
@@ -128,28 +128,16 @@ const ResumeBuilder = () => {
               <span className="text-accent">Free while it's in beta.</span>
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {turns.length > 0 && (
-              <button
-                type="button"
-                onClick={reset}
-                className="flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-accent/50 hover:text-accent"
-              >
-                <RotateCcw size={12} />
-                Start over
-              </button>
-            )}
+          {turns.length > 0 && (
             <button
               type="button"
-              onClick={() => void supabase?.auth.signOut()}
-              title="Sign out"
-              aria-label="Sign out"
-              className="flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
+              onClick={reset}
+              className="flex shrink-0 items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-accent/50 hover:text-accent"
             >
-              <LogOut size={12} />
-              Sign out
+              <RotateCcw size={12} />
+              Start over
             </button>
-          </div>
+          )}
         </header>
 
         <div className="relative flex flex-1 flex-col overflow-hidden rounded-xl border border-border/60 bg-card/50">
@@ -380,7 +368,7 @@ const ResumeBuilder = () => {
           </form>
         </div>
       </main>
-    </div>
+    </CvAppShell>
   );
 };
 

@@ -21,6 +21,10 @@ const ResumeBuilder = lazy(() => import("./pages/ResumeBuilder.tsx"));
 const CvSignIn = lazy(() => import("./pages/cv/CvSignIn.tsx"));
 const CvSignUp = lazy(() => import("./pages/cv/CvSignUp.tsx"));
 const CvTerms = lazy(() => import("./pages/cv/CvTerms.tsx"));
+const CvVerify = lazy(() => import("./pages/cv/CvVerify.tsx"));
+const CvProfile = lazy(() => import("./pages/cv/CvProfile.tsx"));
+const CvMyData = lazy(() => import("./pages/cv/CvMyData.tsx"));
+const CvContact = lazy(() => import("./pages/cv/CvContact.tsx"));
 const CvProtectedRoute = lazy(() => import("./components/cv/CvProtectedRoute.tsx"));
 
 const AdminLayout = lazy(() => import("./components/admin/AdminLayout.tsx"));
@@ -74,11 +78,40 @@ const App = () => (
             <Route path="/cv-builder/login" element={<CvSignIn />} />
             <Route path="/cv-builder/signup" element={<CvSignUp />} />
             <Route path="/cv-builder/terms" element={<CvTerms />} />
+            {/* Lands here straight from the confirmation email — Supabase
+                has already exchanged the link for a session by the time this
+                mounts (detectSessionInUrl), so it sits outside the guard the
+                same way login/signup do, rather than bouncing through it. */}
+            <Route path="/cv-builder/verify" element={<CvVerify />} />
             <Route
               path="/cv-builder"
               element={
                 <CvProtectedRoute>
                   <ResumeBuilder />
+                </CvProtectedRoute>
+              }
+            />
+            <Route
+              path="/cv-builder/profile"
+              element={
+                <CvProtectedRoute>
+                  <CvProfile />
+                </CvProtectedRoute>
+              }
+            />
+            <Route
+              path="/cv-builder/mydata"
+              element={
+                <CvProtectedRoute>
+                  <CvMyData />
+                </CvProtectedRoute>
+              }
+            />
+            <Route
+              path="/cv-builder/contact"
+              element={
+                <CvProtectedRoute>
+                  <CvContact />
                 </CvProtectedRoute>
               }
             />

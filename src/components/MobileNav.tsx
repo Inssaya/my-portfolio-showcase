@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, BookOpen, ChevronDown, Moon, Sun, X } from "lucide-react";
+import { ArrowUp, BookOpen, ChevronDown, FileText, Moon, Sun, X } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 
 /**
@@ -186,6 +186,14 @@ const MobileNav = () => {
                 >
                   <BookOpen size={12} />
                   Blog
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setOpen(false); navigate("/cv-builder"); }}
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-accent"
+                >
+                  <FileText size={12} />
+                  CV Builder
                 </button>
                 <button
                   type="button"

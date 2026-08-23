@@ -1,11 +1,12 @@
 """HTTP surface for the resume service.
 
-Every route except /health sits behind Supabase auth (see app/auth.py):
-`Depends(get_current_user)` verifies the bearer token and every session is
-owned by the user who created it (`app/session.py`'s SessionStore checks
-ownership on every lookup, not just on creation). Sessions are still
-per-process — the DB-backed persistence in NEXT.md Step 2 is the next piece,
-not this one — but nobody can read or render a session that is not theirs.
+Every route except /health and /ping sits behind Supabase auth (see
+app/auth.py): `Depends(get_current_user)` verifies the bearer token and every
+session is owned by the user who created it (`app/session.py`'s SessionStore
+checks ownership on every lookup, not just on creation). A session lives in
+this process first, with Postgres (app/db.py) as a write-through, read-on-miss
+backup — nobody can read or render a session that is not theirs, and a
+session now survives this process restarting too.
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Response,
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from . import db
 from .agent import SessionBudgetExceeded, recover_by_vision, run_turn, seed_uploaded_cv
 from .auth import AuthUser, get_current_user
 from .config import get_settings
@@ -99,61 +101,71 @@ class ChatResponse(BaseModel):
     usage: dict
 
 
-def _turn_or_http_error(session, message: str) -> dict:
+def _turn_or_http_error(session, message: str, access_token: str | None = None) -> dict:
     """Run a turn, translating model-layer failures into honest HTTP.
 
     Shared by /chat and /upload so the two cannot drift: a visitor who uploads
     a CV while the key pool is saturated must get the same "busy, try again in
     n seconds" as one who typed a message.
+
+    Saves to Postgres in a `finally`, not just on the success path: tool
+    rounds run and can patch the draft before the round that actually fails
+    (budget exceeded, the pool busy), so a raised error must not also mean
+    that already-real progress never reaches Postgres — see the comments on
+    SessionBudgetExceeded and LLMBusy below, which say the same thing about
+    what the *response* carries.
     """
     try:
-        return run_turn(session, message)
-    except SessionBudgetExceeded as exc:
-        # 402-adjacent, but nothing is owed while the service is free, so 429
-        # with an explicit reason. The draft survives and /generate still works,
-        # so this never means "you lost your CV".
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            {
-                "message": str(exc),
-                "session_id": session.id,
-                "usage": session.usage.as_dict(),
-                "pdf_version": session.pdf_version,
-                "budget_exhausted": True,
-            },
-        ) from exc
-    except LLMNotConfigured as exc:
-        # Deliberately explicit: this is the one failure a deployer must fix,
-        # and a generic 500 would send them hunting through logs.
-        logger.error("resume service is not configured: %s", exc)
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "not_configured") from exc
-    except LLMBusy as exc:
-        # Every key is rate-limited. That is a wait, not a fault — say so, and
-        # say for how long, so the UI can promise something true.
-        #
-        # The turn may have got part-way first: tool rounds run before the round
-        # that hits the limit, so work can already be saved and billed. Reporting
-        # only "try again" would have the UI tell the visitor nothing happened
-        # while their draft quietly moved on, so the session's real state rides
-        # along on the error.
-        seconds = max(1, int(exc.retry_after))
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            {
-                "message": (
-                    f"Everyone's building CVs right now. Try again in about "
-                    f"{seconds} seconds."
-                ),
-                "session_id": session.id,
-                "usage": session.usage.as_dict(),
-                "pdf_version": session.pdf_version,
-                "partial": bool(session.filled_fields()),
-            },
-            headers={"Retry-After": str(seconds)},
-        ) from exc
-    except LLMError as exc:
-        logger.error("turn failed for session %s: %s", session.id, exc)
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "upstream_error") from exc
+        try:
+            return run_turn(session, message)
+        except SessionBudgetExceeded as exc:
+            # 402-adjacent, but nothing is owed while the service is free, so
+            # 429 with an explicit reason. The draft survives and /generate
+            # still works, so this never means "you lost your CV".
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                {
+                    "message": str(exc),
+                    "session_id": session.id,
+                    "usage": session.usage.as_dict(),
+                    "pdf_version": session.pdf_version,
+                    "budget_exhausted": True,
+                },
+            ) from exc
+        except LLMNotConfigured as exc:
+            # Deliberately explicit: this is the one failure a deployer must
+            # fix, and a generic 500 would send them hunting through logs.
+            logger.error("resume service is not configured: %s", exc)
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "not_configured") from exc
+        except LLMBusy as exc:
+            # Every key is rate-limited. That is a wait, not a fault — say so,
+            # and say for how long, so the UI can promise something true.
+            #
+            # The turn may have got part-way first: tool rounds run before the
+            # round that hits the limit, so work can already be saved and
+            # billed. Reporting only "try again" would have the UI tell the
+            # visitor nothing happened while their draft quietly moved on, so
+            # the session's real state rides along on the error.
+            seconds = max(1, int(exc.retry_after))
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                {
+                    "message": (
+                        f"Everyone's building CVs right now. Try again in about "
+                        f"{seconds} seconds."
+                    ),
+                    "session_id": session.id,
+                    "usage": session.usage.as_dict(),
+                    "pdf_version": session.pdf_version,
+                    "partial": bool(session.filled_fields()),
+                },
+                headers={"Retry-After": str(seconds)},
+            ) from exc
+        except LLMError as exc:
+            logger.error("turn failed for session %s: %s", session.id, exc)
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "upstream_error") from exc
+    finally:
+        store.save(session, access_token)
 
 
 @app.get("/health")
@@ -228,7 +240,7 @@ def _as_pasted_document(text: str) -> dict | None:
     dependencies=[limit_by_user(CHAT_PER_USER, "chat", "chat messages")],
 )
 def chat(payload: ChatRequest = Body(...), user: AuthUser = Depends(get_current_user)) -> ChatResponse:
-    session = store.get_or_create(payload.session_id, user.id)
+    session = store.get_or_create(payload.session_id, user.id, user.access_token)
     message = payload.message.strip()
 
     pasted = _as_pasted_document(message)
@@ -243,7 +255,7 @@ def chat(payload: ChatRequest = Body(...), user: AuthUser = Depends(get_current_
             "draft with update_resume, then tell me what you got."
         )
 
-    outcome = _turn_or_http_error(session, message)
+    outcome = _turn_or_http_error(session, message, user.access_token)
 
     return ChatResponse(
         session_id=session.id,
@@ -285,12 +297,15 @@ async def upload(
     # No model call: attaching a photo needs no reasoning, so spending a turn on
     # it would be pure cost. The reply is written here.
     if looks_like_an_image(filename):
-        session = store.get_or_create(session_id, user.id)
+        session = store.get_or_create(session_id, user.id, user.access_token)
         try:
             session.photo = prepare_uploaded_photo(data, filename)
         except PhotoError as exc:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
+        # The photo itself is not a persisted column (see to_row's docstring),
+        # so nothing here actually changes what save() would write — skipped
+        # rather than spending a Postgres round trip on a no-op.
         note = "Photo added — it'll appear on your CV."
         if session.pdf is not None:
             note += " Hit Rebuild to see it."
@@ -310,7 +325,7 @@ async def upload(
         # message says how, so it is a 400 with real text rather than a 500.
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
-    session = store.get_or_create(session_id, user.id)
+    session = store.get_or_create(session_id, user.id, user.access_token)
     if extraction.get("photo"):
         session.photo = extraction["photo"]
 
@@ -345,6 +360,7 @@ async def upload(
         session,
         "I've uploaded my CV. Save every section you can into the draft with "
         "update_resume, then tell me what you got.",
+        user.access_token,
     )
 
     return ChatResponse(
@@ -374,11 +390,12 @@ def generate(session_id: str, user: AuthUser = Depends(get_current_user)) -> Cha
     PDF out. It costs no tokens, cannot be talked out of it, and works whatever
     the model does.
     """
-    session = store.get(session_id, user.id)
+    session = store.get(session_id, user.id, user.access_token)
     if session is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "That session has expired.")
 
     result = run_tool(session, "generate_resume", {})
+    store.save(session, user.access_token)
     if session.pdf is None:
         # run_tool reports refusals as text for the model; here the same text is
         # the honest explanation for the visitor.
@@ -403,7 +420,7 @@ def download(session_id: str, user: AuthUser = Depends(get_current_user)) -> Res
     frontend fetches this with the bearer token and saves the response as a
     blob instead (see `src/lib/resume/api.ts`, `downloadResume`).
     """
-    session = store.get(session_id, user.id)
+    session = store.get(session_id, user.id, user.access_token)
     if session is None or session.pdf is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No CV has been generated yet.")
     return Response(
@@ -413,10 +430,38 @@ def download(session_id: str, user: AuthUser = Depends(get_current_user)) -> Res
     )
 
 
+@app.get("/sessions")
+def list_sessions(user: AuthUser = Depends(get_current_user)) -> dict:
+    """Every CV this visitor has started, for the "My Data" page.
+
+    Reads straight from Postgres rather than this process's in-memory store —
+    that only ever holds sessions this instance has touched, never the whole
+    history. An empty list when persistence is not configured is honest: no
+    per-process store can answer "everything I've ever started" at all.
+    """
+    if not db.persistence_configured():
+        return {"sessions": []}
+    rows = db.list_session_rows(user.access_token)
+    return {
+        "sessions": [
+            {
+                "id": row["id"],
+                "name": (row.get("draft") or {}).get("full_name", "").strip() or None,
+                "style": row.get("style"),
+                "language": row.get("language"),
+                "pdf_version": row.get("pdf_version", 0),
+                "created_at": row.get("created_at"),
+                "updated_at": row.get("updated_at"),
+            }
+            for row in rows
+        ]
+    }
+
+
 @app.get("/draft/{session_id}")
 def draft(session_id: str, user: AuthUser = Depends(get_current_user)) -> dict:
     """What the session currently holds. Powers the live preview panel."""
-    session = store.get(session_id, user.id)
+    session = store.get(session_id, user.id, user.access_token)
     if session is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "That session has expired.")
     return {
@@ -441,7 +486,7 @@ def photo(session_id: str, user: AuthUser = Depends(get_current_user)) -> Respon
     the PDF download — so the frontend fetches this and turns the response
     into an object URL rather than pointing an <img> straight at it.
     """
-    session = store.get(session_id, user.id)
+    session = store.get(session_id, user.id, user.access_token)
     if session is None or session.photo is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No photo attached.")
     return Response(
@@ -462,7 +507,7 @@ def remove_photo(session_id: str, user: AuthUser = Depends(get_current_user)) ->
     uploaded CV — and not everyone wants one on the rebuild. Some countries
     advise against photos on a CV entirely, so this is not a nicety.
     """
-    session = store.get(session_id, user.id)
+    session = store.get(session_id, user.id, user.access_token)
     if session is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "That session has expired.")
     session.photo = None

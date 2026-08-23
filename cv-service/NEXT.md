@@ -60,10 +60,11 @@ testing yet.
 
 ---
 
-## Step 2 — Supabase auth + persistence — AUTH DONE, PERSISTENCE NOT
+## Step 2 — Supabase auth + persistence — BOTH DONE
 
-Split into two halves. **Auth is done and verified live.** Persisting sessions
-to Postgres — the other half, below — is not, and is the next thing to build.
+Split into two halves. **Auth is done and verified live.** Persisting
+sessions to Postgres — the other half, below — is now built too (not yet
+verified against a live deploy — see 2c's "Done when").
 
 ### 2a. Supabase dashboard — partly done
 
@@ -129,9 +130,21 @@ surfaced the Brevo gap above.
 `httpx.get` boundary in `test_auth.py`, and every other test gets a fixed fake
 user for free from the autouse override in `tests/conftest.py`.
 
-### 2b. Schema for session persistence — NOT DONE, this is next
+### 2b. Schema for session persistence — DONE
 
-Add to `supabase/schema.sql` (it is already idempotent — follow its style):
+Added to `supabase/schema.sql`, following its existing style exactly (still
+idempotent, still DROP-then-CREATE for policies). `cv_devices` from the
+original sketch below is **not** included — that belongs to Step 5
+(fingerprinting), not persistence, and adding it now with nothing reading or
+writing it yet would just be dead schema. Add it when Step 5 actually needs
+it.
+
+**Not yet run against the live project.** This is SQL in the repo, not SQL
+that has executed — paste `supabase/schema.sql` into Supabase Dashboard → SQL
+Editor → Run before deploying the code below, or every request will 500 with
+a "relation does not exist" from PostgREST.
+
+Original sketch, kept for reference (matches what actually shipped):
 
 ```sql
 -- One row per CV conversation.
@@ -177,43 +190,77 @@ RLS: a user reads and writes **only their own** rows
 (`auth.uid() = user_id`). `cv_messages` inherits through `session_id`. Copy the
 policy shape already used in that file.
 
-### 2c. Service changes — the persistence half, not done
+### 2c. Service changes — the persistence half — DONE
 
-Everything below is still exactly as originally planned; none of it exists yet.
-`app/auth.py`, `app/main.py`'s auth gating and `Session.user_id` (2a-continued
-above) are done — this is the part that makes a session outlive one Render
-process, which is what actually fixes the "sleeping wipes every draft" problem
-in `README.md`.
+Built as `app/db.py` (the PostgREST client) plus changes to `app/session.py`
+and `app/main.py`. This is the part that makes a session outlive one Render
+process, which is what actually fixes the "sleeping wipes every draft"
+problem in `README.md`.
 
-- `app/session.py`: back `SessionStore` with Postgres instead of the
-  in-process dict, using `cv_sessions`/`cv_messages` from 2b above. `Session`
-  is a plain dataclass specifically so it maps to a row. Keep the in-memory
-  store as the fallback when Supabase is unconfigured, exactly as
-  `src/lib/admin-data.ts` falls back to localStorage.
-- Write through Postgres using the **visitor's own access token**
-  (`AuthUser.access_token`, already returned by `get_current_user` for exactly
-  this reason), calling Supabase's PostgREST endpoint directly rather than the
-  service_role key. RLS then enforces per-user isolation at the database
-  itself — this service still never needs to hold service_role, the same
-  boundary `app/auth.py` already keeps.
-- Persist `session.transcript` to `cv_messages` as it grows.
-- `session.photo` and `session.pdf` are raw bytes, which do not belong in a
-  jsonb column. Either a `bytea` column on `cv_sessions` (simplest, fine at
-  this scale) or a Supabase Storage bucket per user (more work, better if
-  photos/PDFs get large or numerous) — pick one, this file does not prescribe
-  it.
+- `app/db.py`: `load_session_row`, `create_session_row`, `update_session_row`,
+  `append_messages` — thin wrappers over `httpx` against Supabase's PostgREST
+  endpoint (`{SUPABASE_URL}/rest/v1/...`), authenticated with the **visitor's
+  own access token** (`AuthUser.access_token`), never `service_role`. RLS
+  (2b's policies) enforces per-user isolation at the database itself — this
+  service still never needs `service_role`, the same boundary `app/auth.py`
+  already keeps. Every function catches `httpx.HTTPError` and returns
+  `None`/`False` rather than raising: a Postgres hiccup must never turn into a
+  500 for a visitor mid-chat.
+- `app/session.py`: `SessionStore` is unchanged in shape — still the
+  in-process dict as the fast path, exactly as before — with Postgres as a
+  **write-through, read-on-miss backup** behind it, not a replacement.
+  `.create`/`.get`/`.get_or_create`/`.save` all take an optional
+  `access_token: str | None = None`; with no token (every existing direct
+  test-suite call) or with Supabase unconfigured, behaviour is byte-for-byte
+  the old in-memory-only code path — this is what keeps the 267 original
+  tests hermetic with zero changes to them. `Session.to_row()`/`.from_row()`
+  map the dataclass to a `cv_sessions` row; `photo`/`pdf` bytes are
+  deliberately excluded (see the note atop `supabase/schema.sql`) — a
+  restored session has its draft and transcript back, but a photo needs
+  re-upload and a PDF needs one click on Build, both cheap. `Session.id`
+  switched from `secrets.token_urlsafe(16)` to a real `uuid.uuid4()` to match
+  the `uuid primary key` column — confirmed nothing else assumed the old
+  format.
+- `app/main.py`: every route now passes `user.access_token` through to the
+  store. `_turn_or_http_error` (shared by `/chat` and `/upload`) saves in a
+  `finally`, not just on success — tool rounds can patch the draft before the
+  round that actually fails (budget exceeded, pool busy), so a raised error
+  must not also mean that real progress never reaches Postgres.
+- `session.transcript` persists to `cv_messages`, but only the tail Postgres
+  doesn't have yet (`Session._persisted_message_count`, an in-memory cursor,
+  not a column) — a session is never re-sent whole on every turn.
+- Restoring a session leaves `history` (the wire-format sent to the model)
+  empty on purpose, rather than replaying `cv_messages` into it. The draft is
+  this app's real memory of what the visitor said — the model picks the
+  conversation back up from `draft_summary()`, not from a replayed
+  transcript. Simpler, and avoids re-litigating `_compact()`'s token-cost
+  logic against a restored history shaped differently than a live one.
 
 **Done when:** signing out and back in on a different browser shows the same
-draft, and Render restarting no longer loses it. (Auth alone already gets you
-"nobody else can see your draft" — it does not yet get you "the draft survives
-a restart"; that is what this section is for.)
+draft, and Render restarting no longer loses it. Logic is unit-tested against
+faked `httpx` calls (`tests/test_persistence.py`, 22 tests) — this has **not**
+yet been proven against the live Supabase project or a real Render restart,
+because that needs 2b's SQL actually run first. Do that (dashboard → SQL
+Editor → paste `supabase/schema.sql` → Run — safe to re-run, every statement
+is idempotent), redeploy, then verify for real: start a CV, restart the
+Render service from its dashboard, reload `/cv-builder` and confirm the draft
+is still there.
 
 **Traps:**
-- `numInstances: 1` in `render.yaml` exists *because* state was per-process.
-  Once state is in Postgres, that comment is stale — update it and the matching
-  note in `HANDOFF.md` §5, or the next person will believe it.
-- The key pool stays per-process. It is not session state and does not belong in
-  the database.
+- `numInstances: 1` in `render.yaml` is still 1, but the comment now explains
+  a narrower reason — session state itself is fine to scale out; the API-key
+  pool and the rate limiter are not (Step 4's still-open DB-backed half).
+  Read the updated comment before assuming persistence alone clears the way
+  to a second instance.
+- `tests/conftest.py` gained `_no_real_supabase`, an autouse fixture that
+  blanks `SUPABASE_URL`/`SUPABASE_ANON_KEY` for every test by default. Without
+  it, a developer's real local `.env` would make `settings.auth_configured`
+  true during `pytest`, and every HTTP-level test would attempt a real
+  network call the moment it touched `SessionStore` with the fake bearer
+  token `conftest.py` hands out. If a future test needs a *configured* fake
+  project, do what `test_auth.py`'s `_configure(monkeypatch)` and
+  `test_persistence.py`'s copy of it do — set fake env vars and
+  `reset_settings()` inside that specific test.
 
 ---
 

@@ -22,12 +22,17 @@ services:
 
     healthCheckPath: /health
 
-    # One instance, and this is not a cost decision. Sessions and the API-key
-    # pool are per-process (see app/session.py, app/keypool.py): a second
-    # instance would strand half of all drafts on the wrong machine and double
-    # the effective rate limits. Auth is verified against Supabase now, but the
-    # draft itself still lives in this process's memory — Postgres persistence
-    # (NEXT.md Step 2, second half) is what makes more than one instance safe.
+    # Still one instance, for a narrower reason than before. A session's
+    # draft now survives this process dying (app/db.py writes it through to
+    # Postgres, app/session.py reads it back on a miss) — but the API-key
+    # pool (app/keypool.py) and the rate limiter (app/ratelimit.py) are still
+    # per-process in-memory state with no Postgres backing. A second instance
+    # would strand half the key pool's cooldown tracking on the wrong machine
+    # and double the effective rate limits (each instance counts requests
+    # separately). Raising this needs the DB-backed rate limiter NEXT.md Step
+    # 4 still calls out as not done — the key pool can stay per-process either
+    # way, since a key's cooldown resetting slightly early on a scale-out is
+    # a much smaller problem than a visitor's CV disappearing was.
     numInstances: 1
 
     envVars:

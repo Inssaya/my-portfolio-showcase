@@ -15,6 +15,7 @@ from __future__ import annotations
 import pytest
 
 from app.auth import AuthUser, get_current_user
+from app.config import reset_settings
 from app.main import app
 from app.ratelimit import limiter
 
@@ -35,6 +36,25 @@ def _override_auth():
     app.dependency_overrides[get_current_user] = _fake_current_user
     yield
     app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_supabase(monkeypatch):
+    """app/db.py (Postgres persistence) piggybacks on the same
+    SUPABASE_URL/ANON_KEY as auth — see Settings.auth_configured. A developer's
+    local .env has real values for manual testing against the live project;
+    left alone, every HTTP test now passes a real-looking bearer token through
+    to SessionStore, which would turn "session not found in memory" into a
+    genuine network call. Force both blank as the default for every test;
+    test_auth.py's own `_configure()` opts a specific test back into a *fake*
+    configured project, and that call — happening inside the test body, after
+    this fixture's setup — wins for the duration of that test.
+    """
+    monkeypatch.setenv("SUPABASE_URL", "")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "")
+    reset_settings()
+    yield
+    reset_settings()
 
 
 @pytest.fixture(autouse=True)

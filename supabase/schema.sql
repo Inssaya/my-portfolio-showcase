@@ -222,3 +222,65 @@ create policy "auth update images" on storage.objects
 
 create policy "auth delete images" on storage.objects
   for delete to authenticated using (bucket_id = 'images');
+
+
+-- ------------------------------------------------------- CV builder tables --
+-- One row per CV conversation, plus every turn kept verbatim. cv-service
+-- (Python/FastAPI, deployed separately to Render) is the only thing that
+-- talks to these — always with the visitor's own access token, never
+-- service_role, so RLS below is what actually enforces "only your own CVs",
+-- not application code. See cv-service/app/db.py.
+--
+-- Photo and generated-PDF bytes are deliberately NOT stored here: the photo
+-- is re-uploadable and the PDF is regenerable from `draft` in one request, so
+-- keeping bytea out of this path keeps every save a small JSON write instead
+-- of shipping a whole file on every turn. Losing them across a restart is an
+-- acceptable, documented trade — losing the draft itself is not.
+
+create table if not exists public.cv_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  draft jsonb not null default '{}'::jsonb,
+  style text not null default 'modern',
+  language text not null default 'en',
+  prompt_tokens integer not null default 0,
+  completion_tokens integer not null default 0,
+  pdf_version integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists cv_sessions_user_idx on public.cv_sessions(user_id, updated_at desc);
+drop trigger if exists cv_sessions_updated_at on public.cv_sessions;
+create trigger cv_sessions_updated_at before update on public.cv_sessions
+  for each row execute function public.set_updated_at();
+
+-- Every turn, kept verbatim: the training corpus, and what lets a session
+-- restored on a new device or after a restart show its own history rather
+-- than just the current draft.
+create table if not exists public.cv_messages (
+  id bigserial primary key,
+  session_id uuid not null references public.cv_sessions(id) on delete cascade,
+  role text not null,               -- user | assistant | tool | system
+  content text not null default '',
+  tool_name text,
+  tool_arguments jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists cv_messages_session_idx on public.cv_messages(session_id, id);
+
+alter table public.cv_sessions enable row level security;
+alter table public.cv_messages enable row level security;
+
+drop policy if exists "own sessions" on public.cv_sessions;
+create policy "own sessions" on public.cv_sessions
+  for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- cv_messages carries no user_id of its own — ownership is checked through
+-- the parent session, the standard shape for a policy scoped by foreign key.
+drop policy if exists "own messages" on public.cv_messages;
+create policy "own messages" on public.cv_messages
+  for all to authenticated using (
+    exists (select 1 from public.cv_sessions s where s.id = session_id and s.user_id = auth.uid())
+  ) with check (
+    exists (select 1 from public.cv_sessions s where s.id = session_id and s.user_id = auth.uid())
+  );

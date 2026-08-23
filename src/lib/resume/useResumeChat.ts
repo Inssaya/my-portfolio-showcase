@@ -49,7 +49,13 @@ function storeSession(id: string): void {
   }
 }
 
-export function useResumeChat() {
+/**
+ * @param initialSessionId When set (from `?session=` on /cv-builder, used by
+ * the "Continue" link on the My Data page), this wins over whatever id is in
+ * localStorage — a visitor picking an older CV from their history must not
+ * silently land back on today's session instead.
+ */
+export function useResumeChat(initialSessionId?: string | null) {
   const [turns, setTurns] = useState<ResumeTurn[]>([]);
   const [status, setStatus] = useState<ResumeStatus>(
     resumeApiConfigured ? "idle" : "unavailable",
@@ -65,7 +71,7 @@ export function useResumeChat() {
    *  requires, so the bytes are fetched once here instead of pointed at
    *  directly — see fetchPhotoUrl in api.ts. */
   const [photoBlobUrl, setPhotoBlobUrl] = useState<string | null>(null);
-  const sessionRef = useRef<string | null>(readStoredSession());
+  const sessionRef = useRef<string | null>(initialSessionId || readStoredSession());
   const photoBlobUrlRef = useRef<string | null>(null);
 
   const busy = status === "thinking" || status === "uploading";
@@ -123,6 +129,21 @@ export function useResumeChat() {
     },
     [setPhoto],
   );
+
+  // Opening a specific past session (My Data's "Continue" link): persist the
+  // override so a reload stays on it, and pull its draft state immediately —
+  // the chat transcript itself starts empty regardless (see the backend's
+  // Session.from_row docstring for why that is deliberate, not a bug), but
+  // the live preview panel (canBuild/pdfVersion/photo) should not wait for a
+  // first message to catch up.
+  useEffect(() => {
+    if (!initialSessionId) return;
+    storeSession(initialSessionId);
+    void refreshDraft(initialSessionId);
+    // Only ever meant to run once per explicit session switch; refreshDraft
+    // is stable across the identity that matters here (setPhoto).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSessionId]);
 
   const applyResponse = useCallback(
     (data: ChatResponse) => {

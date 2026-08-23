@@ -13,17 +13,24 @@ Instead the draft is server state. The model patches one field at a time
 correction near the end of a long session costs a few dozen output tokens
 rather than a full restatement, and a small model stays sufficient.
 
-Sessions are per-process and expire. That is correct for a single dyno and is
-the deliberate boundary before Phase 2 moves this into Supabase, where the
-transcript also becomes the training corpus the user asked for.
+Sessions live in-process first — every read and write in a turn touches only
+memory, no network. Postgres (app/db.py) sits behind that as a write-through,
+read-on-miss backup: SessionStore.save() pushes the current row after a
+mutating route finishes, and SessionStore.get() falls back to Postgres only
+when the id is not already in this process (a restart, a different Render
+instance, or a different device). Both are best-effort and silently skipped
+when no access token is given or Supabase is not configured — the in-memory
+behaviour this module started with is still exactly what runs in that case,
+which is what keeps the test suite hermetic (see tests/conftest.py).
 """
 from __future__ import annotations
 
-import secrets
 import threading
 import time
+import uuid
 from dataclasses import dataclass, field
 
+from . import db
 from .cv.builder import RESUME_FIELDS
 
 # Long enough that somebody can walk away mid-CV and come back; short enough
@@ -96,6 +103,13 @@ class Session:
     # a re-offer of the one it already has.
     pdf_version: int = 0
 
+    # How much of `transcript` Postgres already has, so save() sends only the
+    # new tail instead of the whole history every turn. In-memory bookkeeping
+    # only — not a column, and reset implicitly whenever a session is built
+    # (fresh: 0; restored from a row: set in from_row to the length just
+    # loaded, so those messages are not immediately re-sent).
+    _persisted_message_count: int = 0
+
     def touch(self) -> None:
         self.touched_at = time.time()
 
@@ -163,6 +177,60 @@ class Session:
             lines.append(f"still empty: {', '.join(missing)}")
         return "\n".join(lines)
 
+    def to_row(self) -> dict:
+        """This session's cv_sessions columns. photo/pdf bytes are excluded
+        on purpose — see the note at the top of supabase/schema.sql."""
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "draft": self.draft,
+            "style": self.style,
+            "language": self.language,
+            "prompt_tokens": self.usage.prompt,
+            "completion_tokens": self.usage.completion,
+            "pdf_version": self.pdf_version,
+        }
+
+    @classmethod
+    def from_row(cls, row: dict) -> "Session":
+        """Rebuild a session from a Postgres row (plus its embedded
+        cv_messages). `history` — the wire-format sent to the model — starts
+        empty deliberately: the draft (restored below) is this app's actual
+        memory of what the visitor has said, per the module docstring, so the
+        model picks the conversation back up from draft_summary() rather than
+        from a replayed transcript. `photo`/`pdf` stay None: re-upload or hit
+        Build."""
+        session = cls(id=row["id"], user_id=row["user_id"])
+        session.draft = dict(row.get("draft") or {})
+        session.style = row.get("style") or "modern"
+        session.language = row.get("language") or "en"
+        session.usage = TokenUsage(
+            prompt=row.get("prompt_tokens") or 0,
+            completion=row.get("completion_tokens") or 0,
+        )
+        session.pdf_version = row.get("pdf_version") or 0
+        session.transcript = [_message_from_row(m) for m in row.get("cv_messages") or []]
+        session._persisted_message_count = len(session.transcript)
+        return session
+
+
+def _message_to_row(entry: dict) -> dict:
+    return {
+        "role": entry.get("role", "user"),
+        "content": entry.get("content", ""),
+        "tool_name": entry.get("name"),
+        "tool_arguments": entry.get("arguments"),
+    }
+
+
+def _message_from_row(row: dict) -> dict:
+    entry = {"role": row.get("role", "user"), "content": row.get("content", "")}
+    if row.get("tool_name"):
+        entry["name"] = row["tool_name"]
+    if row.get("tool_arguments") is not None:
+        entry["arguments"] = row["tool_arguments"]
+    return entry
+
 
 class SessionStore:
     """Thread-safe session map with TTL. FastAPI runs sync handlers in a
@@ -173,14 +241,16 @@ class SessionStore:
         self._lock = threading.Lock()
         self._last_sweep = time.monotonic()
 
-    def create(self, user_id: str) -> Session:
-        session = Session(id=secrets.token_urlsafe(16), user_id=user_id)
+    def create(self, user_id: str, access_token: str | None = None) -> Session:
+        session = Session(id=str(uuid.uuid4()), user_id=user_id)
         with self._lock:
             self._maybe_sweep()
             self._sessions[session.id] = session
+        if access_token and db.persistence_configured():
+            db.create_session_row(session.to_row(), access_token)
         return session
 
-    def get(self, session_id: str, user_id: str) -> Session | None:
+    def get(self, session_id: str, user_id: str, access_token: str | None = None) -> Session | None:
         """The session, or None if it does not exist, has expired, **or
         belongs to someone else**.
 
@@ -188,26 +258,58 @@ class SessionStore:
         gets it for free and none can forget it. A mismatch returns the same
         None as "does not exist" — distinguishing them would let one user
         probe for another's session ids by the shape of the error.
+
+        Not in this process' memory is not the same as gone: with an access
+        token and Postgres configured, a miss falls through to db.py before
+        giving up — this is what makes a session survive a restart or follow
+        a visitor to a second device.
         """
         with self._lock:
             self._maybe_sweep()
             session = self._sessions.get(session_id)
-            if session is None:
-                return None
-            if time.time() - session.touched_at > SESSION_TTL_SECONDS:
-                del self._sessions[session_id]
-                return None
-            if session.user_id != user_id:
-                return None
-            session.touch()
-            return session
+            if session is not None:
+                if time.time() - session.touched_at > SESSION_TTL_SECONDS:
+                    del self._sessions[session_id]
+                    session = None
+                elif session.user_id != user_id:
+                    return None
+                else:
+                    session.touch()
+                    return session
 
-    def get_or_create(self, session_id: str | None, user_id: str) -> Session:
+        if not (access_token and db.persistence_configured()):
+            return None
+        row = db.load_session_row(session_id, access_token)
+        if row is None or row.get("user_id") != user_id:
+            return None
+        restored = Session.from_row(row)
+        restored.touch()
+        with self._lock:
+            self._sessions[restored.id] = restored
+        return restored
+
+    def get_or_create(
+        self, session_id: str | None, user_id: str, access_token: str | None = None
+    ) -> Session:
         if session_id:
-            existing = self.get(session_id, user_id)
+            existing = self.get(session_id, user_id, access_token)
             if existing is not None:
                 return existing
-        return self.create(user_id)
+        return self.create(user_id, access_token)
+
+    def save(self, session: Session, access_token: str | None = None) -> None:
+        """Push this session's current state to Postgres: best-effort, and a
+        no-op with no token or no Supabase configured. Call once at the end
+        of any route that mutates a session — never on a read-only route,
+        and never load-bearing for the response the visitor is waiting on."""
+        if not (access_token and db.persistence_configured()):
+            return
+        db.update_session_row(session.id, session.to_row(), access_token)
+        new_messages = session.transcript[session._persisted_message_count:]
+        if new_messages:
+            rows = [_message_to_row(entry) for entry in new_messages]
+            if db.append_messages(session.id, rows, access_token):
+                session._persisted_message_count = len(session.transcript)
 
     def _maybe_sweep(self) -> None:
         """Drop expired sessions. Caller holds the lock."""

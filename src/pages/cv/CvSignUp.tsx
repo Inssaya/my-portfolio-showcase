@@ -81,11 +81,15 @@ const CvSignUp = () => {
       password,
       options: {
         data: { first_name: firstName.trim(), last_name: lastName.trim() },
-        // Falls back to the dashboard's configured Site URL if this exact
-        // path isn't in the redirect allow-list yet — landing on the
-        // homepage with a session already set is a minor inconvenience, not
-        // a broken signup, so this is safe to attempt regardless.
-        emailRedirectTo: `${window.location.origin}/cv-builder`,
+        // Lands on the explicit "you're verified" checkpoint (CvVerify)
+        // rather than dropping straight into the app. Falls back to the
+        // dashboard's configured Site URL if this exact path isn't in the
+        // redirect allow-list yet — landing on the homepage with a session
+        // already set is a minor inconvenience, not a broken signup, so this
+        // is safe to attempt regardless. Add
+        // `${origin}/cv-builder/verify` to Supabase's redirect allow-list
+        // (Authentication → URL Configuration) for this to take effect.
+        emailRedirectTo: `${window.location.origin}/cv-builder/verify`,
       },
     });
 
