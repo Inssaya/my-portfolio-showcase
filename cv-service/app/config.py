@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     # --- limits --------------------------------------------------------------
     max_upload_bytes: int = 5 * 1024 * 1024
 
+    # Master switch for app/ratelimit.py. Defaults on; exists as an escape
+    # hatch to flip off via one env var without a redeploy if the limiter
+    # itself ever misbehaves (a false-positive block during an incident is a
+    # worse outage than briefly having no rate limiting at all).
+    rate_limit_enabled: bool = True
+
     # Ceiling on one session's total tokens. Not a per-minute limit — there is
     # none in this service; a "too many requests" message can only ever be
     # OpenAI's own, relayed.

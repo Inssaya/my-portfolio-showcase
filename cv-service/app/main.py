@@ -21,6 +21,13 @@ from .config import get_settings
 from .cv.extract import ExtractionError, extract_cv, extract_everything
 from .cv.photo import PhotoError, looks_like_an_image, prepare_uploaded_photo
 from .llm import LLMBusy, LLMError, LLMNotConfigured, get_pool
+from .ratelimit import (
+    CHAT_PER_USER,
+    GENERATE_PER_USER,
+    UPLOAD_PER_USER,
+    GlobalIpRateLimitMiddleware,
+    limit_by_user,
+)
 from .session import store
 from .tools import ToolError, run_tool
 
@@ -29,6 +36,22 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Resume service", version="0.1.0")
 
 settings = get_settings()
+
+# Order here is not cosmetic. Starlette's add_middleware() inserts at the
+# *front* of its internal list, and the middleware built from that list wraps
+# outside-in from the end — net effect: **the middleware added last ends up
+# outermost**, seeing every request first and every response last. (Verified
+# against Starlette 0.41's actual build_middleware_stack(); the intuitive
+# guess — first added, outermost — is backwards.)
+#
+# GlobalIpRateLimitMiddleware has to go first, CORSMiddleware second, so CORS
+# ends up outermost and wraps *everything* on the way back out — including a
+# 429 the rate limiter returns without ever reaching the route. Added in the
+# opposite order, a rate-limited response skips CORS entirely and a visitor's
+# browser shows a CORS error instead of the real "too many requests" message,
+# which is exactly what shipped here the first time (caught by
+# test_ratelimit.py's test_global_limit_response_carries_cors_headers).
+app.add_middleware(GlobalIpRateLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins,
@@ -199,7 +222,11 @@ def _as_pasted_document(text: str) -> dict | None:
     return extraction
 
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post(
+    "/chat",
+    response_model=ChatResponse,
+    dependencies=[limit_by_user(CHAT_PER_USER, "chat", "chat messages")],
+)
 def chat(payload: ChatRequest = Body(...), user: AuthUser = Depends(get_current_user)) -> ChatResponse:
     session = store.get_or_create(payload.session_id, user.id)
     message = payload.message.strip()
@@ -228,7 +255,11 @@ def chat(payload: ChatRequest = Body(...), user: AuthUser = Depends(get_current_
     )
 
 
-@app.post("/upload", response_model=ChatResponse)
+@app.post(
+    "/upload",
+    response_model=ChatResponse,
+    dependencies=[limit_by_user(UPLOAD_PER_USER, "upload", "uploads")],
+)
 async def upload(
     file: UploadFile = File(...),
     session_id: str | None = Form(default=None),
@@ -326,7 +357,11 @@ async def upload(
     )
 
 
-@app.post("/generate/{session_id}", response_model=ChatResponse)
+@app.post(
+    "/generate/{session_id}",
+    response_model=ChatResponse,
+    dependencies=[limit_by_user(GENERATE_PER_USER, "generate", "renders")],
+)
 def generate(session_id: str, user: AuthUser = Depends(get_current_user)) -> ChatResponse:
     """Render the draft directly, with no model involved.
 

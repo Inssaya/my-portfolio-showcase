@@ -16,6 +16,7 @@ import pytest
 
 from app.auth import AuthUser, get_current_user
 from app.main import app
+from app.ratelimit import limiter
 
 TEST_USER_ID = "00000000-0000-4000-8000-000000000001"
 TEST_USER_EMAIL = "test@example.com"
@@ -34,3 +35,16 @@ def _override_auth():
     app.dependency_overrides[get_current_user] = _fake_current_user
     yield
     app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    """Without this, the whole suite shares one in-process limiter and one
+    TestClient "IP" — 253 tests finish in a few seconds, so their cumulative
+    request count lands inside a single 60-second window and later tests
+    start failing GLOBAL_PER_IP for a reason that has nothing to do with what
+    they are testing. Reset before *and* after: before, so an interrupted
+    previous test can't leave a dirty window; after, for the same reason."""
+    limiter.reset()
+    yield
+    limiter.reset()

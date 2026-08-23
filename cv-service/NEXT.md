@@ -237,17 +237,43 @@ Build** — that path never calls the model, and a test pins it.
 
 ---
 
-## Step 4 — Rate limiting
+## Step 4 — Rate limiting — DONE for one instance; DB-backed version still needed to scale out
 
-Port the *algorithm* from `projectAntiv/backend/app/ratelimit.py`, **not** the
-storage. That implementation documents itself as an in-process sliding window
-correct only for a single worker; on more than one Render instance it would
-count to one forever.
+Built as `app/ratelimit.py` — the algorithm ported from
+`projectAntiv/backend/app/ratelimit.py` (sliding-window log, same reasoning,
+same in-process boundary), the *rules* rewritten for what this service
+actually needs to protect: a global per-IP backstop on every route
+(`GLOBAL_PER_IP`, applied by `GlobalIpRateLimitMiddleware` — deliberately a
+middleware, not a per-route dependency, so nothing added later can forget to
+wire it in), plus tighter per-user limits on `/chat`, `/upload` and
+`/generate` — the three that spend real OpenAI tokens or real CPU.
 
-Back it with a Postgres table or Supabase, keyed on user id and route.
+**Verified live against the actual Render deployment, not just tests**:
+flooded `/ping` past `GLOBAL_PER_IP`, confirmed a real 429 with `Retry-After`,
+confirmed it carried the correct CORS header, waited out the window, confirmed
+it recovered cleanly.
 
-**Done when:** a script firing 50 requests in 10 seconds gets 429s with a real
-`Retry-After`, and a normal conversation never does.
+**A real bug this caught, worth knowing before touching this file again:**
+Starlette's `add_middleware()` inserts at the *front* of its internal list,
+and the stack it builds wraps outside-in from the end — net effect, **the
+middleware added *last* ends up *outermost***. The intuitive guess (first
+added = outermost, like a decorator) is backwards. Getting this wrong made the
+rate limiter's 429 skip CORS entirely, so a rate-limited browser saw a CORS
+error instead of the real message — caught by
+`test_ratelimit.py::test_global_limit_response_carries_cors_headers`. The
+correct order, and why, is spelled out in `app/main.py` right where the two
+middlewares are added; read that comment before reordering anything there.
+
+**Still not done — the DB-backed part.** This is in-process, same as
+`session.py` and `keypool.py`, correct for `render.yaml`'s `numInstances: 1`
+and wrong the moment that becomes more than one — each replica would get its
+own counters and the effective limit would multiply by the replica count. That
+upgrade is the same Postgres move as Step 2c, on the same timeline: back
+`SlidingWindow` with a table keyed on user id and route instead of an
+in-process dict once persistence lands.
+
+**Done when** (this part): a script firing 50 requests in 10 seconds gets
+429s with a real `Retry-After`, and a normal conversation never does. ✅
 
 ---
 
