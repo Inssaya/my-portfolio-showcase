@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HtmlAudio } from "./audio";
 import { TourEngine, TourState } from "./engine";
-import { activeCues, revealedCharCount, tourProgress } from "./timing";
+import { activeBeatIndex, activeCues, captionBeats, revealedCharCount, tourProgress } from "./timing";
 import { TourManifest } from "./types";
 
 type LoadState =
@@ -142,10 +142,21 @@ export function useTour({ manifest, chains, closingSegmentId }: UseTourOptions) 
   const segment = state?.segment ?? null;
   const positionMs = state?.positionMs ?? 0;
 
+  // A segment's text arrives as one or more caption "beats" — see
+  // captionBeats' docstring. Most segments are short enough to be a single
+  // beat covering their whole text, unchanged from before this existed.
+  const beats = useMemo(() => (segment ? captionBeats(segment.text) : []), [segment]);
+  const beatIndex = useMemo(
+    () => (segment ? activeBeatIndex(beats, segment.charTimingsMs, positionMs) : 0),
+    [beats, segment, positionMs],
+  );
+  const beat = beats[beatIndex] ?? { start: 0, end: segment?.text.length ?? 0 };
+
   const revealedCount = useMemo(
     () => (segment ? revealedCharCount(segment.charTimingsMs, positionMs) : 0),
     [segment, positionMs],
   );
+  const revealedInBeat = Math.max(beat.start, Math.min(revealedCount, beat.end));
 
   return {
     state,
@@ -153,10 +164,14 @@ export function useTour({ manifest, chains, closingSegmentId }: UseTourOptions) 
     positionMs,
     muted,
 
-    /** The portion of the caption that has been spoken. */
-    revealedText: segment ? segment.text.slice(0, revealedCount) : "",
-    /** The rest, rendered dimmed so the line does not reflow as it fills in. */
-    pendingText: segment ? segment.text.slice(revealedCount) : "",
+    /** The active beat's already-spoken portion — see captionBeats. */
+    revealedText: segment ? segment.text.slice(beat.start, revealedInBeat) : "",
+    /** The rest of the active beat, dimmed so the line does not reflow. */
+    pendingText: segment ? segment.text.slice(revealedInBeat, beat.end) : "",
+    /** Changes on every beat, not just every segment — the caller keys
+     *  TourCaption's exit/enter animation on this so a beat change gets the
+     *  same fade the old separate segments got for free. */
+    beatKey: segment ? `${segment.id}-${beatIndex}` : "idle",
     cues: segment ? activeCues(segment.cues, positionMs) : [],
     progress: tourProgress(manifest.segments, segment?.id ?? null, positionMs),
 

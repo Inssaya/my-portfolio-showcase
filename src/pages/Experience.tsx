@@ -152,7 +152,7 @@ const TourPlayer = ({ manifest }: { manifest: TourManifest }) => {
             </motion.div>
           ) : (
             <TourCaption
-              key="caption"
+              key={tour.beatKey}
               revealed={tour.revealedText}
               pending={tour.pendingText}
             />

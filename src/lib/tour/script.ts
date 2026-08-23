@@ -39,42 +39,13 @@ export const TOUR_SCRIPT: ScriptSegment[] = [
       { afterWord: 47, type: "fact", label: "PFE — Morocco or abroad" },
       { afterWord: 71, type: "fact", label: "Open to freelance work" },
     ],
-    next: "skills-1",
-  },
-
-  // -------------------------------------------------------------- skills --
-  {
-    id: "skills-1",
-    kind: "narration",
-    text:
-      "What I actually do splits into three. I build data pipelines, I build " +
-      "machine learning and retrieval systems on top of them, and I ship the " +
-      "web applications that put both in front of real users.",
-    cues: [
-      { afterWord: 8, type: "tech", label: "Data Engineering" },
-      { afterWord: 14, type: "tech", label: "ML & RAG" },
-      { afterWord: 24, type: "tech", label: "Full-Stack" },
-    ],
-    next: "skills-2",
-  },
-  {
-    id: "skills-2",
-    kind: "narration",
-    text:
-      "Mostly in Python and TypeScript. Postgres, Kafka and Docker on the " +
-      "data side. LangChain, LangGraph and local models when the work " +
-      "involves language.",
-    next: "projects-intro",
+    // Straight into the project list — no skills/tech-stack detour between
+    // the introduction and the projects. Visitors said the wait to actually
+    // see something felt long; the projects speak for the stack anyway.
+    next: "projects-list",
   },
 
   // ------------------------------------------------------------ projects --
-  {
-    id: "projects-intro",
-    kind: "narration",
-    text:
-      "But descriptions are cheap. Let me show you what I've actually built.",
-    next: "projects-list",
-  },
   {
     id: "projects-list",
     kind: "project-list",
