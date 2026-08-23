@@ -7,27 +7,37 @@ const AdminSkills = () => {
   const [editing, setEditing] = useState<SkillCategory | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [skillInput, setSkillInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { setSkills(adminData.getSkills()); }, []);
 
-  const save = () => {
+  const save = async () => {
     if (!editing) return;
-    let updated: SkillCategory[];
-    if (isNew) {
-      updated = [...skills, { ...editing, id: crypto.randomUUID() }];
-    } else {
-      updated = skills.map((s) => (s.id === editing.id ? editing : s));
+    const updated: SkillCategory[] = isNew
+      ? [...skills, { ...editing, id: crypto.randomUUID() }]
+      : skills.map((s) => (s.id === editing.id ? editing : s));
+    setError(null);
+    try {
+      await adminData.setSkills(updated);
+      setSkills(updated);
+      setEditing(null);
+      setIsNew(false);
+    } catch (err) {
+      console.error("Failed to save skill category", err);
+      setError("Échec de la sauvegarde — réessayez.");
     }
-    adminData.setSkills(updated);
-    setSkills(updated);
-    setEditing(null);
-    setIsNew(false);
   };
 
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     const updated = skills.filter((s) => s.id !== id);
-    adminData.setSkills(updated);
-    setSkills(updated);
+    setError(null);
+    try {
+      await adminData.setSkills(updated);
+      setSkills(updated);
+    } catch (err) {
+      console.error("Failed to delete skill category", err);
+      setError("Échec de la suppression — réessayez.");
+    }
   };
 
   const addSkill = () => {
@@ -44,6 +54,8 @@ const AdminSkills = () => {
           <Plus size={16} /> Ajouter Catégorie
         </button>
       </div>
+
+      {error && <p className="text-destructive text-sm">{error}</p>}
 
       {editing && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
@@ -66,7 +78,7 @@ const AdminSkills = () => {
                 <button onClick={addSkill} className="px-3 py-2 rounded-lg bg-accent/15 text-accent text-sm"><Plus size={16} /></button>
               </div>
             </div>
-            <button onClick={save} className="w-full py-2.5 rounded-lg bg-accent text-accent-foreground font-medium text-sm flex items-center justify-center gap-2"><Check size={16} /> Sauvegarder</button>
+            <button onClick={() => void save()} className="w-full py-2.5 rounded-lg bg-accent text-accent-foreground font-medium text-sm flex items-center justify-center gap-2"><Check size={16} /> Sauvegarder</button>
           </div>
         </div>
       )}
@@ -82,7 +94,7 @@ const AdminSkills = () => {
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <button onClick={() => { setEditing(cat); setIsNew(false); }} className="p-2 rounded-lg hover:bg-secondary/50 text-muted-foreground hover:text-foreground"><Pencil size={15} /></button>
-              <button onClick={() => remove(cat.id)} className="p-2 rounded-lg hover:bg-destructive/15 text-muted-foreground hover:text-destructive"><Trash2 size={15} /></button>
+              <button onClick={() => void remove(cat.id)} className="p-2 rounded-lg hover:bg-destructive/15 text-muted-foreground hover:text-destructive"><Trash2 size={15} /></button>
             </div>
           </div>
         ))}

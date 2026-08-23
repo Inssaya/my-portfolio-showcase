@@ -11,27 +11,37 @@ const AdminProjects = () => {
   const [editing, setEditing] = useState<Project | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [techInput, setTechInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { setProjects(adminData.getProjects()); }, []);
 
-  const save = () => {
+  const save = async () => {
     if (!editing) return;
-    let updated: Project[];
-    if (isNew) {
-      updated = [...projects, { ...editing, id: crypto.randomUUID() }];
-    } else {
-      updated = projects.map((p) => (p.id === editing.id ? editing : p));
+    const updated: Project[] = isNew
+      ? [...projects, { ...editing, id: crypto.randomUUID() }]
+      : projects.map((p) => (p.id === editing.id ? editing : p));
+    setError(null);
+    try {
+      await adminData.setProjects(updated);
+      setProjects(updated);
+      setEditing(null);
+      setIsNew(false);
+    } catch (err) {
+      console.error("Failed to save project", err);
+      setError("Échec de la sauvegarde — réessayez.");
     }
-    adminData.setProjects(updated);
-    setProjects(updated);
-    setEditing(null);
-    setIsNew(false);
   };
 
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     const updated = projects.filter((p) => p.id !== id);
-    adminData.setProjects(updated);
-    setProjects(updated);
+    setError(null);
+    try {
+      await adminData.setProjects(updated);
+      setProjects(updated);
+    } catch (err) {
+      console.error("Failed to delete project", err);
+      setError("Échec de la suppression — réessayez.");
+    }
   };
 
   const addTech = () => {
@@ -51,6 +61,8 @@ const AdminProjects = () => {
           <Plus size={16} /> Ajouter
         </button>
       </div>
+
+      {error && <p className="text-destructive text-sm">{error}</p>}
 
       {/* Edit modal */}
       {editing && (
@@ -97,7 +109,7 @@ const AdminProjects = () => {
             <input value={editing.demoUrl || ""} onChange={(e) => setEditing({ ...editing, demoUrl: e.target.value })} placeholder="Lien Démo (optionnel)" className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none focus:border-accent/50" />
             <input value={editing.githubUrl || ""} onChange={(e) => setEditing({ ...editing, githubUrl: e.target.value })} placeholder="Lien GitHub (optionnel)" className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none focus:border-accent/50" />
 
-            <button onClick={save} className="w-full py-2.5 rounded-lg bg-accent text-accent-foreground font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90">
+            <button onClick={() => void save()} className="w-full py-2.5 rounded-lg bg-accent text-accent-foreground font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90">
               <Check size={16} /> Sauvegarder
             </button>
           </div>
@@ -121,7 +133,7 @@ const AdminProjects = () => {
             </div>
             <div className="flex items-center gap-1">
               <button onClick={() => { setEditing(p); setIsNew(false); }} className="p-2 rounded-lg hover:bg-secondary/50 text-muted-foreground hover:text-foreground"><Pencil size={15} /></button>
-              <button onClick={() => remove(p.id)} className="p-2 rounded-lg hover:bg-destructive/15 text-muted-foreground hover:text-destructive"><Trash2 size={15} /></button>
+              <button onClick={() => void remove(p.id)} className="p-2 rounded-lg hover:bg-destructive/15 text-muted-foreground hover:text-destructive"><Trash2 size={15} /></button>
             </div>
           </div>
         ))}

@@ -5,13 +5,20 @@ import { Check } from "lucide-react";
 const AdminHero = () => {
   const [hero, setHero] = useState<HeroContent>({ subtitle: "", title: "", titleHighlight: "", description: "" });
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { setHero(adminData.getHero()); }, []);
 
-  const save = () => {
-    adminData.setHero(hero);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const save = async () => {
+    setError(null);
+    try {
+      await adminData.setHero(hero);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error("Failed to save hero", err);
+      setError("Échec de la sauvegarde — réessayez.");
+    }
   };
 
   return (
@@ -37,9 +44,10 @@ const AdminHero = () => {
         </div>
       </div>
 
-      <button onClick={save} className="px-6 py-2.5 rounded-lg bg-accent text-accent-foreground font-medium text-sm flex items-center gap-2 hover:opacity-90">
+      <button onClick={() => void save()} className="px-6 py-2.5 rounded-lg bg-accent text-accent-foreground font-medium text-sm flex items-center gap-2 hover:opacity-90">
         <Check size={16} /> {saved ? "Sauvegardé ✓" : "Sauvegarder"}
       </button>
+      {error && <p className="text-destructive text-sm">{error}</p>}
     </div>
   );
 };

@@ -13,7 +13,7 @@ values (
   'AI & Data Engineering',
   'I Build Systems That',
   'Actually Scale',
-  'Final-year engineering student in AI & Data Science at EMSI Casablanca, currently interning as an AI Data Engineer at Aptiv. I build AI-powered and full-stack systems — from RAG pipelines to production-ready web apps — and I''m looking for a 6-month PFE internship starting February 2027.'
+  'Hey, I''m Yassine — a final-year engineering student in AI & Data Science. I like taking ideas and turning them into real-world projects that are stable, useful, and built to succeed in today''s competitive world, and I''m looking for a 6-month PFE internship in Morocco or abroad, ideally with a company where I can grow, contribute, and hopefully continue working together after the internship, while also being open to freelance work.'
 )
 on conflict (id) do nothing;
 
@@ -34,7 +34,7 @@ on conflict (id) do nothing;
 insert into public.about_cards (icon, title, content, position)
 select * from (values
   ('Briefcase'::text, 'Experience'::text,
-    'AI Data Engineer Intern at Aptiv (Tangier) — maintenance KPI platform, predictive maintenance and an agentic RAG assistant. Previously: Laravel chatbot & PDF tool internship at a Casablanca web agency.'::text,
+    'Just finished an internship at Aptiv (Tangier), where I built tools to help a maintenance team catch equipment problems earlier. Before that, I built a chatbot and a PDF tool for a web agency in Casablanca. Now looking for my next internship or freelance project.'::text,
     0::int),
   ('Globe', 'Languages',
     E'Arabic — Native\nFrench — B2\nEnglish — B2\nSpanish — A2',
@@ -57,15 +57,15 @@ where not exists (select 1 from public.education);
 
 insert into public.experience (period, title, company, location, bullets, position)
 select * from (values
-  ('Jun 2026 – Present'::text,
+  ('Jun 2026 – Aug 2026'::text,
    'AI Data Engineer Intern'::text,
    'Aptiv'::text,
    'Tangier, Morocco · Maintenance Department'::text,
    array[
      'Built a maintenance intervention tracking and KPI platform, replacing a manual Excel workflow, and owned its technical specification end to end.',
      'Designed a predictive maintenance module ranking machines by failure risk, combining statistical reliability modeling with an ML classifier.',
-     'Built an agentic RAG assistant calling retrieval and clustering tools over past maintenance reports to surface similar cases and suggest likely causes.',
-     'Validated the full pipeline on synthetic data before touching production, keeping sensitive data on-premise.'
+     'Built an AI assistant that searches past maintenance reports to find similar cases and suggest likely causes.',
+     'Tested everything on synthetic data before touching real production data, to keep sensitive information safe.'
    ]::text[],
    0::int),
   ('2024 – 2025 · 1 month',

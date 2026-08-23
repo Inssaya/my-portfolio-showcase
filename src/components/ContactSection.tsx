@@ -58,9 +58,9 @@ const ContactSection = () => {
             className="space-y-8"
           >
             <p className="text-muted-foreground leading-relaxed">
-              I'm looking for a 6-month final-year internship (PFE) starting February 2027, with
-              the opportunity to transition into a full-time role after graduation. Feel free to
-              reach out for any opportunity or collaboration.
+              I'm an AI &amp; Data Engineer looking for my next internship (PFE) — in Morocco or
+              abroad — or freelance projects. If your team could use some extra hands, I'd love to
+              hear from you.
             </p>
 
             <div className="space-y-4">

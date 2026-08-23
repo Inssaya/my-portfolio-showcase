@@ -6,27 +6,37 @@ const AdminCertificates = () => {
   const [certs, setCerts] = useState<Certificate[]>([]);
   const [editing, setEditing] = useState<Certificate | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { setCerts(adminData.getCertificates()); }, []);
 
-  const save = () => {
+  const save = async () => {
     if (!editing) return;
-    let updated: Certificate[];
-    if (isNew) {
-      updated = [...certs, { ...editing, id: crypto.randomUUID() }];
-    } else {
-      updated = certs.map((c) => (c.id === editing.id ? editing : c));
+    const updated: Certificate[] = isNew
+      ? [...certs, { ...editing, id: crypto.randomUUID() }]
+      : certs.map((c) => (c.id === editing.id ? editing : c));
+    setError(null);
+    try {
+      await adminData.setCertificates(updated);
+      setCerts(updated);
+      setEditing(null);
+      setIsNew(false);
+    } catch (err) {
+      console.error("Failed to save certificate", err);
+      setError("Échec de la sauvegarde — réessayez.");
     }
-    adminData.setCertificates(updated);
-    setCerts(updated);
-    setEditing(null);
-    setIsNew(false);
   };
 
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     const updated = certs.filter((c) => c.id !== id);
-    adminData.setCertificates(updated);
-    setCerts(updated);
+    setError(null);
+    try {
+      await adminData.setCertificates(updated);
+      setCerts(updated);
+    } catch (err) {
+      console.error("Failed to delete certificate", err);
+      setError("Échec de la suppression — réessayez.");
+    }
   };
 
   return (
@@ -38,6 +48,8 @@ const AdminCertificates = () => {
         </button>
       </div>
 
+      {error && <p className="text-destructive text-sm">{error}</p>}
+
       {editing && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-card border border-border rounded-xl w-full max-w-lg p-6 space-y-4">
@@ -47,7 +59,7 @@ const AdminCertificates = () => {
             </div>
             <input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} placeholder="Nom du certificat" className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none" />
             <input value={editing.issuer} onChange={(e) => setEditing({ ...editing, issuer: e.target.value })} placeholder="Émetteur (ex: IBM, Google...)" className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none" />
-            <button onClick={save} className="w-full py-2.5 rounded-lg bg-accent text-accent-foreground font-medium text-sm flex items-center justify-center gap-2"><Check size={16} /> Sauvegarder</button>
+            <button onClick={() => void save()} className="w-full py-2.5 rounded-lg bg-accent text-accent-foreground font-medium text-sm flex items-center justify-center gap-2"><Check size={16} /> Sauvegarder</button>
           </div>
         </div>
       )}
@@ -61,7 +73,7 @@ const AdminCertificates = () => {
             </div>
             <div className="flex items-center gap-1">
               <button onClick={() => { setEditing(c); setIsNew(false); }} className="p-2 rounded-lg hover:bg-secondary/50 text-muted-foreground hover:text-foreground"><Pencil size={15} /></button>
-              <button onClick={() => remove(c.id)} className="p-2 rounded-lg hover:bg-destructive/15 text-muted-foreground hover:text-destructive"><Trash2 size={15} /></button>
+              <button onClick={() => void remove(c.id)} className="p-2 rounded-lg hover:bg-destructive/15 text-muted-foreground hover:text-destructive"><Trash2 size={15} /></button>
             </div>
           </div>
         ))}

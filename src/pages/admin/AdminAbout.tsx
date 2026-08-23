@@ -6,17 +6,24 @@ const AdminAbout = () => {
   const [cards, setCards] = useState<AboutCard[]>([]);
   const [editing, setEditing] = useState<AboutCard | null>(null);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { setCards(adminData.getAbout()); }, []);
 
-  const save = () => {
+  const save = async () => {
     if (!editing) return;
     const updated = cards.map((c) => (c.id === editing.id ? editing : c));
-    adminData.setAbout(updated);
-    setCards(updated);
-    setEditing(null);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setError(null);
+    try {
+      await adminData.setAbout(updated);
+      setCards(updated);
+      setEditing(null);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error("Failed to save about card", err);
+      setError("Échec de la sauvegarde — réessayez.");
+    }
   };
 
   return (
@@ -35,7 +42,8 @@ const AdminAbout = () => {
             </div>
             <input value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} placeholder="Titre" className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none" />
             <textarea value={editing.content} onChange={(e) => setEditing({ ...editing, content: e.target.value })} rows={5} placeholder="Contenu" className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none resize-none" />
-            <button onClick={save} className="w-full py-2.5 rounded-lg bg-accent text-accent-foreground font-medium text-sm hover:opacity-90">Sauvegarder</button>
+            {error && <p className="text-destructive text-sm">{error}</p>}
+            <button onClick={() => void save()} className="w-full py-2.5 rounded-lg bg-accent text-accent-foreground font-medium text-sm hover:opacity-90">Sauvegarder</button>
           </div>
         </div>
       )}

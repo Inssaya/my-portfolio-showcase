@@ -8,27 +8,37 @@ const AdminEducation = () => {
   const [items, setItems] = useState<Education[]>([]);
   const [editing, setEditing] = useState<Education | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { setItems(adminData.getEducation()); }, []);
 
-  const save = () => {
+  const save = async () => {
     if (!editing) return;
-    let updated: Education[];
-    if (isNew) {
-      updated = [...items, { ...editing, id: crypto.randomUUID() }];
-    } else {
-      updated = items.map((e) => (e.id === editing.id ? editing : e));
+    const updated: Education[] = isNew
+      ? [...items, { ...editing, id: crypto.randomUUID() }]
+      : items.map((e) => (e.id === editing.id ? editing : e));
+    setError(null);
+    try {
+      await adminData.setEducation(updated);
+      setItems(updated);
+      setEditing(null);
+      setIsNew(false);
+    } catch (err) {
+      console.error("Failed to save education", err);
+      setError("Échec de la sauvegarde — réessayez.");
     }
-    adminData.setEducation(updated);
-    setItems(updated);
-    setEditing(null);
-    setIsNew(false);
   };
 
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     const updated = items.filter((e) => e.id !== id);
-    adminData.setEducation(updated);
-    setItems(updated);
+    setError(null);
+    try {
+      await adminData.setEducation(updated);
+      setItems(updated);
+    } catch (err) {
+      console.error("Failed to delete education", err);
+      setError("Échec de la suppression — réessayez.");
+    }
   };
 
   return (
@@ -39,6 +49,8 @@ const AdminEducation = () => {
           <Plus size={16} /> Ajouter
         </button>
       </div>
+
+      {error && <p className="text-destructive text-sm">{error}</p>}
 
       {editing && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
@@ -51,7 +63,7 @@ const AdminEducation = () => {
             <input value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} placeholder="Titre" className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none" />
             <input value={editing.institution} onChange={(e) => setEditing({ ...editing, institution: e.target.value })} placeholder="Institution" className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none" />
             <textarea value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} placeholder="Description" rows={3} className="w-full px-3 py-2.5 rounded-lg bg-secondary/50 border border-border text-sm outline-none resize-none" />
-            <button onClick={save} className="w-full py-2.5 rounded-lg bg-accent text-accent-foreground font-medium text-sm flex items-center justify-center gap-2"><Check size={16} /> Sauvegarder</button>
+            <button onClick={() => void save()} className="w-full py-2.5 rounded-lg bg-accent text-accent-foreground font-medium text-sm flex items-center justify-center gap-2"><Check size={16} /> Sauvegarder</button>
           </div>
         </div>
       )}
@@ -66,7 +78,7 @@ const AdminEducation = () => {
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <button onClick={() => { setEditing(e); setIsNew(false); }} className="p-2 rounded-lg hover:bg-secondary/50 text-muted-foreground hover:text-foreground"><Pencil size={15} /></button>
-              <button onClick={() => remove(e.id)} className="p-2 rounded-lg hover:bg-destructive/15 text-muted-foreground hover:text-destructive"><Trash2 size={15} /></button>
+              <button onClick={() => void remove(e.id)} className="p-2 rounded-lg hover:bg-destructive/15 text-muted-foreground hover:text-destructive"><Trash2 size={15} /></button>
             </div>
           </div>
         ))}
