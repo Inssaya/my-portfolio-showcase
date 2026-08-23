@@ -46,8 +46,24 @@ const ResumeBuilder = () => {
   } = useResumeChat();
   const [draft, setDraft] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [longWait, setLongWait] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // The warm-up ping (main.tsx, useResumeChat) usually means the backend is
+  // already awake by the time a message is sent — but not always: a Render
+  // free-tier cold start can take up to about a minute, and a visitor who
+  // moves fast enough can still land on one. Spinning dots alone for 50
+  // seconds with no explanation reads as broken, not slow, so this switches
+  // to an explicit message once a request has been running a while.
+  useEffect(() => {
+    if (!busy) {
+      setLongWait(false);
+      return;
+    }
+    const timer = setTimeout(() => setLongWait(true), 7000);
+    return () => clearTimeout(timer);
+  }, [busy]);
 
   useEffect(() => {
     document.title = "CV Builder — Yassine Sinif";
@@ -248,11 +264,15 @@ const ResumeBuilder = () => {
                     />
                   ))}
                 </div>
-                {status === "uploading" && (
+                {longWait ? (
+                  <span className="text-xs text-muted-foreground">
+                    Waking up the server — this can take up to a minute the first time.
+                  </span>
+                ) : status === "uploading" ? (
                   <span className="text-xs text-muted-foreground">
                     Reading your CV…
                   </span>
-                )}
+                ) : null}
               </div>
             )}
 

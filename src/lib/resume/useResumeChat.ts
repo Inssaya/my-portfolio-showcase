@@ -10,6 +10,7 @@ import {
   resumeApiConfigured,
   sendMessage,
   uploadCv,
+  warmUpResumeService,
 } from "./api";
 
 export interface ResumeTurn {
@@ -68,6 +69,17 @@ export function useResumeChat() {
   const photoBlobUrlRef = useRef<string | null>(null);
 
   const busy = status === "thinking" || status === "uploading";
+
+  // main.tsx already pings on every full page load, but that fires once per
+  // document load, not per SPA route change — a visitor who browsed the rest
+  // of the site client-side for a while before clicking into the CV builder
+  // would otherwise get no second chance to warm a backend that fell back
+  // asleep in the meantime. warmUpResumeService no-ops if it already pinged
+  // recently, so this costs nothing on the common path where main.tsx's ping
+  // is still fresh.
+  useEffect(() => {
+    warmUpResumeService();
+  }, []);
 
   const setPhoto = useCallback((url: string | null) => {
     // Each object URL pins the blob in memory until revoked; without this a

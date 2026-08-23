@@ -17,6 +17,43 @@ const BASE_URL = (import.meta.env.VITE_RESUME_API_URL as string | undefined)?.re
 /** True when the frontend knows where the resume service lives. */
 export const resumeApiConfigured = BASE_URL.length > 0;
 
+// Render's free tier sleeps a service after ~15 minutes idle and takes up to
+// roughly a minute to cold-start on the next request. Re-pinging more often
+// than that window is just wasted requests against an instance that is
+// already awake.
+const WARM_UP_MIN_INTERVAL_MS = 5 * 60 * 1000;
+let lastWarmUpAt = 0;
+
+/**
+ * Fire-and-forget GET to /health, to wake a sleeping backend before the
+ * visitor's first real request needs it to already be awake.
+ *
+ * The frontend itself never waits on this — it is a static Vercel deploy the
+ * visitor sees instantly regardless of what the backend is doing. Without
+ * this, though, the *backend* only starts waking up the moment the visitor
+ * sends their first chat message, which makes an ordinary first message look
+ * like the app has hung for the better part of a minute. Calling this as
+ * early as possible (main.tsx, before React even mounts) uses the time the
+ * visitor spends reading the page, signing in or uploading a file as free
+ * warm-up time instead.
+ *
+ * `/health` needs no auth and answers before any session or OpenAI key is
+ * touched, so this never spends a token or creates state server-side — it is
+ * genuinely just "is the process awake".
+ */
+export function warmUpResumeService(): void {
+  if (!resumeApiConfigured) return;
+  const now = Date.now();
+  if (now - lastWarmUpAt < WARM_UP_MIN_INTERVAL_MS) return;
+  lastWarmUpAt = now;
+
+  fetch(`${BASE_URL}/health`).catch(() => {
+    // Silent on purpose: this is opportunistic warming, not a real request.
+    // Failure here changes nothing — the visitor's actual first message
+    // would simply wait out the cold start itself, exactly as it always did.
+  });
+}
+
 /**
  * The signed-in visitor's bearer token, read fresh on every call.
  *
