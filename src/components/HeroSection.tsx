@@ -153,13 +153,13 @@ const HeroSection = () => {
               // "H" (Hey, I'm...), previously "F". A wide, boxy capital like H
               // needs more right clearance than a narrow one like F or a
               // curved one like O, or the wrapped text crowds its right edge;
-              // me-3 (vs. the old me-2) and a touch more size is a deliberate
-              // compromise across letterforms, not tuned to any one of them.
+              // me-3 (vs. the old me-2) gives it that room. Font size is back
+              // to the original — only the spacing changed.
               className="mb-7 max-w-[34rem] text-[15.5px] leading-[1.75] text-foreground/85 md:text-base
                          first-letter:me-3 first-letter:mt-1 first-letter:float-left
-                         first-letter:font-playfair first-letter:text-[3.75rem]
+                         first-letter:font-playfair first-letter:text-[3.5rem]
                          first-letter:font-medium first-letter:leading-[0.85]
-                         first-letter:text-accent md:first-letter:text-[4.25rem]"
+                         first-letter:text-accent md:first-letter:text-[4rem]"
             >
               {hero.description}
             </motion.p>
