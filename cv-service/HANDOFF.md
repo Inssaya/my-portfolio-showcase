@@ -16,17 +16,24 @@ A CV builder at `/cv-builder` on the portfolio. A visitor either uploads/pastes
 an existing CV or is interviewed from scratch, and gets back a designed PDF that
 reproduces Yassine's own CV design.
 
-**Status: Phase 1 complete.** No auth, anonymous sessions, free. 222 tests pass.
-Verified end to end in Docker against the real OpenAI API.
+**Status: Phase 1 complete. Phase 2 auth complete; persistence not started.**
+Every route now requires a signed-in Supabase user and a session belongs to
+exactly one account (verified live: an unauthenticated request gets a real
+401). The draft itself still lives in this process's memory, not Postgres —
+that is the next thing to build, detailed in `NEXT.md` Step 2b/2c. 251 tests
+pass, hermetic (auth is faked at the network boundary — see
+`tests/conftest.py`, `tests/test_auth.py`).
 
 ```
 portfolio (Vite → Vercel, static)
-        │  HTTPS
+        │  HTTPS, bearer token
         ▼
 cv-service (FastAPI + ReportLab → Render, Docker)
-        │
-        ▼
-   OpenAI (gpt-4o-mini, pooled keys)
+        │                    │
+        ▼                    ▼
+   OpenAI                Supabase (GET /auth/v1/user — verifies the
+(gpt-4o-mini,              token; this service never touches the
+ pooled keys)               database directly, see §8)
 ```
 
 ---
@@ -147,11 +154,18 @@ something real was run through the system.
 17. `contact` arrived pipe-separated (`A | B | C`) because the model borrowed the entry-header delimiter.
 18. All-caps names (`YASSINE SINIF`) printed shouting, because designed CVs store the name the way they render it.
 
+**Auth — not bugs, but both cost real time discovering live and are worth knowing before you hit them again**
+19. `<img src>` and `<a href>` cannot carry a custom `Authorization` header — a plain browser navigation just drops it. The PDF download and photo thumbnail both had to switch from pointing straight at the endpoint to fetching it with `fetch()` + the bearer header and handing the browser a local `blob:` URL instead (`downloadResume`, `fetchPhotoUrl` in `src/lib/resume/api.ts`).
+20. Supabase's own email deliverability check rejects reserved test domains (`@example.com`) with `email_address_invalid` before your code even runs — not a bug, but a wasted debugging session if you don't know it. Use a real-shaped domain (`@gmail.com` works fine as a *format*, even for an address nobody reads) when testing signup by hand.
+21. Supabase's **built-in mailer rate-limits hard** — confirmed live: a real signup attempt hit `over_email_send_rate_limit` on the second or third try. This is why 2a in `NEXT.md` calls out Brevo SMTP as still outstanding, not optional polish.
+
 ---
 
 ## 5. Things that look wrong but are deliberate
 
-* **One worker, one instance.** Sessions and the key pool are per-process. A second would strand drafts on the wrong machine and double effective rate limits.
+* **One worker, one instance.** Sessions and the key pool are per-process. A second would strand drafts on the wrong machine and double effective rate limits. Auth is now verified against Supabase (network call, stateless), but the draft itself is not yet in Postgres — so this constraint has not gone away, it has just moved: it now applies to session state specifically, not "everything", and Step 2b/2c in `NEXT.md` is what removes it.
+* **Auth verifies against a live Supabase endpoint, not a locally-checked JWT.** `GET /auth/v1/user` per request (cached 30s) rather than decoding the token with a shared secret — trades a network round trip for zero secret management and instant revocation. See `app/auth.py`'s docstring.
+* **This service never holds the Supabase `service_role` key.** Only the anon key, same as the frontend. It is enough because verification goes through Supabase's own endpoint rather than a direct database read — see the point above. When persistence lands (`NEXT.md` 2c), it stays this way: writes go through PostgREST authenticated as the visitor's own token, and RLS enforces isolation at the database, not service_role bypassing it.
 * **Fonts vendored in `app/cv/fonts/`,** not installed from the system. The old `/usr/share/fonts` path failed silently everywhere but Linux, falling back to Helvetica/Times. The Docker build now *fails* if they do not load.
 * **pypdf, not PyMuPDF.** PyMuPDF is better but AGPL: hosting it obliges publishing the service's source. This is intended to become paid.
 * **`_cvmodern.py` / `_cvdesign.py` are vendored verbatim.** Geometry was measured off reference PDFs at 110dpi. Only two deliberate edits exist (font registration, employer weight), both tested.
@@ -171,14 +185,16 @@ cd cv-service && docker compose up --build          # :8000
 # frontend (repo root)
 npm run dev                                          # :8080 → /cv-builder
 
-cd cv-service && .venv/Scripts/python -m pytest -q  # 222 tests, no network needed
+cd cv-service && .venv/Scripts/python -m pytest -q  # 251 tests, no network needed
 ```
 
 Python **3.13** — 3.14 has no wheels for pydantic-core/pillow and tries to
 compile Rust.
 
 `cv-service/.env` holds the key and is gitignored. `.env.example` documents
-every variable.
+every variable, including `SUPABASE_URL`/`SUPABASE_ANON_KEY` — the same values
+the frontend's `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` use, not new ones to
+generate.
 
 ### Deploying
 
@@ -187,7 +203,13 @@ redeploy** — Vite inlines env vars at build time.
 
 Backend: Render → New → Blueprint → this repo. `render.yaml` is committed; it
 prompts for `OPENAI_API_KEY` and `ALLOWED_ORIGINS` (exact origin, no trailing
-slash).
+slash) and pre-fills `SUPABASE_URL`/`SUPABASE_ANON_KEY` — safe to commit, they
+already ship in the frontend's browser bundle (see `render.yaml`'s comment).
+
+Every route requiring sign-in means the deploy checklist now includes
+Supabase, not just Render/Vercel: Authentication → Providers → Email must be
+on (it is, on the live project), and Brevo SMTP should be configured before
+directing real traffic at it — see the bug list above, item 21.
 
 **Free tier caveat:** Render sleeps after 15 min idle. ~50s cold start, and
 sleeping **wipes every in-flight draft** because sessions are in-process. This is

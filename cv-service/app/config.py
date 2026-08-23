@@ -62,6 +62,19 @@ class Settings(BaseSettings):
     # Set MAX_SESSION_TOKENS=0 to disable the ceiling entirely.
     max_session_tokens: int = 60_000
 
+    # --- auth ------------------------------------------------------------------
+    # The same project the portfolio's admin panel already uses
+    # (src/lib/supabase.ts) — this service only ever calls the public
+    # /auth/v1/user endpoint with the anon key, never the service_role key, so
+    # the anon key is all it needs. See app/auth.py for why verification goes
+    # through Supabase rather than a locally-checked JWT secret.
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
+
+    @property
+    def auth_configured(self) -> bool:
+        return bool(self.supabase_url and self.supabase_anon_key)
+
     # --- CORS ----------------------------------------------------------------
     allowed_origins: str = "http://localhost:8080,http://127.0.0.1:8080"
 

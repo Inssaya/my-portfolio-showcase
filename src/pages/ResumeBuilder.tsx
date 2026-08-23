@@ -1,10 +1,10 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, Check, Download, FileText, FileUp, RotateCcw, Sparkles, X } from "lucide-react";
+import { ArrowUp, Check, Download, FileText, FileUp, LogOut, RotateCcw, Sparkles, X } from "lucide-react";
 import ChatMarkdown from "@/components/ChatMarkdown";
 import Navigation from "@/components/Navigation";
 import MobileNav from "@/components/MobileNav";
-import { photoUrl, resumeDownloadUrl } from "@/lib/resume/api";
+import { supabase } from "@/lib/supabase";
 import { useResumeChat } from "@/lib/resume/useResumeChat";
 
 /**
@@ -36,11 +36,11 @@ const ResumeBuilder = () => {
     pdfVersion,
     canBuild,
     hasPhoto,
-    photoVersion,
-    sessionId,
+    photoBlobUrl,
     send,
     upload,
     build,
+    download,
     dropPhoto,
     reset,
   } = useResumeChat();
@@ -112,16 +112,28 @@ const ResumeBuilder = () => {
               <span className="text-accent">Free while it's in beta.</span>
             </p>
           </div>
-          {turns.length > 0 && (
+          <div className="flex shrink-0 items-center gap-2">
+            {turns.length > 0 && (
+              <button
+                type="button"
+                onClick={reset}
+                className="flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-accent/50 hover:text-accent"
+              >
+                <RotateCcw size={12} />
+                Start over
+              </button>
+            )}
             <button
               type="button"
-              onClick={reset}
-              className="flex shrink-0 items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-accent/50 hover:text-accent"
+              onClick={() => void supabase?.auth.signOut()}
+              title="Sign out"
+              aria-label="Sign out"
+              className="flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
             >
-              <RotateCcw size={12} />
-              Start over
+              <LogOut size={12} />
+              Sign out
             </button>
-          )}
+          </div>
         </header>
 
         <div className="relative flex flex-1 flex-col overflow-hidden rounded-xl border border-border/60 bg-card/50">
@@ -202,10 +214,15 @@ const ResumeBuilder = () => {
 
                   {/* Attached to the turn that produced it, so scrolling back
                       through several versions keeps each download with the
-                      message that describes it. */}
-                  {turn.pdfVersion !== undefined && sessionId && (
-                    <a
-                      href={resumeDownloadUrl(sessionId)}
+                      message that describes it. A button rather than an
+                      <a href>: the endpoint now requires a bearer token that a
+                      plain browser navigation cannot carry, so this fetches
+                      the PDF and saves it as a blob instead — see
+                      downloadResume in api.ts. */}
+                  {turn.pdfVersion !== undefined && (
+                    <button
+                      type="button"
+                      onClick={() => void download()}
                       className="mt-3 inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-xs font-semibold text-accent-foreground transition-opacity hover:opacity-90"
                     >
                       <Download size={13} />
@@ -213,7 +230,7 @@ const ResumeBuilder = () => {
                       {turn.pdfVersion > 1 && (
                         <span className="opacity-70">v{turn.pdfVersion}</span>
                       )}
-                    </a>
+                    </button>
                   )}
                 </div>
               </div>
@@ -264,10 +281,10 @@ const ResumeBuilder = () => {
           {canBuild && !unavailable && (
             <div className="flex items-center justify-between gap-3 border-t border-border/50 bg-accent/5 px-4 py-2.5">
               <div className="flex min-w-0 items-center gap-2.5">
-                {hasPhoto && sessionId && (
+                {hasPhoto && photoBlobUrl && (
                   <span className="flex shrink-0 items-center gap-1.5">
                     <img
-                      src={photoUrl(sessionId, photoVersion)}
+                      src={photoBlobUrl}
                       alt="The photo that will appear on your CV"
                       className="h-7 w-7 rounded-full object-cover ring-1 ring-border/60"
                     />

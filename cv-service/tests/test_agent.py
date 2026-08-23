@@ -13,6 +13,7 @@ from app import agent as agent_module
 from app.llm import Completion, ToolCall
 from app.session import Session, store
 from app.tools import run_tool
+from conftest import TEST_USER_ID
 
 
 @pytest.fixture(autouse=True)
@@ -24,7 +25,7 @@ def _clean_sessions():
 
 @pytest.fixture
 def session() -> Session:
-    return store.create()
+    return store.create(user_id=TEST_USER_ID)
 
 
 def _fake_llm(monkeypatch, script: list[Completion]):

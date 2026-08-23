@@ -60,25 +60,76 @@ testing yet.
 
 ---
 
-## Step 2 — Supabase auth + persistence
+## Step 2 — Supabase auth + persistence — AUTH DONE, PERSISTENCE NOT
 
-This is the big one. Everything after it depends on it. **Decided already:**
-Supabase Auth, not a port of `projectAntiv`'s FastAPI auth — that one issues
-8-digit *codes* while the requirement is verification *links*, and it needs a
-persistent server. Supabase does links, JWT and password reset natively and is
-already wired into the portfolio (`src/lib/supabase.ts`).
+Split into two halves. **Auth is done and verified live.** Persisting sessions
+to Postgres — the other half, below — is not, and is the next thing to build.
 
-### 2a. Supabase dashboard
+### 2a. Supabase dashboard — partly done
 
-- Authentication → Providers → **Email** on, **Confirm email** on.
-- Authentication → URL Configuration → Site URL = the Vercel URL; add
-  `https://<vercel-url>/cv-builder` to redirect allow-list.
-- Project Settings → Auth → SMTP → **Brevo**. Supabase's built-in mailer is rate
-  limited to a handful of messages an hour and will silently throttle a launch.
-  Brevo's API-key transport is in `projectAntiv/backend/app/mailer.py`; read the
-  errno 101 comment there before choosing SMTP over the HTTPS API.
+- Authentication → Providers → **Email** on, **Confirm email** on — **done**.
+- Authentication → URL Configuration → Site URL set to the Vercel root — **done**.
+  Not yet added: `https://<vercel-url>/cv-builder/login` to the redirect
+  allow-list specifically. Without it, a password-reset link falls back to
+  landing on the site root instead of the login page — the session still gets
+  set correctly (see `CvSignIn.tsx`'s comment on this), it just takes one extra
+  manual visit to `/cv-builder/login` to reach the "set a new password" form.
+  Small, but worth the thirty seconds to add.
+- Project Settings → Auth → SMTP → **Brevo — NOT done, and confirmed to matter
+  in practice, not just in theory.** Live-tested against the real project: a
+  signup attempt from a real email address returned
+  `over_email_send_rate_limit` immediately. Supabase's built-in mailer allows
+  only a handful of emails an hour; the frontend now shows a clear message for
+  it (`CvSignUp.tsx`/`CvSignIn.tsx`'s `messageFor`) rather than a confusing
+  generic failure, but real signups will keep hitting this wall until SMTP is
+  switched to Brevo. Brevo's API-key transport is in
+  `projectAntiv/backend/app/mailer.py`; read the errno 101 comment there before
+  choosing SMTP over the HTTPS API.
 
-### 2b. Schema
+### 2a-continued. Auth verification — DONE, differently than planned below
+
+Built as `app/auth.py`. **Deliberately not** the JWT-secret approach originally
+sketched here: verification goes through Supabase's own `GET /auth/v1/user`
+endpoint (one HTTP call, using the anon key you already have) rather than
+decoding the JWT locally with a shared signing secret. Two reasons, both in the
+module's own docstring: no secret to manage (newer Supabase projects rotate an
+asymmetric key over JWKS, older ones use a shared HS256 secret — plumbing
+either correctly is one more thing to get wrong), and instant revocation (a
+locally verified JWT reads as valid until it expires even after a ban; asking
+Supabase applies its own revocation immediately). A verified token is cached
+30s in-process so a burst of frontend calls in one turn does not re-verify on
+every one.
+
+Also done, not originally split out as its own item: **session ownership**.
+`Session` now carries `user_id`; `SessionStore.get`/`get_or_create` in
+`app/session.py` refuse to return a session that belongs to someone else,
+indistinguishably from "does not exist" (never leaks whether an id is real but
+foreign — see the tests in `test_auth.py`). Every route in `main.py` sits
+behind `Depends(get_current_user)` except `/health` (Render's health check
+carries no bearer token) and `/ops/keys` (unchanged from Phase 1 — putting it
+behind *admin* auth specifically is still Step 5, not this one).
+
+Frontend: `CvSignUp.tsx`, `CvSignIn.tsx` (sign in, forgot-password, and the
+"set new password" recovery view all live in one file — see its docstring for
+why), `CvProtectedRoute.tsx`, `CvTerms.tsx`. Every call in
+`src/lib/resume/api.ts` now carries a bearer header read fresh from
+`supabase.auth.getSession()` on each call, which is what makes supabase-js's
+background token refresh actually take effect for this service's calls too. The
+PDF download and photo thumbnail could not stay a plain `<a href>`/`<img src>`
+once their endpoints required a header a browser navigation cannot send — both
+now fetch as an authenticated blob and hand the browser a local `blob:` URL
+instead (`downloadResume`, `fetchPhotoUrl` in `api.ts`).
+
+**Verified live, not just by the test suite:** rebuilt the Docker image,
+confirmed an unauthenticated request now gets a real 401, and drove signup
+through an actual browser against the real Supabase project — which is what
+surfaced the Brevo gap above.
+
+251 backend tests (was 237), all hermetic — `app/auth.py` is faked at the
+`httpx.get` boundary in `test_auth.py`, and every other test gets a fixed fake
+user for free from the autouse override in `tests/conftest.py`.
+
+### 2b. Schema for session persistence — NOT DONE, this is next
 
 Add to `supabase/schema.sql` (it is already idempotent — follow its style):
 
@@ -126,31 +177,36 @@ RLS: a user reads and writes **only their own** rows
 (`auth.uid() = user_id`). `cv_messages` inherits through `session_id`. Copy the
 policy shape already used in that file.
 
-### 2c. Service changes
+### 2c. Service changes — the persistence half, not done
 
-- New `app/auth.py`: verify the Supabase JWT on every request. Supabase signs
-  with the project's JWT secret — verify signature and `exp`, then read `sub` as
-  the user id. `jose` is already a frontend dependency; on the Python side use
-  `pyjwt` (add to `requirements.txt`).
-- `app/main.py`: add the dependency to every route. The module is already shaped
-  for this — every handler takes a session and nothing assumes anonymity.
-- `app/session.py`: back `SessionStore` with Postgres instead of the in-process
-  dict. `Session` is a plain dataclass specifically so it maps to a row. Keep
-  the in-memory store as the fallback when Supabase is unconfigured, exactly as
+Everything below is still exactly as originally planned; none of it exists yet.
+`app/auth.py`, `app/main.py`'s auth gating and `Session.user_id` (2a-continued
+above) are done — this is the part that makes a session outlive one Render
+process, which is what actually fixes the "sleeping wipes every draft" problem
+in `README.md`.
+
+- `app/session.py`: back `SessionStore` with Postgres instead of the
+  in-process dict, using `cv_sessions`/`cv_messages` from 2b above. `Session`
+  is a plain dataclass specifically so it maps to a row. Keep the in-memory
+  store as the fallback when Supabase is unconfigured, exactly as
   `src/lib/admin-data.ts` falls back to localStorage.
+- Write through Postgres using the **visitor's own access token**
+  (`AuthUser.access_token`, already returned by `get_current_user` for exactly
+  this reason), calling Supabase's PostgREST endpoint directly rather than the
+  service_role key. RLS then enforces per-user isolation at the database
+  itself — this service still never needs to hold service_role, the same
+  boundary `app/auth.py` already keeps.
 - Persist `session.transcript` to `cv_messages` as it grows.
-
-### 2d. Frontend
-
-- `/cv-builder` requires a session: redirect to sign-in when absent.
-- Reuse `src/components/admin/ProtectedRoute.tsx` — it already does
-  `onAuthStateChange`.
-- Send the access token as `Authorization: Bearer <token>` from
-  `src/lib/resume/api.ts`. Note `allow_credentials=False` in the CORS config;
-  a bearer header works with it, cookies would not.
+- `session.photo` and `session.pdf` are raw bytes, which do not belong in a
+  jsonb column. Either a `bytea` column on `cv_sessions` (simplest, fine at
+  this scale) or a Supabase Storage bucket per user (more work, better if
+  photos/PDFs get large or numerous) — pick one, this file does not prescribe
+  it.
 
 **Done when:** signing out and back in on a different browser shows the same
-draft, and Render restarting no longer loses it.
+draft, and Render restarting no longer loses it. (Auth alone already gets you
+"nobody else can see your draft" — it does not yet get you "the draft survives
+a restart"; that is what this section is for.)
 
 **Traps:**
 - `numInstances: 1` in `render.yaml` exists *because* state was per-process.

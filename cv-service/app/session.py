@@ -57,6 +57,10 @@ class TokenUsage:
 @dataclass
 class Session:
     id: str
+    # The Supabase user id that owns this session. Required: every route now
+    # sits behind auth (see app/auth.py), so a session with no owner should
+    # never be constructible.
+    user_id: str
     created_at: float = field(default_factory=time.time)
     touched_at: float = field(default_factory=time.time)
 
@@ -169,14 +173,22 @@ class SessionStore:
         self._lock = threading.Lock()
         self._last_sweep = time.monotonic()
 
-    def create(self) -> Session:
-        session = Session(id=secrets.token_urlsafe(16))
+    def create(self, user_id: str) -> Session:
+        session = Session(id=secrets.token_urlsafe(16), user_id=user_id)
         with self._lock:
             self._maybe_sweep()
             self._sessions[session.id] = session
         return session
 
-    def get(self, session_id: str) -> Session | None:
+    def get(self, session_id: str, user_id: str) -> Session | None:
+        """The session, or None if it does not exist, has expired, **or
+        belongs to someone else**.
+
+        Ownership is checked here rather than by the caller, so every route
+        gets it for free and none can forget it. A mismatch returns the same
+        None as "does not exist" — distinguishing them would let one user
+        probe for another's session ids by the shape of the error.
+        """
         with self._lock:
             self._maybe_sweep()
             session = self._sessions.get(session_id)
@@ -185,15 +197,17 @@ class SessionStore:
             if time.time() - session.touched_at > SESSION_TTL_SECONDS:
                 del self._sessions[session_id]
                 return None
+            if session.user_id != user_id:
+                return None
             session.touch()
             return session
 
-    def get_or_create(self, session_id: str | None) -> Session:
+    def get_or_create(self, session_id: str | None, user_id: str) -> Session:
         if session_id:
-            existing = self.get(session_id)
+            existing = self.get(session_id, user_id)
             if existing is not None:
                 return existing
-        return self.create()
+        return self.create(user_id)
 
     def _maybe_sweep(self) -> None:
         """Drop expired sessions. Caller holds the lock."""

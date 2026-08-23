@@ -12,6 +12,7 @@ from app.config import reset_settings
 from app.llm import Completion, LLMBusy, LLMNotConfigured, ToolCall
 from app.main import app
 from app.session import store
+from conftest import TEST_USER_ID
 
 
 @pytest.fixture(autouse=True)
@@ -166,7 +167,7 @@ def test_upload_extracts_and_opens_the_conversation(monkeypatch, client: TestCli
     assert "Jane Doe" in body["reply"]
 
     # The extracted text must have reached the model's context.
-    session = store.get(body["session_id"])
+    session = store.get(body["session_id"], TEST_USER_ID)
     assert any("Acme" in m.get("content", "") for m in session.history)
 
 

@@ -14,6 +14,7 @@ from app import agent as agent_module
 from app.llm import Completion
 from app.main import app
 from app.session import store
+from conftest import TEST_USER_ID
 
 
 @pytest.fixture(autouse=True)
@@ -34,7 +35,7 @@ def test_generate_renders_without_calling_the_model(monkeypatch, client: TestCli
 
     monkeypatch.setattr(agent_module, "complete", explode)
 
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.set_field("full_name", "Ahmed Sefriui")
     session.set_field("experience", "Manager Intern | Acme | Feb 2021\n- Managed cash flow.")
 
@@ -50,7 +51,7 @@ def test_generate_renders_without_calling_the_model(monkeypatch, client: TestCli
 
 
 def test_generate_costs_no_tokens(client: TestClient) -> None:
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.set_field("full_name", "Ahmed Sefriui")
     session.set_field("skills", "Finance: Budgeting, Cash Flow Management")
 
@@ -61,7 +62,7 @@ def test_generate_costs_no_tokens(client: TestClient) -> None:
 
 def test_generate_rejects_a_name_only_draft(client: TestClient) -> None:
     """The same substance rule as the tool: never hand somebody a blank CV."""
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.set_field("full_name", "Ahmed Sefriui")
 
     response = client.post(f"/generate/{session.id}")
@@ -75,7 +76,7 @@ def test_generate_404s_for_an_unknown_session(client: TestClient) -> None:
 
 
 def test_rebuild_bumps_the_version(client: TestClient) -> None:
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.set_field("full_name", "Ahmed Sefriui")
     session.set_field("skills", "Finance: Budgeting")
 

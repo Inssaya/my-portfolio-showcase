@@ -11,6 +11,7 @@ import pytest
 
 from app.agent import VERBATIM_WINDOW, _compact, _wire_messages
 from app.session import store
+from conftest import TEST_USER_ID
 
 
 @pytest.fixture(autouse=True)
@@ -41,7 +42,7 @@ def _exchange(session, index: int) -> None:
 
 
 def test_short_history_is_untouched() -> None:
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     _exchange(session, 1)
 
     assert _compact(session) == session.history
@@ -54,7 +55,7 @@ def test_long_history_is_bounded() -> None:
     to a user message rather than slicing mid-exchange. What matters is that it
     is a *constant* — identical for a 20-turn and a 200-turn conversation.
     """
-    short, long = store.create(), store.create()
+    short, long = store.create(user_id=TEST_USER_ID), store.create(user_id=TEST_USER_ID)
     for i in range(20):
         _exchange(short, i)
     for i in range(200):
@@ -66,7 +67,7 @@ def test_long_history_is_bounded() -> None:
 
 def test_compaction_keeps_the_most_recent_turns() -> None:
     """'No, change that' must still have its referent."""
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     for i in range(20):
         _exchange(session, i)
 
@@ -80,7 +81,7 @@ def test_every_tool_call_keeps_its_result() -> None:
     """A `tool_calls` message whose results were sliced away is rejected by
     OpenAI with a 400 — the failure mode a naive truncation walks straight into.
     """
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     for i in range(20):
         _exchange(session, i)
 
@@ -100,7 +101,7 @@ def test_every_tool_call_keeps_its_result() -> None:
 
 
 def test_cut_lands_on_a_user_message() -> None:
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     for i in range(20):
         _exchange(session, i)
 
@@ -115,7 +116,7 @@ def test_cut_lands_on_a_user_message() -> None:
 
 def test_digest_carries_the_saved_draft() -> None:
     """Dropped turns are only safe because their content is in the draft."""
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.set_field("full_name", "Yassine Sinif")
     session.set_field("skills", "Languages: Python, TypeScript")
     for i in range(20):
@@ -130,7 +131,7 @@ def test_digest_carries_the_saved_draft() -> None:
 def test_system_prompt_stays_the_stable_prefix() -> None:
     """Prompt caching only pays if nothing variable is prepended ahead of the
     system message."""
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     for i in range(20):
         _exchange(session, i)
 
@@ -142,7 +143,7 @@ def test_system_prompt_stays_the_stable_prefix() -> None:
 
 def test_growth_is_linear_not_quadratic() -> None:
     """The whole justification, measured: per-request size must flatten."""
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     sizes = []
     for i in range(30):
         _exchange(session, i)

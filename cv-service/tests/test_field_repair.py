@@ -18,6 +18,7 @@ from pypdf import PdfReader
 
 from app.cv.builder import build_resume
 from app.session import store
+from conftest import TEST_USER_ID
 
 BS = chr(92)  # a single backslash
 ESC_N = BS + "n"  # the two characters a double-escaping model sends
@@ -39,7 +40,7 @@ def test_the_fixture_really_is_two_characters() -> None:
 def test_literal_backslash_n_becomes_a_newline() -> None:
     """The model double-escapes its JSON arguments, so a line break arrives as
     a backslash followed by an 'n'."""
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.set_field("languages", f"Arabic — Native{ESC_N}French — B2{ESC_N}English — B2")
 
     stored = session.draft["languages"]
@@ -49,7 +50,7 @@ def test_literal_backslash_n_becomes_a_newline() -> None:
 
 
 def test_escaped_crlf_and_tabs_are_repaired() -> None:
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.set_field("skills", f"Languages: Python{BS}r{BS}nData: pandas{BS}tNumPy")
 
     stored = session.draft["skills"]
@@ -58,7 +59,7 @@ def test_escaped_crlf_and_tabs_are_repaired() -> None:
 
 
 def test_real_newlines_are_untouched() -> None:
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.set_field("languages", "Arabic — Native\nFrench — B2")
 
     assert session.draft["languages"] == "Arabic — Native\nFrench — B2"
@@ -66,7 +67,7 @@ def test_real_newlines_are_untouched() -> None:
 
 def test_a_backslash_that_is_not_an_escape_survives() -> None:
     """Only the escape sequences are rewritten, not every backslash."""
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.set_field("skills", f"Tools: C:{BS}Program Files, awk")
 
     assert f"C:{BS}Program Files" in session.draft["skills"]
@@ -74,7 +75,7 @@ def test_a_backslash_that_is_not_an_escape_survives() -> None:
 
 def test_piped_contact_becomes_one_item_per_line() -> None:
     """The model borrows the entry-header delimiter for a flat field."""
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.set_field(
         "contact", "Casablanca, Morocco | +212 6 23 84 25 35 | me@example.com"
     )
@@ -88,7 +89,7 @@ def test_piped_contact_becomes_one_item_per_line() -> None:
 
 def test_pipes_in_experience_are_preserved() -> None:
     """There the pipe is load-bearing — it delimits title, employer and dates."""
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.set_field(
         "experience", "AI Data Engineer | Aptiv | Jun 2026 | Tangier\n- Did the work."
     )
@@ -97,7 +98,7 @@ def test_pipes_in_experience_are_preserved() -> None:
 
 
 def test_contact_with_newlines_is_not_re_split() -> None:
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.set_field("contact", "Casablanca\nme@example.com")
 
     assert session.draft["contact"].splitlines() == ["Casablanca", "me@example.com"]
@@ -105,7 +106,7 @@ def test_contact_with_newlines_is_not_re_split() -> None:
 
 def test_repaired_fields_render_as_separate_lines() -> None:
     """End to end: the mangled input must reach the page as real lines."""
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.set_field("full_name", "Yassine Sinif")
     session.set_field("languages", f"Arabic — Native{ESC_N}French — B2{ESC_N}English — B2")
     session.set_field("skills", f"Languages: Python{ESC_N}Data: pandas, NumPy")

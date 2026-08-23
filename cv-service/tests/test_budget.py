@@ -15,6 +15,7 @@ from app.config import get_settings, reset_settings
 from app.llm import Completion
 from app.main import app
 from app.session import store
+from conftest import TEST_USER_ID
 
 
 @pytest.fixture(autouse=True)
@@ -39,7 +40,7 @@ def test_budget_default_clears_a_full_interview() -> None:
 
 
 def test_turn_is_refused_once_the_budget_is_spent(monkeypatch) -> None:
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.usage.add(get_settings().max_session_tokens, 0)
     _reply(monkeypatch, Completion(content="should never run"))
 
@@ -50,7 +51,7 @@ def test_turn_is_refused_once_the_budget_is_spent(monkeypatch) -> None:
 def test_the_check_happens_before_any_spend(monkeypatch) -> None:
     """Stopping mid-turn would bill for the rounds already spent and still
     leave the visitor without an answer."""
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.usage.add(get_settings().max_session_tokens, 0)
 
     def explode(*args, **kwargs):
@@ -67,7 +68,7 @@ def test_an_exhausted_session_can_still_build_its_cv(monkeypatch) -> None:
     """The whole reason the Build button bypasses the model: running out of
     conversation must never mean losing the CV."""
     client = TestClient(app)
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.set_field("full_name", "Ahmed Sefriui")
     session.set_field("skills", "Finance: Budgeting")
     session.usage.add(get_settings().max_session_tokens, 0)
@@ -85,7 +86,7 @@ def test_budget_can_be_disabled(monkeypatch) -> None:
     monkeypatch.setenv("MAX_SESSION_TOKENS", "0")
     reset_settings()
 
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.usage.add(999_999, 0)
     _reply(monkeypatch, Completion(content="fine"))
 

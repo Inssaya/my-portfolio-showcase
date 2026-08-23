@@ -1,8 +1,8 @@
 # Render blueprint for the CV service.
 #
 # Deploy: Render dashboard → New → Blueprint → point at this repo. Render reads
-# this file, builds the Dockerfile in ./cv-service, and asks for the one secret
-# it needs.
+# this file, builds the Dockerfile in ./cv-service, and prompts for the two
+# values it cannot know on its own (OPENAI_API_KEY, ALLOWED_ORIGINS).
 #
 # The frontend stays on Vercel — it is a static Vite build and Vercel does that
 # better. Only this service needs a container, because ReportLab and the
@@ -25,7 +25,9 @@ services:
     # One instance, and this is not a cost decision. Sessions and the API-key
     # pool are per-process (see app/session.py, app/keypool.py): a second
     # instance would strand half of all drafts on the wrong machine and double
-    # the effective rate limits. Scaling out needs Phase 2's move to Supabase.
+    # the effective rate limits. Auth is verified against Supabase now, but the
+    # draft itself still lives in this process's memory — Postgres persistence
+    # (NEXT.md Step 2, second half) is what makes more than one instance safe.
     numInstances: 1
 
     envVars:
@@ -39,6 +41,17 @@ services:
       # which is a confusing hour to spend.
       - key: ALLOWED_ORIGINS
         sync: false
+
+      # The same Supabase project the portfolio already uses
+      # (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY in the frontend's env).
+      # The anon key is safe to commit here — it already ships in the
+      # frontend's browser bundle; Supabase's RLS policies are what actually
+      # protect the data, not secrecy of this key. Only service_role would be
+      # a real secret, and this service never uses it — see app/auth.py.
+      - key: SUPABASE_URL
+        value: https://ksgqrbghwbfdhwvvmbym.supabase.co
+      - key: SUPABASE_ANON_KEY
+        value: sb_publishable_9U_JSoOImoZ_b8QBqF1h4g_ibcyZTUb
 
       - key: LLM_MODEL
         value: gpt-4o-mini

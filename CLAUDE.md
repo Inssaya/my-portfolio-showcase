@@ -20,9 +20,11 @@ Two documents, and they do different jobs:
   schema where relevant, a "done when", and the traps already known. **Start
   here if you are picking up work.**
 
-Phase 1 is complete and tested (222 tests). The immediate next actions are:
-deploy it (`NEXT.md` Step 0, ~30 min), then fix invented dates (Step 1), then
-Supabase auth + persistence (Step 2).
+Phase 1 is complete and tested. Phase 2 auth is done — every route requires a
+signed-in Supabase user (`app/auth.py`, verified live: unauthenticated
+requests get a real 401). Session **persistence** is not — the draft still
+lives in process memory, not Postgres, which is the next thing to build
+(`NEXT.md` Step 2b/2c). 251 tests pass.
 
 Quick orientation:
 
@@ -44,7 +46,7 @@ npm run build
 
 # cv-service (from cv-service/)
 docker compose up --build                            # :8000
-.venv/Scripts/python -m pytest -q                    # 222 tests, no network
+.venv/Scripts/python -m pytest -q                    # 251 tests, no network
 .venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
 ```
 

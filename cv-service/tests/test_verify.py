@@ -18,6 +18,7 @@ import pytest
 from app.cv.verify import input_years, strip_invented_years
 from app.session import Session, store
 from app.tools import run_tool
+from conftest import TEST_USER_ID
 
 
 @pytest.fixture(autouse=True)
@@ -29,7 +30,7 @@ def _clean():
 
 @pytest.fixture
 def session() -> Session:
-    return store.create()
+    return store.create(user_id=TEST_USER_ID)
 
 
 # ------------------------------------------------------------- input_years

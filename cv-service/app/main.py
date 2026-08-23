@@ -1,19 +1,22 @@
 """HTTP surface for the resume service.
 
-Phase 1: no auth. Sessions are anonymous and identified by an opaque id the
-client holds. Phase 2 puts Supabase JWT verification in front of every route
-here, ties sessions to a user, persists the transcript, and enforces the token
-quota — all of which this module is shaped to accept without rework.
+Every route except /health sits behind Supabase auth (see app/auth.py):
+`Depends(get_current_user)` verifies the bearer token and every session is
+owned by the user who created it (`app/session.py`'s SessionStore checks
+ownership on every lookup, not just on creation). Sessions are still
+per-process — the DB-backed persistence in NEXT.md Step 2 is the next piece,
+not this one — but nobody can read or render a session that is not theirs.
 """
 from __future__ import annotations
 
 import logging
 
-from fastapi import Body, FastAPI, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .agent import SessionBudgetExceeded, recover_by_vision, run_turn, seed_uploaded_cv
+from .auth import AuthUser, get_current_user
 from .config import get_settings
 from .cv.extract import ExtractionError, extract_cv, extract_everything
 from .cv.photo import PhotoError, looks_like_an_image, prepare_uploaded_photo
@@ -31,9 +34,17 @@ app.add_middleware(
     allow_origins=settings.origins,
     allow_credentials=False,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["content-type"],
-    # The client reads the session id off the first response and echoes it back.
-    expose_headers=["x-session-id"],
+    # "authorization" carries the Supabase bearer token on every request now
+    # that routes are gated — omitting it does not error, it just makes the
+    # browser silently drop the header on preflight, which reads as a random
+    # 401 with no clue why.
+    allow_headers=["content-type", "authorization"],
+    # The client reads the session id off the first response and echoes it
+    # back. content-disposition carries the PDF's filename, which the browser
+    # only exposes to JS if the server explicitly allows reading it — needed
+    # once downloads go through fetch()+blob instead of a plain <a href>,
+    # which a bearer-token-gated endpoint can no longer be.
+    expose_headers=["x-session-id", "content-disposition"],
 )
 
 
@@ -176,8 +187,8 @@ def _as_pasted_document(text: str) -> dict | None:
 
 
 @app.post("/chat", response_model=ChatResponse)
-def chat(payload: ChatRequest = Body(...)) -> ChatResponse:
-    session = store.get_or_create(payload.session_id)
+def chat(payload: ChatRequest = Body(...), user: AuthUser = Depends(get_current_user)) -> ChatResponse:
+    session = store.get_or_create(payload.session_id, user.id)
     message = payload.message.strip()
 
     pasted = _as_pasted_document(message)
@@ -208,6 +219,7 @@ def chat(payload: ChatRequest = Body(...)) -> ChatResponse:
 async def upload(
     file: UploadFile = File(...),
     session_id: str | None = Form(default=None),
+    user: AuthUser = Depends(get_current_user),
 ) -> ChatResponse:
     """Accept a CV, extract it, and let the agent open the conversation on it."""
     limits = get_settings()
@@ -229,7 +241,7 @@ async def upload(
     # No model call: attaching a photo needs no reasoning, so spending a turn on
     # it would be pure cost. The reply is written here.
     if looks_like_an_image(filename):
-        session = store.get_or_create(session_id)
+        session = store.get_or_create(session_id, user.id)
         try:
             session.photo = prepare_uploaded_photo(data, filename)
         except PhotoError as exc:
@@ -254,7 +266,7 @@ async def upload(
         # message says how, so it is a 400 with real text rather than a 500.
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
-    session = store.get_or_create(session_id)
+    session = store.get_or_create(session_id, user.id)
     if extraction.get("photo"):
         session.photo = extraction["photo"]
 
@@ -302,7 +314,7 @@ async def upload(
 
 
 @app.post("/generate/{session_id}", response_model=ChatResponse)
-def generate(session_id: str) -> ChatResponse:
+def generate(session_id: str, user: AuthUser = Depends(get_current_user)) -> ChatResponse:
     """Render the draft directly, with no model involved.
 
     The escape hatch. The agent is supposed to call `generate_resume` when the
@@ -314,7 +326,7 @@ def generate(session_id: str) -> ChatResponse:
     PDF out. It costs no tokens, cannot be talked out of it, and works whatever
     the model does.
     """
-    session = store.get(session_id)
+    session = store.get(session_id, user.id)
     if session is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "That session has expired.")
 
@@ -335,8 +347,15 @@ def generate(session_id: str) -> ChatResponse:
 
 
 @app.get("/resume/{session_id}.pdf")
-def download(session_id: str) -> Response:
-    session = store.get(session_id)
+def download(session_id: str, user: AuthUser = Depends(get_current_user)) -> Response:
+    """The rendered PDF.
+
+    Auth here means a plain `<a href>` can no longer trigger the download — a
+    browser navigation does not carry a custom Authorization header. The
+    frontend fetches this with the bearer token and saves the response as a
+    blob instead (see `src/lib/resume/api.ts`, `downloadResume`).
+    """
+    session = store.get(session_id, user.id)
     if session is None or session.pdf is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No CV has been generated yet.")
     return Response(
@@ -347,9 +366,9 @@ def download(session_id: str) -> Response:
 
 
 @app.get("/draft/{session_id}")
-def draft(session_id: str) -> dict:
+def draft(session_id: str, user: AuthUser = Depends(get_current_user)) -> dict:
     """What the session currently holds. Powers the live preview panel."""
-    session = store.get(session_id)
+    session = store.get(session_id, user.id)
     if session is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "That session has expired.")
     return {
@@ -367,9 +386,14 @@ def draft(session_id: str) -> dict:
 
 
 @app.get("/photo/{session_id}")
-def photo(session_id: str) -> Response:
-    """The attached portrait, for the UI's thumbnail."""
-    session = store.get(session_id)
+def photo(session_id: str, user: AuthUser = Depends(get_current_user)) -> Response:
+    """The attached portrait, for the UI's thumbnail.
+
+    A plain `<img src>` cannot carry a bearer token either — same reason as
+    the PDF download — so the frontend fetches this and turns the response
+    into an object URL rather than pointing an <img> straight at it.
+    """
+    session = store.get(session_id, user.id)
     if session is None or session.photo is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No photo attached.")
     return Response(
@@ -383,14 +407,14 @@ def photo(session_id: str) -> Response:
 
 
 @app.delete("/photo/{session_id}")
-def remove_photo(session_id: str) -> dict:
+def remove_photo(session_id: str, user: AuthUser = Depends(get_current_user)) -> dict:
     """Detach the portrait.
 
     Needed because a photo can arrive without being asked for — lifted out of an
     uploaded CV — and not everyone wants one on the rebuild. Some countries
     advise against photos on a CV entirely, so this is not a nicety.
     """
-    session = store.get(session_id)
+    session = store.get(session_id, user.id)
     if session is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "That session has expired.")
     session.photo = None

@@ -15,6 +15,7 @@ from PIL import Image
 from app.cv.photo import PhotoError, looks_like_an_image, prepare_uploaded_photo
 from app.main import app
 from app.session import store
+from conftest import TEST_USER_ID
 
 
 @pytest.fixture(autouse=True)
@@ -55,14 +56,14 @@ def test_a_photo_upload_attaches_without_calling_the_model(monkeypatch, client: 
     assert body["actions"] == ["Added the photo"]
     assert body["usage"]["total"] == 0
 
-    session = store.get(body["session_id"])
+    session = store.get(body["session_id"], TEST_USER_ID)
     assert session.photo is not None
 
 
 def test_uploaded_photo_reaches_the_rendered_cv(client: TestClient) -> None:
     from app.cv.photo import extract_portrait
 
-    session = store.create()
+    session = store.create(user_id=TEST_USER_ID)
     session.set_field("full_name", "Ahmed Sefriui")
     session.set_field("skills", "Finance: Budgeting")
 
