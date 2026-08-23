@@ -1,0 +1,16 @@
+# Local run:  docker compose up --build
+#
+# Keys are read from cv-service/.env at *runtime*, never copied into the image
+# (see .dockerignore). That file is gitignored.
+
+services:
+  cv-service:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Overridable per environment; the Vite dev server by default.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8080}
+    restart: unless-stopped

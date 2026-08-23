@@ -17,6 +17,11 @@ const ProjectDetail = lazy(() => import("./pages/ProjectDetail.tsx"));
 const Blog = lazy(() => import("./pages/Blog.tsx"));
 const BlogPost = lazy(() => import("./pages/BlogPost.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
+const ResumeBuilder = lazy(() => import("./pages/ResumeBuilder.tsx"));
+const CvSignIn = lazy(() => import("./pages/cv/CvSignIn.tsx"));
+const CvSignUp = lazy(() => import("./pages/cv/CvSignUp.tsx"));
+const CvTerms = lazy(() => import("./pages/cv/CvTerms.tsx"));
+const CvProtectedRoute = lazy(() => import("./components/cv/CvProtectedRoute.tsx"));
 
 const AdminLayout = lazy(() => import("./components/admin/AdminLayout.tsx"));
 const AdminLogin = lazy(() => import("./pages/admin/AdminLogin.tsx"));
@@ -63,6 +68,20 @@ const App = () => (
             <Route path="/classic" element={<Navigate to="/" replace />} />
             <Route path="/experience" element={<Experience />} />
             <Route path="/projects/:slug" element={<ProjectDetail />} />
+            {/* Sign-in/up sit outside the guard — otherwise a signed-out
+                visitor would ping-pong between /cv-builder and
+                /cv-builder/login forever. */}
+            <Route path="/cv-builder/login" element={<CvSignIn />} />
+            <Route path="/cv-builder/signup" element={<CvSignUp />} />
+            <Route path="/cv-builder/terms" element={<CvTerms />} />
+            <Route
+              path="/cv-builder"
+              element={
+                <CvProtectedRoute>
+                  <ResumeBuilder />
+                </CvProtectedRoute>
+              }
+            />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
 

@@ -1,0 +1,21 @@
+# CV service — CPU-only, no compiler toolchain beyond manylinux wheels, so it
+# deploys to a free Render/Railway/Fly dyno without a custom build image.
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.0
+httpx==0.28.1
+# Multipart form parsing — what FastAPI needs to accept an uploaded CV.
+python-multipart==0.0.20
+
+# Documents. ReportLab lays the PDF out server-side: no headless browser in the
+# image, deterministic output, and the same result on every host.
+reportlab==4.2.5
+pypdf==5.1.0
+python-docx==1.1.2
+# Pillow crops the CV portrait to a square before it is clipped to a circle.
+pillow==11.0.0
+
+# Tests
+pytest==8.3.4
