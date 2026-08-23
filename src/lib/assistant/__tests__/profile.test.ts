@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildProfileDigest, buildSystemPrompt } from "../profile";
 import { adminData, slugify } from "@/lib/admin-data";
 
@@ -7,7 +7,16 @@ import { adminData, slugify } from "@/lib/admin-data";
  * carrying a section, the assistant does not error — it just starts saying
  * "I don't have that information" about things that are plainly on the page,
  * or worse, fills the gap itself. Cheap to assert, expensive to miss.
+ *
+ * Supabase is mocked off (not just left unconfigured by a missing env var):
+ * `.env.local`'s real project URL/key load even under `vitest`'s `test` mode
+ * in this repo, so without this, "reflects edits made through the admin
+ * panel" fires a genuine write at production Supabase every run — caught
+ * once RLS correctly rejected it as unauthenticated (the anon key alone
+ * cannot write), never before because the old admin-data.ts cached locally
+ * before that write even started, so nothing here ever waited to find out.
  */
+vi.mock("@/lib/supabase", () => ({ supabase: null, supabaseEnabled: false }));
 
 beforeEach(() => {
   localStorage.clear();
@@ -68,8 +77,8 @@ describe("buildProfileDigest", () => {
     expect(digest).not.toMatch(/LinkedIn:\s*$/m);
   });
 
-  it("reflects edits made through the admin panel", () => {
-    adminData.setProjects([
+  it("reflects edits made through the admin panel", async () => {
+    await adminData.setProjects([
       {
         id: "x",
         title: "Totally New Thing",

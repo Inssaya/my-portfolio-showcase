@@ -17,42 +17,28 @@ import { ScriptSegment } from "./types";
  */
 export const TOUR_SCRIPT: ScriptSegment[] = [
   // ------------------------------------------------------------- opening --
+  // A single clip (ElevenLabs, voiced and dropped in by hand — see
+  // scripts/manifest-from-audio.mjs), not synthesised like the rest of the
+  // tour. `text` must stay byte-for-byte what the clip actually says: the
+  // manifest's caption timing and word-anchored cues are both estimated from
+  // this string's word positions, with no real transcription behind it for
+  // this one segment (see that script's docstring on `timingSource`).
   {
-    id: "greeting",
-    kind: "greeting",
-    text: "Hi. Welcome in.",
-    next: "intro-1",
-  },
-  {
-    id: "intro-1",
+    id: "intro",
     kind: "narration",
     text:
-      "Let me introduce myself. I'm Yassine Sinif, a final-year engineering " +
-      "student in Artificial Intelligence and Data Science at EMSI Casablanca.",
-    cues: [{ afterWord: 5, type: "title", label: "Yassine Sinif" }],
-    next: "intro-2",
-  },
-  {
-    id: "intro-2",
-    kind: "narration",
-    // Deliberately present perfect rather than "Right now I'm an intern at
-    // Aptiv". The internship ends 21 August 2026, and a recruiter who opens
-    // this in November would otherwise be told something untrue by a recording
-    // nobody remembered to regenerate. "I've been" is accurate both during the
-    // internship and for the whole hiring window after it.
-    text:
-      "I've been an AI Data Engineer intern at Aptiv, in Tangier, working " +
-      "inside the maintenance department of a wire-harness plant.",
-    cues: [{ afterWord: 9, type: "fact", label: "Aptiv — Tangier" }],
-    next: "intro-3",
-  },
-  {
-    id: "intro-3",
-    kind: "narration",
-    text:
-      "And I'm looking for a six-month final-year internship starting " +
-      "February 2027, with the chance to stay on afterwards.",
-    cues: [{ afterWord: 4, type: "fact", label: "PFE — February 2027" }],
+      "Hey, I'm Yassine — a final-year engineering student in AI & Data " +
+      "Science. I like taking ideas and turning them into real-world " +
+      "projects that are stable, useful, and built to succeed in today's " +
+      "competitive world, and I'm looking for a 6-month PFE internship in " +
+      "Morocco or abroad, ideally with a company where I can grow, " +
+      "contribute, and hopefully continue working together after the " +
+      "internship, while also being open to freelance work.",
+    cues: [
+      { afterWord: 3, type: "title", label: "Yassine Sinif" },
+      { afterWord: 47, type: "fact", label: "PFE — Morocco or abroad" },
+      { afterWord: 71, type: "fact", label: "Open to freelance work" },
+    ],
     next: "skills-1",
   },
 

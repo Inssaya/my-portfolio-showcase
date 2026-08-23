@@ -169,7 +169,7 @@ const HeroSection = () => {
                   curl. Same signature-off role, less machine-generated
                   feel. */}
               <CurvedFlourish delay={1.6} />
-              <span>Casablanca — available February 2027</span>
+              <span>Casablanca — available now</span>
             </motion.div>
 
             {/* The tour invitation. Deliberately styled as a quiet link

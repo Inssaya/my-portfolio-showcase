@@ -149,14 +149,11 @@ const defaultHero: HeroContent = {
   subtitle: "AI & Data Engineering",
   title: "I Build Systems That",
   titleHighlight: "Actually Scale",
-  // "I've interned" rather than "currently interning": the Aptiv internship
-  // ends 21 August 2026, and the one thing worse than an out-of-date portfolio
-  // is one that states something a recruiter can check and find false.
-  description: "Final-year engineering student in AI & Data Science at EMSI Casablanca. I've interned as an AI Data Engineer at Aptiv, and I build AI-powered and full-stack systems — from RAG pipelines to production-ready web apps. I'm looking for a 6-month PFE internship starting February 2027.",
+  description: "Hey, I'm Yassine — a final-year engineering student in AI & Data Science. I like taking ideas and turning them into real-world projects that are stable, useful, and built to succeed in today's competitive world, and I'm looking for a 6-month PFE internship in Morocco or abroad, ideally with a company where I can grow, contribute, and hopefully continue working together after the internship, while also being open to freelance work.",
 };
 
 const defaultAbout: AboutCard[] = [
-  { id: "1", icon: "Briefcase", title: "Experience", content: "AI Data Engineer Intern at Aptiv (Tangier) — maintenance KPI platform, predictive maintenance and an agentic RAG assistant. Previously: Laravel chatbot & PDF tool internship at a Casablanca web agency." },
+  { id: "1", icon: "Briefcase", title: "Experience", content: "Just finished an internship at Aptiv (Tangier), where I built tools to help a maintenance team catch equipment problems earlier. Before that, I built a chatbot and a PDF tool for a web agency in Casablanca. Now looking for my next internship or freelance project." },
   { id: "2", icon: "Globe", title: "Languages", content: "Arabic — Native\nFrench — B2\nEnglish — B2\nSpanish — A2" },
   { id: "3", icon: "Award", title: "Certifications", content: "DeepLearning.AI Data Engineering Professional Certificate (in progress) • Python for Data Science, AI & Development (IBM) • Software Engineering: Design and Project Management (HKUST) • La recherche documentaire (École Polytechnique)" },
 ];
@@ -175,8 +172,8 @@ const defaultExperience: Experience[] = [
     bullets: [
       "Built a maintenance intervention tracking and KPI platform, replacing a manual Excel workflow, and owned its technical specification end to end.",
       "Designed a predictive maintenance module ranking machines by failure risk, combining statistical reliability modeling with an ML classifier.",
-      "Built an agentic RAG assistant calling retrieval and clustering tools over past maintenance reports to surface similar cases and suggest likely causes.",
-      "Validated the full pipeline on synthetic data before touching production, keeping sensitive data on-premise.",
+      "Built an AI assistant that searches past maintenance reports to find similar cases and suggest likely causes.",
+      "Tested everything on synthetic data before touching real production data, to keep sensitive information safe.",
     ],
   },
   {
@@ -431,75 +428,75 @@ export const adminData = {
   // -- Projects ----------------------------------------------------------------
   getProjects: (): Project[] => get(K.projects, defaultProjects),
   setProjects: async (projects: Project[]): Promise<void> => {
-    setLocal(K.projects, projects);
     if (supabase) {
       await replaceTable("projects", projects.map((p, i) => unmapProject(p, i)));
     }
+    setLocal(K.projects, projects);
   },
 
   // -- Hero (singleton) --------------------------------------------------------
   getHero: (): HeroContent => get(K.hero, defaultHero),
   setHero: async (hero: HeroContent): Promise<void> => {
-    setLocal(K.hero, hero);
     if (supabase) {
       const { error } = await supabase.from("hero").upsert(unmapHero(hero), { onConflict: "id" });
       if (error) throw error;
     }
+    setLocal(K.hero, hero);
   },
 
   // -- SocialLinks (singleton) -------------------------------------------------
   getSocialLinks: (): SocialLinks => get(K.social, defaultSocialLinks),
   setSocialLinks: async (social: SocialLinks): Promise<void> => {
-    setLocal(K.social, social);
     if (supabase) {
       const { error } = await supabase.from("social_links").upsert(unmapSocial(social), { onConflict: "id" });
       if (error) throw error;
     }
+    setLocal(K.social, social);
   },
 
   // -- About -------------------------------------------------------------------
   getAbout: (): AboutCard[] => get(K.about, defaultAbout),
   setAbout: async (about: AboutCard[]): Promise<void> => {
-    setLocal(K.about, about);
     if (supabase) {
       await replaceTable("about_cards", about.map((a, i) => unmapAbout(a, i)));
     }
+    setLocal(K.about, about);
   },
 
   // -- Education ---------------------------------------------------------------
   getEducation: (): Education[] => get(K.education, defaultEducation),
   setEducation: async (education: Education[]): Promise<void> => {
-    setLocal(K.education, education);
     if (supabase) {
       await replaceTable("education", education.map((e, i) => unmapEducation(e, i)));
     }
+    setLocal(K.education, education);
   },
 
   // -- Experience --------------------------------------------------------------
   getExperience: (): Experience[] => get(K.experience, defaultExperience),
   setExperience: async (experience: Experience[]): Promise<void> => {
-    setLocal(K.experience, experience);
     if (supabase) {
       await replaceTable("experience", experience.map((e, i) => unmapExperience(e, i)));
     }
+    setLocal(K.experience, experience);
   },
 
   // -- Skills ------------------------------------------------------------------
   getSkills: (): SkillCategory[] => get(K.skills, defaultSkills),
   setSkills: async (skills: SkillCategory[]): Promise<void> => {
-    setLocal(K.skills, skills);
     if (supabase) {
       await replaceTable("skill_categories", skills.map((s, i) => unmapSkillCategory(s, i)));
     }
+    setLocal(K.skills, skills);
   },
 
   // -- Certificates ------------------------------------------------------------
   getCertificates: (): Certificate[] => get(K.certificates, defaultCertificates),
   setCertificates: async (certificates: Certificate[]): Promise<void> => {
-    setLocal(K.certificates, certificates);
     if (supabase) {
       await replaceTable("certificates", certificates.map((c, i) => unmapCertificate(c, i)));
     }
+    setLocal(K.certificates, certificates);
   },
 
   // -- Messages ---------------------------------------------------------------
@@ -536,24 +533,25 @@ export const adminData = {
   setMessages: async (messages: Message[]): Promise<void> => {
     // Only used by mark-read and delete. Compute the set of ids that should
     // exist after this write, and delete anything else on the server.
+    if (supabase) {
+      const keepIds = messages.map((m) => m.id);
+      if (keepIds.length === 0) {
+        // Delete everything on the server — this is a real intent (Clear inbox).
+        const { error } = await supabase.from("messages").delete().not("id", "is", null);
+        if (error) throw error;
+      } else {
+        const { error: delError } = await supabase
+          .from("messages")
+          .delete()
+          .not("id", "in", `(${keepIds.map((id) => `"${id}"`).join(",")})`);
+        if (delError) throw delError;
+      }
+      // Update `read` flags on rows that remain.
+      for (const m of messages.filter((m) => m.read)) {
+        await supabase.from("messages").update({ read: true }).eq("id", m.id);
+      }
+    }
     setLocal(K.messages, messages);
-    if (!supabase) return;
-    const keepIds = messages.map((m) => m.id);
-    if (keepIds.length === 0) {
-      // Delete everything on the server — this is a real intent (Clear inbox).
-      const { error } = await supabase.from("messages").delete().not("id", "is", null);
-      if (error) throw error;
-    } else {
-      const { error: delError } = await supabase
-        .from("messages")
-        .delete()
-        .not("id", "in", `(${keepIds.map((id) => `"${id}"`).join(",")})`);
-      if (delError) throw delError;
-    }
-    // Update `read` flags on rows that remain.
-    for (const m of messages.filter((m) => m.read)) {
-      await supabase.from("messages").update({ read: true }).eq("id", m.id);
-    }
   },
 
   markMessageRead: async (id: string): Promise<void> => {
