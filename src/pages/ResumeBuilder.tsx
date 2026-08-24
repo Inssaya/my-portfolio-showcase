@@ -1,16 +1,7 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  ArrowUp,
-  Check,
-  Download,
-  FileText,
-  FileUp,
-  RotateCcw,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { ArrowUp, Check, Download, FileText, FileUp, RotateCcw, Sparkles, X } from "lucide-react";
 import ChatMarkdown from "@/components/ChatMarkdown";
 import CvAppShell from "@/components/cv/CvAppShell";
 import { useResumeChat } from "@/lib/resume/useResumeChat";
@@ -30,11 +21,16 @@ const OPENERS = [
   "I'm applying for an internship",
 ];
 
+// One control for both jobs: a CV to read, or a headshot to put on it. The
+// server routes by content, so the visitor never has to know there are two
+// paths — see the `/upload` handler.
 const ACCEPTED = ".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp";
 
 const ResumeBuilder = () => {
+  // "Continue" from the My Data page links here with ?session=<id>, which
+  // must win over whatever session localStorage already had — see
+  // useResumeChat's initialSessionId doc comment.
   const [searchParams] = useSearchParams();
-
   const {
     turns,
     status,
@@ -51,28 +47,29 @@ const ResumeBuilder = () => {
     dropPhoto,
     reset,
   } = useResumeChat(searchParams.get("session"));
-
   const [draft, setDraft] = useState("");
   const [dragging, setDragging] = useState(false);
   const [longWait, setLongWait] = useState(false);
-
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // The warm-up ping (main.tsx, useResumeChat) usually means the backend is
+  // already awake by the time a message is sent — but not always: a Render
+  // free-tier cold start can take up to about a minute, and a visitor who
+  // moves fast enough can still land on one. Spinning dots alone for 50
+  // seconds with no explanation reads as broken, not slow, so this switches
+  // to an explicit message once a request has been running a while.
   useEffect(() => {
     if (!busy) {
       setLongWait(false);
       return;
     }
-
     const timer = setTimeout(() => setLongWait(true), 7000);
-
     return () => clearTimeout(timer);
   }, [busy]);
 
   useEffect(() => {
     document.title = "CV Builder — Yassine Sinif";
-
     return () => {
       document.title = "Yassine Sinif — AI & Data Engineer | Portfolio";
     };
@@ -94,18 +91,15 @@ const ResumeBuilder = () => {
 
   const pickFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-
+    // Reset the input so choosing the same file twice still fires a change.
     event.target.value = "";
-
     if (file) void upload(file);
   };
 
   const onDrop = (event: React.DragEvent) => {
     event.preventDefault();
     setDragging(false);
-
     const file = event.dataTransfer.files?.[0];
-
     if (file) void upload(file);
   };
 
@@ -115,7 +109,7 @@ const ResumeBuilder = () => {
   return (
     <CvAppShell>
       <main
-        className="relative mx-auto flex min-h-[calc(100svh-3.5rem)] w-full max-w-3xl flex-col px-3 pb-3 pt-4 sm:px-4 sm:pb-4 sm:pt-5"
+        className="mx-auto flex min-h-[calc(100svh-3.5rem)] w-full max-w-3xl flex-col px-4 pb-4 pt-6"
         onDragOver={(event) => {
           event.preventDefault();
           if (!busy && !unavailable) setDragging(true);
@@ -123,171 +117,91 @@ const ResumeBuilder = () => {
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
       >
-        {/* Subtle ambient glow */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 -z-0 overflow-hidden">
-          <div className="mx-auto h-40 w-72 rounded-full bg-accent/[0.07] blur-3xl" />
-        </div>
-
-        {/* Header */}
-        <header className="relative z-10 mb-4 flex items-start justify-between gap-4 px-1 sm:px-0">
+        <header className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/10">
-                <Sparkles size={15} strokeWidth={2.2} />
-              </div>
-
-              <h1 className="font-sora text-[22px] font-bold tracking-[-0.025em] text-foreground sm:text-2xl md:text-3xl">
-                CV Builder
-              </h1>
-            </div>
-
-            <p className="mt-2 max-w-xl text-[13px] leading-5 text-muted-foreground sm:text-sm">
-              Upload your CV or answer a few questions. I'll write and design
-              it for you.{" "}
-              <span className="font-medium text-accent">
-                Free while it's in beta.
-              </span>
+            <h1 className="font-sora text-2xl font-bold md:text-3xl">
+              CV Builder
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Upload your CV or answer a few questions. I'll write and design it
+              for you.{" "}
+              <span className="text-accent">Free while it's in beta.</span>
             </p>
           </div>
-
           {turns.length > 0 && (
             <button
               type="button"
               onClick={reset}
-              className="group mt-0.5 flex shrink-0 items-center gap-1.5 rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur-sm transition-all duration-200 hover:border-accent/40 hover:bg-accent/[0.04] hover:text-accent"
+              className="flex shrink-0 items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-accent/50 hover:text-accent"
             >
-              <RotateCcw
-                size={11}
-                className="transition-transform duration-300 group-hover:-rotate-90"
-              />
+              <RotateCcw size={12} />
               Start over
             </button>
           )}
         </header>
 
-        {/* Main workspace */}
-        <div className="relative flex flex-1 flex-col overflow-hidden rounded-[22px] border border-border/70 bg-card/70 shadow-[0_14px_45px_rgba(0,0,0,0.06)] backdrop-blur-xl sm:rounded-[26px]">
-          {/* Inner highlight */}
-          <div className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-white/[0.04]" />
-
-          {/* Drag overlay */}
+        <div className="relative flex flex-1 flex-col overflow-hidden rounded-xl border border-border/60 bg-card/50">
           <AnimatePresence>
             {dragging && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 z-20 flex items-center justify-center bg-background/85 p-6 backdrop-blur-md"
+                className="absolute inset-0 z-10 flex items-center justify-center bg-background/90 backdrop-blur-sm"
               >
-                <motion.div
-                  initial={{ scale: 0.96, y: 8 }}
-                  animate={{ scale: 1, y: 0 }}
-                  className="rounded-3xl border border-dashed border-accent/50 bg-accent/[0.06] px-8 py-7 text-center shadow-2xl"
-                >
-                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent ring-1 ring-accent/15">
-                    <FileUp size={21} />
-                  </div>
-
-                  <p className="font-sora text-sm font-semibold text-foreground">
-                    Drop your file here
-                  </p>
-
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    CV or profile photo
-                  </p>
-                </motion.div>
+                <p className="flex items-center gap-2 font-sora text-sm font-semibold text-accent">
+                  <FileUp size={16} />
+                  Drop a CV to import it, or a photo for your CV
+                </p>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Conversation */}
-          <div
-            ref={scrollRef}
-            className="relative flex-1 space-y-5 overflow-y-auto px-3.5 py-5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border/60 sm:px-5 sm:py-6"
-          >
-            {/* Empty state */}
+          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
             {empty && !unavailable && (
-              <div className="space-y-6 py-5 sm:py-8">
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35 }}
-                  className="flex items-start gap-3.5"
-                >
-                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/10">
-                    <Sparkles size={16} />
-                  </div>
-
-                  <div className="max-w-xl space-y-2.5 text-[13px] leading-6 text-muted-foreground sm:text-sm">
-                    <p className="font-sora font-semibold text-[14px] text-foreground sm:text-[15px]">
+              <div className="space-y-5 py-6">
+                <div className="flex items-start gap-3">
+                  <Sparkles size={18} className="mt-0.5 shrink-0 text-accent" />
+                  <div className="space-y-2 text-sm leading-relaxed text-muted-foreground">
+                    <p className="font-sora font-semibold text-foreground">
                       Two ways to start
                     </p>
-
                     <p>
-                      <strong className="font-semibold text-foreground">
-                        Have a CV?
-                      </strong>{" "}
-                      Drop it here or use the upload button — I'll read it,
-                      fix the writing and redesign it.
+                      <strong className="text-foreground">Have a CV?</strong> Drop
+                      it here or use the upload button — I'll read it, fix the
+                      writing and redesign it.
                     </p>
-
                     <p>
-                      <strong className="font-semibold text-foreground">
-                        Starting fresh?
-                      </strong>{" "}
+                      <strong className="text-foreground">Starting fresh?</strong>{" "}
                       Just tell me about yourself and I'll ask what I need.
                     </p>
                   </div>
-                </motion.div>
-
-                <div className="ml-0 flex flex-wrap gap-2 sm:ml-[3.25rem]">
-                  {OPENERS.map((opener, index) => (
-                    <motion.button
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {OPENERS.map((opener) => (
+                    <button
                       key={opener}
                       type="button"
                       onClick={() => void send(opener)}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{
-                        duration: 0.25,
-                        delay: 0.08 + index * 0.04,
-                      }}
-                      className="rounded-full border border-border/70 bg-background/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:bg-accent/[0.05] hover:text-accent hover:shadow-md"
+                      className="rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-accent/50 hover:text-accent"
                     >
                       {opener}
-                    </motion.button>
+                    </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Messages */}
             {turns.map((turn, index) => (
-              <motion.div
+              <div
                 key={index}
-                initial={{
-                  opacity: 0,
-                  y: 7,
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                transition={{
-                  duration: 0.24,
-                  ease: "easeOut",
-                }}
-                className={
-                  turn.role === "user"
-                    ? "flex justify-end"
-                    : "flex justify-start"
-                }
+                className={turn.role === "user" ? "flex justify-end" : "flex justify-start"}
               >
                 <div
-                  className={`max-w-[90%] rounded-[20px] px-4 py-3 text-sm leading-6 shadow-sm sm:max-w-[84%] ${
+                  className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                     turn.role === "user"
-                      ? "rounded-br-[7px] bg-accent text-accent-foreground shadow-accent/10"
-                      : "rounded-bl-[7px] border border-border/60 bg-secondary/75 text-foreground/90"
+                      ? "bg-accent text-accent-foreground"
+                      : "bg-secondary text-foreground/90"
                   }`}
                 >
                   <ChatMarkdown content={turn.content} />
@@ -295,168 +209,126 @@ const ResumeBuilder = () => {
                   {turn.actions?.map((action) => (
                     <span
                       key={action}
-                      className="mt-2.5 flex items-center gap-1.5 text-[11px] font-semibold text-accent"
+                      className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-accent"
                     >
-                      <Check size={11} strokeWidth={2.5} />
+                      <Check size={11} />
                       {action}
                     </span>
                   ))}
 
+                  {/* Attached to the turn that produced it, so scrolling back
+                      through several versions keeps each download with the
+                      message that describes it. A button rather than an
+                      <a href>: the endpoint now requires a bearer token that a
+                      plain browser navigation cannot carry, so this fetches
+                      the PDF and saves it as a blob instead — see
+                      downloadResume in api.ts. */}
                   {turn.pdfVersion !== undefined && (
                     <button
                       type="button"
                       onClick={() => void download()}
-                      className="group mt-3 inline-flex items-center gap-2 rounded-xl bg-background px-3.5 py-2 text-xs font-semibold text-foreground shadow-sm ring-1 ring-border/60 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                      className="mt-3 inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-xs font-semibold text-accent-foreground transition-opacity hover:opacity-90"
                     >
-                      <Download
-                        size={13}
-                        className="text-accent transition-transform group-hover:translate-y-0.5"
-                      />
-
-                      <span>Download your CV</span>
-
+                      <Download size={13} />
+                      Download your CV
                       {turn.pdfVersion > 1 && (
-                        <span className="text-muted-foreground">
-                          v{turn.pdfVersion}
-                        </span>
+                        <span className="opacity-70">v{turn.pdfVersion}</span>
                       )}
                     </button>
                   )}
                 </div>
-              </motion.div>
+              </div>
             ))}
 
-            {/* Loading */}
             {busy && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex items-center gap-2 px-1 py-2"
-              >
-                <div className="flex h-7 items-center gap-1.5 rounded-full border border-border/60 bg-secondary/50 px-2.5">
+              <div className="flex items-center gap-2 px-1 py-2">
+                <div className="flex gap-1.5" aria-label="Working">
                   {[0, 1, 2].map((dot) => (
                     <motion.span
                       key={dot}
-                      animate={{
-                        opacity: [0.3, 1, 0.3],
-                        scale: [0.85, 1, 0.85],
-                      }}
-                      transition={{
-                        duration: 1.1,
-                        repeat: Infinity,
-                        delay: dot * 0.18,
-                      }}
+                      animate={{ opacity: [0.25, 1, 0.25] }}
+                      transition={{ duration: 1.1, repeat: Infinity, delay: dot * 0.18 }}
                       className="h-1.5 w-1.5 rounded-full bg-accent"
                     />
                   ))}
                 </div>
-
                 {longWait ? (
-                  <span className="text-[11px] text-muted-foreground">
-                    Waking up the server — this can take up to a minute the
-                    first time.
+                  <span className="text-xs text-muted-foreground">
+                    Waking up the server — this can take up to a minute the first time.
                   </span>
                 ) : status === "uploading" ? (
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     Reading your CV…
                   </span>
                 ) : null}
-              </motion.div>
-            )}
-
-            {/* Unavailable */}
-            {unavailable && (
-              <div className="rounded-2xl border border-border/60 bg-secondary/35 px-4 py-4 shadow-sm">
-                <p className="text-sm leading-6 text-muted-foreground">
-                  The CV builder isn't switched on for this deployment yet. In
-                  the meantime, email{" "}
-                  <a
-                    href="mailto:yassinsinif4@gmail.com"
-                    className="font-medium text-accent underline decoration-accent/40 underline-offset-2 transition-colors hover:decoration-accent"
-                  >
-                    yassinsinif4@gmail.com
-                  </a>
-                  .
-                </p>
               </div>
             )}
 
-            {/* Error */}
+            {unavailable && (
+              <p className="py-6 text-sm leading-relaxed text-muted-foreground">
+                The CV builder isn't switched on for this deployment yet. In the
+                meantime, email{" "}
+                <a href="mailto:yassinsinif4@gmail.com" className="text-accent underline">
+                  yassinsinif4@gmail.com
+                </a>
+                .
+              </p>
+            )}
+
             {error && !unavailable && (
-              <motion.p
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="rounded-xl border border-accent/25 bg-accent/[0.045] px-3.5 py-2.5 text-xs leading-5 text-muted-foreground shadow-sm"
-              >
+              <p className="rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-sm text-muted-foreground">
                 {error}
-              </motion.p>
+              </p>
             )}
           </div>
 
-          {/* Build bar */}
+          {/* Always available once the draft holds something real. The agent is
+              meant to render when you approve, but it has more than once said
+              the CV was ready having built nothing — so the visitor gets a
+              route to their file that does not depend on the model at all. */}
           {canBuild && !unavailable && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="border-t border-border/60 bg-accent/[0.035] px-3.5 py-3 sm:px-5"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  {hasPhoto && photoBlobUrl && (
-                    <span className="flex shrink-0 items-center gap-1.5">
-                      <span className="relative">
-                        <img
-                          src={photoBlobUrl}
-                          alt="The photo that will appear on your CV"
-                          className="h-8 w-8 rounded-xl object-cover ring-1 ring-border/70 shadow-sm"
-                        />
-
-                        <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-background text-accent shadow-sm ring-1 ring-border/60">
-                          <Check size={8} strokeWidth={3} />
-                        </span>
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={() => void dropPhoto()}
-                        title="Remove the photo"
-                        aria-label="Remove the photo"
-                        className="flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/10 hover:text-accent"
-                      >
-                        <X size={11} />
-                      </button>
-                    </span>
-                  )}
-
-                  <p className="min-w-0 truncate text-[11px] leading-5 text-muted-foreground sm:text-xs">
-                    {pdfVersion > 0
-                      ? "Made a change? Rebuild to get an updated PDF."
-                      : hasPhoto
-                        ? "Happy with what you've told me? Build it whenever you like."
-                        : "Want a photo on it? Upload one with the button below."}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => void build()}
-                  disabled={busy}
-                  className="group flex shrink-0 items-center gap-1.5 rounded-xl bg-accent px-3.5 py-2 text-xs font-semibold text-accent-foreground shadow-sm shadow-accent/10 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-accent/15 disabled:opacity-40"
-                >
-                  <FileText
-                    size={13}
-                    className="transition-transform group-hover:scale-110"
-                  />
-
-                  {pdfVersion > 0 ? "Rebuild CV" : "Build my CV"}
-                </button>
+            <div className="flex items-center justify-between gap-3 border-t border-border/50 bg-accent/5 px-4 py-2.5">
+              <div className="flex min-w-0 items-center gap-2.5">
+                {hasPhoto && photoBlobUrl && (
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    <img
+                      src={photoBlobUrl}
+                      alt="The photo that will appear on your CV"
+                      className="h-7 w-7 rounded-full object-cover ring-1 ring-border/60"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void dropPhoto()}
+                      title="Remove the photo"
+                      aria-label="Remove the photo"
+                      className="text-muted-foreground transition-colors hover:text-accent"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+                <p className="min-w-0 text-xs text-muted-foreground">
+                  {pdfVersion > 0
+                    ? "Made a change? Rebuild to get an updated PDF."
+                    : hasPhoto
+                      ? "Happy with what you've told me? Build it whenever you like."
+                      : "Want a photo on it? Upload one with the button below."}
+                </p>
               </div>
-            </motion.div>
+              <button
+                type="button"
+                onClick={() => void build()}
+                disabled={busy}
+                className="flex shrink-0 items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5 text-xs font-semibold text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+              >
+                <FileText size={13} />
+                {pdfVersion > 0 ? "Rebuild CV" : "Build my CV"}
+              </button>
+            </div>
           )}
 
-          {/* Composer */}
-          <form className="border-t border-border/60 bg-background/55 p-3 backdrop-blur-md sm:p-3.5">
-            <div className="flex items-center gap-2 rounded-2xl border border-border/70 bg-secondary/40 p-1.5 shadow-inner transition-all duration-200 focus-within:border-accent/30 focus-within:bg-background/80 focus-within:shadow-sm">
+          <form onSubmit={submit} className="border-t border-border/50 p-3">
+            <div className="flex items-center gap-2">
               <input
                 ref={fileRef}
                 type="file"
@@ -464,18 +336,16 @@ const ResumeBuilder = () => {
                 onChange={pickFile}
                 className="hidden"
               />
-
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={busy || unavailable}
                 aria-label="Upload a CV or a photo"
                 title="Upload a CV (PDF/DOCX) or a photo"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-all duration-200 hover:bg-background hover:text-accent disabled:opacity-30"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/60 text-muted-foreground transition-colors hover:border-accent/50 hover:text-accent disabled:opacity-30"
               >
                 <FileUp size={15} />
               </button>
-
               <input
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
@@ -484,16 +354,15 @@ const ResumeBuilder = () => {
                 }
                 aria-label="Your message"
                 disabled={unavailable}
-                className="min-w-0 flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-muted-foreground/55 disabled:opacity-50"
+                className="flex-1 rounded-full bg-secondary/60 px-4 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 focus:bg-secondary disabled:opacity-50"
               />
-
               <button
                 type="submit"
                 disabled={!draft.trim() || busy || unavailable}
                 aria-label="Send"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground shadow-sm transition-all duration-200 hover:scale-[1.03] hover:shadow-md disabled:scale-100 disabled:opacity-25"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground transition-opacity disabled:opacity-30"
               >
-                <ArrowUp size={16} strokeWidth={2.2} />
+                <ArrowUp size={16} />
               </button>
             </div>
           </form>
