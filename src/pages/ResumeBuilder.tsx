@@ -117,28 +117,7 @@ const ResumeBuilder = () => {
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
       >
-        <header className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="font-sora text-2xl font-bold md:text-3xl">
-              CV Builder
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Upload your CV or answer a few questions. I'll write and design it
-              for you.{" "}
-              <span className="text-accent">Free while it's in beta.</span>
-            </p>
-          </div>
-          {turns.length > 0 && (
-            <button
-              type="button"
-              onClick={reset}
-              className="flex shrink-0 items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-accent/50 hover:text-accent"
-            >
-              <RotateCcw size={12} />
-              Start over
-            </button>
-          )}
-        </header>
+       
 
         <div className="relative flex flex-1 flex-col overflow-hidden rounded-xl border border-border/60 bg-card/50">
           <AnimatePresence>
