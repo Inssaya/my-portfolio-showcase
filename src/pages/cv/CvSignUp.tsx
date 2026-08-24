@@ -237,12 +237,13 @@ const CvSignUp = () => {
             )}
           </label>
 
+          {/* ✅ FIXED: Checkbox now clearly visible – larger, with border, accent colours, and circle shape */}
           <label className="flex items-start gap-2.5 text-xs leading-relaxed text-muted-foreground">
             <Checkbox
               checked={agreedToTerms}
               onCheckedChange={(value) => setAgreedToTerms(value === true)}
               disabled={busy}
-              className="mt-0.5"
+              className="mt-0.5 h-5 w-5 rounded-full border-2 border-gray-300 data-[state=checked]:border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
             />
             <span>
               I agree that my CV details are stored to generate my document and understand this is
