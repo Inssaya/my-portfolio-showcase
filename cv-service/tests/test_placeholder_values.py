@@ -64,6 +64,33 @@ def test_real_contact_details_are_left_alone() -> None:
     assert cleaned == text
 
 
+# ---------------------------------------------------- Canva's default template
+# A real upload (a "reallygreatsite.com" Canva resume template a visitor only
+# partly personalised) exposed a second gap of the same shape as
+# kenza@example.com: Canva's own placeholder domain and its boilerplate
+# "123 Anywhere St., Any City" address are shipped, unchanged, in real
+# templates and were not caught by any existing pattern.
+
+def test_canva_placeholder_email_is_removed() -> None:
+    cleaned, removed = strip_placeholder_values("hello@reallygreatsite.com")
+    assert cleaned == ""
+    assert removed == ["hello@reallygreatsite.com"]
+
+
+def test_canva_placeholder_address_is_removed_cleanly() -> None:
+    cleaned, removed = strip_placeholder_values("123 Anywhere St., Any City")
+    assert cleaned == ""
+    assert "123 Anywhere St" in removed
+    assert "Any City" in removed
+
+
+def test_a_real_street_address_is_left_alone() -> None:
+    text = "12 Rue Ibn Sina, Casablanca"
+    cleaned, removed = strip_placeholder_values(text)
+    assert removed == []
+    assert cleaned == text
+
+
 def test_real_headings_and_content_survive() -> None:
     text = "EXPERIENCE\nIntern | Aptiv | Feb 2024\nSkills: Python, Java"
     cleaned, removed = strip_placeholder_values(text)

@@ -88,9 +88,13 @@ def strip_invented_years(content: str, allowed: set[str]) -> tuple[str, set[str]
 # them back to the transcript.
 
 # RFC 2606 reserves example.com/.net/.org for documentation — never a real
-# inbox — plus the literal "your email" local part templates lean on.
+# inbox — plus the literal "your email" local part templates lean on, plus
+# reallygreatsite.com: Canva's own placeholder domain, shipped unchanged in
+# its resume templates. Same failure as "kenza@example.com" above, a
+# different design tool's default left in place by a real upload.
 _PLACEHOLDER_EMAIL_RE = re.compile(
-    r"\b(?:[\w.+-]+@example\.(?:com|org|net)|your[._]?e?mail@[\w.-]+)\b",
+    r"\b(?:[\w.+-]+@(?:example\.(?:com|org|net)|reallygreatsite\.com)"
+    r"|your[._]?e?mail@[\w.-]+)\b",
     re.IGNORECASE,
 )
 
@@ -111,6 +115,10 @@ _PLACEHOLDER_TEXT_RE = re.compile(
     r"university of example|example university|your university|your school|"
     r"your name|your full name|full name here|name here|"
     r"your company|company name here|your address|your city|"
+    # Canva's default resume-template address ("123 Anywhere St., Any City,
+    # ST 12345") — the digits/state/zip vary by template, so only the two
+    # invariant phrases are matched.
+    r"123 anywhere st|any city|"
     r"lorem ipsum"
     r")\b",
     re.IGNORECASE,
@@ -119,6 +127,11 @@ _PLACEHOLDER_TEXT_RE = re.compile(
 # A line left holding only a label ("Email:", "Phone -") once its placeholder
 # value is gone is noise, not data — drop it rather than print a bare label.
 _LABEL_ONLY_RE = re.compile(r"^[A-Za-z /]{1,24}[:\-–—]$")
+
+# A line (or line remnant) with nothing but leftover punctuation — e.g. a
+# trailing ", ." after "123 Anywhere St., Any City" loses both phrases and
+# leaves only the comma and full stop that used to separate them.
+_PUNCT_ONLY_RE = re.compile(r"^[\s,.\-–—·|]*$")
 
 
 def strip_placeholder_values(content: str) -> tuple[str, list[str]]:
@@ -147,9 +160,11 @@ def strip_placeholder_values(content: str) -> tuple[str, list[str]]:
     for line in cleaned.split("\n"):
         line = re.sub(r"[ \t]+", " ", line)
         line = re.sub(rf"{_SEPARATORS}+$", "", line).strip()
-        # Drop a line that is now empty, or just a dangling "Label:" — but keep
-        # real headings ("EXPERIENCE", "Skills"), which carry no trailing colon.
-        if line == "" or _LABEL_ONLY_RE.match(line):
+        line = re.sub(rf"^{_SEPARATORS}+", "", line).strip()
+        # Drop a line that is now empty, just a dangling "Label:", or nothing
+        # but leftover punctuation from a removed value's neighbours — but
+        # keep real headings ("EXPERIENCE", "Skills"), which carry neither.
+        if line == "" or _LABEL_ONLY_RE.match(line) or _PUNCT_ONLY_RE.match(line):
             continue
         lines.append(line)
     cleaned = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip("\n")

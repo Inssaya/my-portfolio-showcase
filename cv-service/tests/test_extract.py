@@ -41,6 +41,53 @@ def test_finds_sections_in_plain_text() -> None:
     assert "full_text" not in result["sections"], "should not fall back when headings were found"
 
 
+# A real upload (a Canva-exported CV template) reproduced this: pypdf's
+# extractor rendered several text runs with one space per glyph, but kept
+# pypdf's own signal for a real word boundary — a double space — intact.
+# `_clean` only sees the string, not the PDF, so this .txt fixture reproduces
+# the same single-space-vs-double-space pattern directly, matching how the
+# existing PLAIN_CV tests exercise extract_cv() without needing a real PDF.
+LETTER_SPACED_CV = (
+    "R I C H A R D  S A N C H E Z\n"
+    "M a r k e t i n g  M a n a g e r\n"
+    "hello@reallygreatsite.com\n"
+    "+123-456-7890\n"
+    "123 Anywhere St., Any City\n"
+    "\n"
+    "P R O F I L E  S U M M A R Y\n"
+    "Highly qualified digital marketing strategist.\n"
+    "\n"
+    "E D U C A T I O N\n"
+    "Wardiere University, 2025 - 2029\n"
+)
+
+
+def test_letter_spaced_text_is_repaired_before_heading_and_name_detection() -> None:
+    """Regression: before the repair, this exact file's name heuristic picked
+    the address line ("123 Anywhere St., Any City") instead of the name,
+    because "R I C H A R D  S A N C H E Z" split into 14 single-char tokens
+    and failed the 2-5-word name check — and no section heading matched
+    either, since "P R O F I L E  S U M M A R Y" contains no contiguous
+    "profile" or "summary" substring."""
+    result = extract_cv(LETTER_SPACED_CV.encode("utf-8"), "cv.txt")
+
+    assert result["estimated_name"] == "RICHARD SANCHEZ"
+    assert set(result["sections"]) >= {"profile", "education"}
+    assert "full_text" not in result["sections"]
+    assert "Wardiere University" in result["sections"]["education"]
+
+
+def test_short_real_words_are_not_mistaken_for_letter_spacing() -> None:
+    """The repair must not fire on ordinary text that happens to contain
+    several short single-letter or two-letter tokens — the failure mode
+    would be silently deleting real spaces and mashing words together."""
+    text = "I am a AI ML NLP developer with 5 yr of experience.\n"
+    result = extract_cv(text.encode("utf-8"), "cv.txt")
+
+    combined = " ".join(result["sections"].get("full_text", "").split())
+    assert "AI ML NLP developer" in combined
+
+
 def test_finds_name_and_contact() -> None:
     result = extract_cv(PLAIN_CV.encode("utf-8"), "cv.txt")
 

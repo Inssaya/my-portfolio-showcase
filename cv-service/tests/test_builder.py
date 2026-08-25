@@ -36,7 +36,7 @@ def _text_of(pdf_bytes: bytes) -> str:
     return "\n".join(page.extract_text() or "" for page in reader.pages)
 
 
-@pytest.mark.parametrize("style", ["modern", "classic"])
+@pytest.mark.parametrize("style", ["modern", "classic", "bold"])
 def test_renders_a_valid_pdf(style: str) -> None:
     pdf_bytes, pages = build_resume(style=style, **SAMPLE)
 
@@ -46,7 +46,7 @@ def test_renders_a_valid_pdf(style: str) -> None:
     assert pages <= 2, f"{style} produced {pages} pages for a one-page CV"
 
 
-@pytest.mark.parametrize("style", ["modern", "classic"])
+@pytest.mark.parametrize("style", ["modern", "classic", "bold"])
 def test_content_survives_rendering(style: str) -> None:
     """The facts a recruiter reads must actually be in the file.
 

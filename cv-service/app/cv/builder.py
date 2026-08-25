@@ -1,20 +1,24 @@
 """Render a resume draft into PDF bytes.
 
-Ported from the Hub's `create_resume` tool. The layout code (`_cvmodern`,
-`_cvdesign`) is vendored verbatim — geometry there was measured off reference
-PDFs and is not something to re-derive. What changed is the boundary: the Hub
-stored an artifact and handed the model a handle, whereas here the caller wants
-the bytes, so `build_resume` returns them and the HTTP layer decides what to do.
+Ported from the Hub's `create_resume` tool. The layout code for `_cvmodern`
+and `_cvdesign` is vendored verbatim — geometry there was measured off
+reference PDFs and is not something to re-derive. `_cvbold` is a third
+template, proportioned (not pixel-measured — no printed reference exists for
+it) against a design sample. What changed is the boundary: the Hub stored an
+artifact and handed the model a handle, whereas here the caller wants the
+bytes, so `build_resume` returns them and the HTTP layer decides what to do.
 
-Two templates, both kept:
+Three templates, all kept:
   modern   teal sidebar, cream page, sans-serif. The house style, and default.
   classic  serif/taupe with a photo header and language bars.
+  bold     single column, circular photo masthead, coloured section rules.
 """
 from __future__ import annotations
 
 import io
 import re
 
+from ._cvbold import BoldCV
 from ._cvdesign import (
     LABELS,
     CVRenderer,
@@ -42,7 +46,7 @@ RESUME_FIELDS = (
     "certifications",
 )
 
-STYLES = ("modern", "classic")
+STYLES = ("modern", "classic", "bold")
 
 # ------------------------------------------------------------- typography ---
 # The reference CV distinguishes three separators that a model — and most
@@ -274,6 +278,14 @@ def build_resume(
             projects=projects, certifications=certifications, photo=photo,
             language=language,
         )
+    if style == "bold":
+        return _build_bold(
+            full_name=full_name, contact=contact, headline=headline, profile=profile,
+            experience=experience, internships=internships, education=education,
+            skills=skills, languages=languages, interests=interests,
+            projects=projects, certifications=certifications, photo=photo,
+            language=language,
+        )
 
     labels = LABELS.get(language, LABELS["en"])
     full_name = normalise_name(full_name)
@@ -318,6 +330,52 @@ def build_resume(
         # way a project name is, so nothing here is set in bold.
         cv.heading(labels["certifications"])
         cv.lead_in_list([(_as_pair(c), "") for c in _lines_of(certifications)])
+
+    pages = cv.finish()
+    return buffer.getvalue(), pages
+
+
+def _build_bold(
+    *, full_name, contact, headline, profile, experience, internships, education,
+    skills, languages, interests, projects, certifications, photo, language,
+) -> tuple[bytes, int]:
+    """Single-column photo-masthead template — see `_cvbold.py`."""
+    labels = LABELS.get(language, LABELS["en"])
+    full_name = normalise_name(full_name)
+
+    buffer = io.BytesIO()
+    cv = BoldCV(buffer, title=f"{full_name} - CV")
+    cv.header(full_name, headline, _lines_of(contact), photo_path=photo)
+
+    if profile.strip():
+        cv.heading(labels["profile"])
+        cv.paragraph(" ".join(profile.split()))
+    if experience.strip():
+        cv.heading(labels["experience"])
+        cv.entries(_polish_entries(parse_entries(experience)))
+    if internships.strip():
+        cv.heading(labels["internships"])
+        cv.entries(_polish_entries(parse_entries(internships)))
+    if education.strip():
+        cv.heading(labels["education"])
+        cv.entries(_polish_entries(parse_entries(education)))
+    if projects.strip():
+        cv.heading(labels["projects"])
+        cv.lead_in_list([_split_lead(p) for p in _lines_of(projects)])
+    if certifications.strip():
+        cv.heading(labels["certifications"])
+        cv.lead_in_list([(_as_pair(c), "") for c in _lines_of(certifications)])
+    if interests.strip():
+        cv.heading(labels["interests"])
+        cv.bullets(_lines_of(interests))
+
+    if skills.strip() or languages.strip():
+        cv.two_up_footer(
+            labels["skills"] if skills.strip() else "",
+            _skill_groups(skills),
+            labels["languages"] if languages.strip() else "",
+            [_as_pair(line) for line in _lines_of(languages)],
+        )
 
     pages = cv.finish()
     return buffer.getvalue(), pages

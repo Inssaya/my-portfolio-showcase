@@ -93,8 +93,10 @@ TOOL_SCHEMAS: list[dict] = [
                         "enum": list(STYLES),
                         "description": (
                             "'modern' is the default house style: teal sidebar, cream page. "
-                            "'classic' is serif with a photo header. Only pass this if the "
-                            "visitor expressed a preference."
+                            "'classic' is serif with a photo header. 'bold' is single-column "
+                            "with a circular photo masthead and coloured section rules — offer "
+                            "it if the visitor wants a photo but not a sidebar layout. Only "
+                            "pass this if the visitor expressed a preference."
                         ),
                     },
                     "language": {

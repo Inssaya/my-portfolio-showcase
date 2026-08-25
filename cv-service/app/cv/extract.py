@@ -92,12 +92,52 @@ def _text_from_docx(data: bytes) -> str:
     return "\n".join(parts)
 
 
+def _looks_letter_spaced(chunk: str) -> bool:
+    """True when a chunk reads like "R I C H A R D" — a real word or phrase
+    with a space forced between every letter, rather than actual short words.
+
+    Seen on real uploads exported from Canva-style design tools: certain text
+    runs in the PDF (a tracked headline, a whole paragraph, a section title —
+    inconsistently, depending on the run's embedded font) come out of pypdf's
+    extractor with one space per glyph. Left alone, this defeats both the
+    section-heading matcher ("P R O F I L E S U M M A R Y" contains no
+    contiguous "profile") and the name heuristic (a 14-token "word" fails the
+    2-5-word name check, so a later ordinary line — an address, in one real
+    case — gets picked as the name instead).
+
+    Guarded to a high single-character ratio over at least 3 tokens so this
+    cannot misfire on genuinely short real words ("AI ML NLP dev").
+    """
+    tokens = chunk.split(" ")
+    if len(tokens) < 3:
+        return False
+    single_char = sum(1 for token in tokens if len(token) == 1)
+    return single_char / len(tokens) >= 0.7
+
+
+def _repair_letter_spacing(raw_line: str) -> str:
+    """Undo `_looks_letter_spaced` runs, using the one signal that still
+    distinguishes "space between letters" from "space between words" at this
+    point: pypdf's extractor renders the former as a single space and the
+    latter as a double space (or more), because it derives spacing from the
+    glyphs' actual on-page gaps. That distinction is lost the moment this
+    line's whitespace gets collapsed to single spaces (`_clean`'s next step),
+    so the repair has to happen first, on the still-doubled-space raw line.
+    """
+    chunks = re.split(r" {2,}", raw_line.strip())
+    repaired = [
+        chunk.replace(" ", "") if _looks_letter_spaced(chunk) else chunk
+        for chunk in chunks
+    ]
+    return " ".join(repaired)
+
+
 def _clean(text: str) -> str:
     """Drop layout noise that survives extraction."""
     lines: list[str] = []
     seen_header: dict[str, int] = {}
     for raw in text.splitlines():
-        line = " ".join(raw.split())
+        line = " ".join(_repair_letter_spacing(raw).split())
         if not line:
             continue
         # Bare page numbers, and "Page 1 of 3". Bounded to four digits: an
