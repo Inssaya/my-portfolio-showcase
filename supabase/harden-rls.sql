@@ -121,10 +121,15 @@ create policy "admin delete images" on storage.objects
 -- ------------------------------------------------------------ verify --------
 -- Should return ZERO rows. Any row means a table still grants write/read to
 -- every authenticated user with a `true` qualifier — i.e. still exploitable.
+-- A policy is dangerously permissive only when NEITHER clause restricts it:
+-- USING (`qual`) governs SELECT/UPDATE/DELETE, WITH CHECK (`with_check`)
+-- governs INSERT/UPDATE. An INSERT policy always has qual = NULL and gates
+-- through with_check, so both must be checked or a locked INSERT looks open.
 select schemaname, tablename, policyname, cmd, qual, with_check
 from pg_policies
 where schemaname in ('public', 'storage')
   and roles::text[] @> array['authenticated']
   and cmd <> 'SELECT'
   and coalesce(qual, 'true') = 'true'
+  and coalesce(with_check, 'true') = 'true'
   and policyname not in ('anyone can send');
