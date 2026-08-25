@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  ChevronDown, ChevronUp, Download, Eye, EyeOff,
-  FileText, Loader2, MessageSquare, Search, X,
+  ArrowLeft, ChevronDown, ChevronUp, FileText, Loader2,
+  MessageSquare, Search, X,
 } from "lucide-react";
-import { adminData, AppUser, ChatSession, UserCV } from "@/lib/admin-data";
+import { adminData, AppUser, ChatMessage, UserCV } from "@/lib/admin-data";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -14,20 +14,13 @@ function fmtDate(iso: string | null) {
   });
 }
 
-function fmtTime(ms: number) {
-  if (!ms) return "0m";
-  const h = Math.floor(ms / 3_600_000);
-  const m = Math.floor((ms % 3_600_000) / 60_000);
-  return h ? `${h}h ${m}m` : `${m}m`;
-}
-
 function fmtTokens(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return String(n);
 }
 
-// ── CVs popup ────────────────────────────────────────────────────────────────
+// ── CVs popup — lists the user's CV sessions ─────────────────────────────────
 
 const CVsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) => {
   const [cvs, setCVs] = useState<UserCV[]>([]);
@@ -47,7 +40,7 @@ const CVsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) => 
       <div className="w-full max-w-xl rounded-xl border border-border bg-card p-6 space-y-4 max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between shrink-0">
           <div>
-            <h2 className="font-sora font-semibold">CVs — {user.fullName}</h2>
+            <h2 className="font-sora font-semibold">CVs — {user.fullName || user.email}</h2>
             <p className="text-xs text-muted-foreground">{user.email}</p>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
@@ -65,90 +58,150 @@ const CVsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) => 
           {!loading && !error && cvs.length === 0 && (
             <p className="text-sm text-center text-muted-foreground py-10">No CVs created yet.</p>
           )}
-          {cvs.map((cv) => (
-            <div key={cv.id} className="flex items-center justify-between rounded-lg border border-border px-4 py-3 text-sm">
-              <div className="min-w-0">
-                <p className="font-medium truncate">{cv.title}</p>
-                <p className="text-xs text-muted-foreground">{fmtDate(cv.createdAt)}</p>
+          {cvs.map((cv, i) => (
+            <div key={cv.id} className="rounded-lg border border-border px-4 py-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-medium">CV #{cvs.length - i}</p>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${cv.pdfVersion > 0 ? "bg-accent/15 text-accent" : "bg-secondary text-muted-foreground"}`}>
+                  {cv.pdfVersion > 0 ? `Generated · v${cv.pdfVersion}` : "Draft"}
+                </span>
               </div>
-              {cv.fileUrl ? (
-                <a
-                  href={cv.fileUrl}
-                  download
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-3 shrink-0 flex items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors"
-                >
-                  <Download size={12} /> Download
-                </a>
-              ) : (
-                <span className="ml-3 shrink-0 text-xs text-muted-foreground">No file</span>
-              )}
+              <p className="mt-1 text-xs text-muted-foreground">
+                {cv.style} · {cv.language.toUpperCase()} · {fmtDate(cv.createdAt)} · {fmtTokens(cv.totalTokens)} tokens · {cv.messageCount} messages
+              </p>
             </div>
           ))}
         </div>
+
+        <p className="shrink-0 text-[11px] text-muted-foreground border-t border-border/50 pt-3">
+          PDFs are generated on demand and not stored server-side, so there's no
+          file to download here — the CV is regenerated from its draft when the
+          visitor requests it.
+        </p>
       </div>
     </div>
   );
 };
 
-// ── Chats popup ───────────────────────────────────────────────────────────────
+// ── Chats popup — sessions list, then transcript on "Open" ────────────────────
 
 const ChatsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) => {
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [sessions, setSessions] = useState<UserCV[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // transcript view
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [msgLoading, setMsgLoading] = useState(false);
+  const [msgError, setMsgError] = useState<string | null>(null);
+
   useEffect(() => {
     adminData
-      .getUserChats(user.id)
+      .getUserCVs(user.id)
       .then(setSessions)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [user.id]);
 
+  const openChat = (id: string) => {
+    setOpenId(id);
+    setMsgLoading(true);
+    setMsgError(null);
+    adminData
+      .getSessionMessages(id)
+      .then(setMessages)
+      .catch((e: Error) => setMsgError(e.message))
+      .finally(() => setMsgLoading(false));
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-xl rounded-xl border border-border bg-card p-6 space-y-4 max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between shrink-0">
-          <div>
-            <h2 className="font-sora font-semibold">Chat sessions — {user.fullName}</h2>
-            <p className="text-xs text-muted-foreground">{user.email}</p>
+          <div className="flex items-center gap-2 min-w-0">
+            {openId && (
+              <button
+                onClick={() => setOpenId(null)}
+                className="text-muted-foreground hover:text-foreground shrink-0"
+                aria-label="Back to sessions"
+              >
+                <ArrowLeft size={18} />
+              </button>
+            )}
+            <div className="min-w-0">
+              <h2 className="font-sora font-semibold truncate">
+                {openId ? "Transcript" : `Chats — ${user.fullName || user.email}`}
+              </h2>
+              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+            </div>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0">
             <X size={20} />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
-          {loading && (
-            <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
-              <Loader2 size={16} className="animate-spin" /> Loading…
-            </div>
+          {/* Sessions list */}
+          {!openId && (
+            <>
+              {loading && (
+                <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
+                  <Loader2 size={16} className="animate-spin" /> Loading…
+                </div>
+              )}
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              {!loading && !error && sessions.length === 0 && (
+                <p className="text-sm text-center text-muted-foreground py-10">No chat sessions yet.</p>
+              )}
+              {sessions.map((s, i) => (
+                <div key={s.id} className="flex items-center justify-between rounded-lg border border-border px-4 py-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium">Session #{sessions.length - i}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {fmtDate(s.createdAt)} · {s.messageCount} messages
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => openChat(s.id)}
+                    className="ml-3 shrink-0 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium hover:bg-secondary/70 transition-colors"
+                  >
+                    Open
+                  </button>
+                </div>
+              ))}
+            </>
           )}
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          {!loading && !error && sessions.length === 0 && (
-            <p className="text-sm text-center text-muted-foreground py-10">No chat sessions yet.</p>
+
+          {/* Transcript */}
+          {openId && (
+            <>
+              {msgLoading && (
+                <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
+                  <Loader2 size={16} className="animate-spin" /> Loading transcript…
+                </div>
+              )}
+              {msgError && <p className="text-sm text-destructive">{msgError}</p>}
+              {!msgLoading && !msgError && messages.length === 0 && (
+                <p className="text-sm text-center text-muted-foreground py-10">This session has no messages.</p>
+              )}
+              {messages
+                .filter((m) => m.role === "user" || m.role === "assistant")
+                .map((m) => (
+                  <div key={m.id} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                        m.role === "user"
+                          ? "bg-accent text-accent-foreground"
+                          : "bg-secondary text-foreground/90"
+                      }`}
+                    >
+                      {m.content || <span className="italic opacity-60">(empty)</span>}
+                    </div>
+                  </div>
+                ))}
+            </>
           )}
-          {sessions.map((s) => (
-            <div key={s.id} className="flex items-center justify-between rounded-lg border border-border px-4 py-3 text-sm">
-              <div className="min-w-0">
-                <p className="font-medium truncate">{s.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {fmtDate(s.createdAt)} · {s.messageCount} messages
-                  {s.lastMessageAt ? ` · last ${fmtDate(s.lastMessageAt)}` : ""}
-                </p>
-              </div>
-              <a
-                href={`/admin/chats/${s.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-3 shrink-0 flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium hover:bg-secondary/70 transition-colors"
-              >
-                Open
-              </a>
-            </div>
-          ))}
         </div>
       </div>
     </div>
@@ -159,7 +212,7 @@ const ChatsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) =
 
 type SortKey = keyof Pick<
   AppUser,
-  "fullName" | "email" | "createdAt" | "lastLoginAt" | "totalCvsCreated" | "totalTimeSpentMs" | "totalTokens"
+  "fullName" | "email" | "createdAt" | "lastLoginAt" | "totalCvsCreated" | "totalTokens"
 >;
 
 const AdminUserManagement = () => {
@@ -169,9 +222,7 @@ const AdminUserManagement = () => {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [sortAsc, setSortAsc] = useState(false);
-  const [revealId, setRevealId] = useState<string | null>(null);
 
-  // modals
   const [cvsFor, setCvsFor] = useState<AppUser | null>(null);
   const [chatsFor, setChatsFor] = useState<AppUser | null>(null);
 
@@ -181,8 +232,7 @@ const AdminUserManagement = () => {
     try {
       setUsers(await adminData.getUsers());
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
@@ -204,7 +254,7 @@ const AdminUserManagement = () => {
     .filter((u) => {
       const q = search.toLowerCase();
       return (
-        u.fullName.toLowerCase().includes(q) ||
+        (u.fullName ?? "").toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
         u.id.toLowerCase().includes(q)
       );
@@ -261,39 +311,11 @@ const AdminUserManagement = () => {
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-4 space-y-2">
           <p className="text-sm text-destructive font-medium">Failed to load users</p>
           <p className="text-xs text-muted-foreground">{error}</p>
-          <details className="text-xs text-muted-foreground">
-            <summary className="cursor-pointer hover:text-foreground">Required Supabase tables</summary>
-            <pre className="mt-2 overflow-x-auto rounded bg-secondary/40 p-3 text-[11px] leading-relaxed">{`-- Run once in Supabase SQL editor:
-
-CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  full_name TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE,
-  password TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  last_login_at TIMESTAMPTZ,
-  total_cvs_created INT DEFAULT 0,
-  total_time_spent_ms BIGINT DEFAULT 0,
-  total_tokens INT DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS cvs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  title TEXT DEFAULT 'Untitled CV',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  file_url TEXT
-);
-
-CREATE TABLE IF NOT EXISTS chat_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  title TEXT DEFAULT 'Chat session',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  last_message_at TIMESTAMPTZ,
-  message_count INT DEFAULT 0
-);`}</pre>
-          </details>
+          <p className="text-xs text-muted-foreground">
+            If this says the function doesn't exist, run{" "}
+            <code className="rounded bg-secondary/60 px-1">supabase/admin-user-functions.sql</code>{" "}
+            in the Supabase SQL editor.
+          </p>
         </div>
       )}
 
@@ -304,12 +326,10 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
               <tr>
                 {th("Full Name", "fullName")}
                 {th("Email", "email")}
-                {th("Password")}
                 {th("User ID")}
                 {th("Created", "createdAt")}
                 {th("Last Login", "lastLoginAt")}
                 {th("CVs", "totalCvsCreated")}
-                {th("Time Spent", "totalTimeSpentMs")}
                 {th("Tokens", "totalTokens")}
                 {th("Actions")}
               </tr>
@@ -319,28 +339,12 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
                 <tr key={u.id} className="hover:bg-secondary/20 transition-colors">
                   <td className="px-4 py-3 font-medium whitespace-nowrap">{u.fullName || "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{u.email}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-xs">
-                        {revealId === u.id ? u.password || "—" : "••••••••"}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setRevealId(revealId === u.id ? null : u.id)}
-                        className="text-muted-foreground hover:text-foreground"
-                        aria-label={revealId === u.id ? "Hide password" : "Show password"}
-                      >
-                        {revealId === u.id ? <EyeOff size={13} /> : <Eye size={13} />}
-                      </button>
-                    </div>
-                  </td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
                     {u.id.slice(0, 8)}…
                   </td>
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{fmtDate(u.createdAt)}</td>
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{fmtDate(u.lastLoginAt)}</td>
                   <td className="px-4 py-3 text-center font-medium">{u.totalCvsCreated}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{fmtTime(u.totalTimeSpentMs)}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{fmtTokens(u.totalTokens)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -364,7 +368,7 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="py-16 text-center text-sm text-muted-foreground">
+                  <td colSpan={8} className="py-16 text-center text-sm text-muted-foreground">
                     {search ? "No users match your search." : "No users yet."}
                   </td>
                 </tr>

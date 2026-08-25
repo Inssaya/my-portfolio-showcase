@@ -423,63 +423,68 @@ export async function hydrateFromSupabase(): Promise<void> {
 }
 
 // -------------------------------------------------- User Management types
+// Backed by admin-only SECURITY DEFINER functions (see
+// supabase/admin-user-functions.sql), NOT by direct table reads. The browser
+// cannot query auth.users with the anon key, and passwords are never exposed —
+// Supabase stores only a bcrypt hash.
 
 export interface AppUser {
   id: string;
-  fullName: string;
+  fullName: string | null;
   email: string;
-  password: string;
   createdAt: string;
   lastLoginAt: string | null;
   totalCvsCreated: number;
-  totalTimeSpentMs: number;
   totalTokens: number;
 }
 
+/** One CV session (each is a CV conversation the visitor built). */
 export interface UserCV {
   id: string;
-  userId: string;
-  title: string;
+  style: string;
+  language: string;
+  pdfVersion: number;
+  totalTokens: number;
   createdAt: string;
-  fileUrl: string | null;
+  updatedAt: string;
+  messageCount: number;
 }
 
-export interface ChatSession {
-  id: string;
-  userId: string;
-  title: string;
+export interface ChatMessage {
+  id: number;
+  role: string;
+  content: string;
+  toolName: string | null;
   createdAt: string;
-  lastMessageAt: string | null;
-  messageCount: number;
 }
 
 const mapAppUser = (row: Row): AppUser => ({
   id: String(row.id),
-  fullName: String(row.full_name ?? row.fullname ?? ""),
+  fullName: (row.full_name as string | null) ?? null,
   email: String(row.email ?? ""),
-  password: String(row.password ?? ""),
   createdAt: String(row.created_at ?? ""),
-  lastLoginAt: (row.last_login_at as string | null) ?? null,
-  totalCvsCreated: Number(row.total_cvs_created ?? 0),
-  totalTimeSpentMs: Number(row.total_time_spent_ms ?? 0),
+  lastLoginAt: (row.last_sign_in_at as string | null) ?? null,
+  totalCvsCreated: Number(row.cv_count ?? 0),
   totalTokens: Number(row.total_tokens ?? 0),
 });
 
 const mapUserCV = (row: Row): UserCV => ({
   id: String(row.id),
-  userId: String(row.user_id),
-  title: String(row.title ?? "Untitled CV"),
+  style: String(row.style ?? ""),
+  language: String(row.language ?? ""),
+  pdfVersion: Number(row.pdf_version ?? 0),
+  totalTokens: Number(row.total_tokens ?? 0),
   createdAt: String(row.created_at ?? ""),
-  fileUrl: (row.file_url as string | null) ?? null,
+  updatedAt: String(row.updated_at ?? ""),
+  messageCount: Number(row.message_count ?? 0),
 });
 
-const mapChatSession = (row: Row): ChatSession => ({
-  id: String(row.id),
-  userId: String(row.user_id),
-  title: String(row.title ?? "Chat session"),
+const mapChatMessage = (row: Row): ChatMessage => ({
+  id: Number(row.id),
+  role: String(row.role ?? ""),
+  content: String(row.content ?? ""),
+  toolName: (row.tool_name as string | null) ?? null,
   createdAt: String(row.created_at ?? ""),
-  lastMessageAt: (row.last_message_at as string | null) ?? null,
-  messageCount: Number(row.message_count ?? 0),
 });
 
 // -------------------------------------------------- public API
@@ -636,35 +641,27 @@ export const adminData = {
   },
 
   // -- Users -------------------------------------------------------------------
+  // All three go through admin-only SECURITY DEFINER RPCs. A non-admin caller
+  // gets a "Not authorized" error from Postgres, never data.
+
   getUsers: async (): Promise<AppUser[]> => {
     if (!supabase) throw new Error("Supabase is not configured.");
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return (data ?? []).map(mapAppUser);
+    const { data, error } = await supabase.rpc("admin_list_users");
+    if (error) throw new Error(error.message);
+    return ((data as Row[]) ?? []).map(mapAppUser);
   },
 
   getUserCVs: async (userId: string): Promise<UserCV[]> => {
     if (!supabase) throw new Error("Supabase is not configured.");
-    const { data, error } = await supabase
-      .from("cvs")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return (data ?? []).map(mapUserCV);
+    const { data, error } = await supabase.rpc("admin_list_user_sessions", { uid: userId });
+    if (error) throw new Error(error.message);
+    return ((data as Row[]) ?? []).map(mapUserCV);
   },
 
-  getUserChats: async (userId: string): Promise<ChatSession[]> => {
+  getSessionMessages: async (sessionId: string): Promise<ChatMessage[]> => {
     if (!supabase) throw new Error("Supabase is not configured.");
-    const { data, error } = await supabase
-      .from("chat_sessions")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return (data ?? []).map(mapChatSession);
+    const { data, error } = await supabase.rpc("admin_get_session_messages", { sid: sessionId });
+    if (error) throw new Error(error.message);
+    return ((data as Row[]) ?? []).map(mapChatMessage);
   },
 };
