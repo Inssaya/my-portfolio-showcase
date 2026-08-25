@@ -130,6 +130,7 @@ const ChatsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) =
   const [msgLoading, setMsgLoading] = useState(false);
   const [msgError, setMsgError] = useState<string | null>(null);
   const [uploads, setUploads] = useState<UploadFileMeta[]>([]);
+  const [uploadsError, setUploadsError] = useState<string | null>(null);
   const [dlId, setDlId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -145,13 +146,17 @@ const ChatsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) =
     setMsgLoading(true);
     setMsgError(null);
     setUploads([]);
+    setUploadsError(null);
     adminData
       .getSessionMessages(id)
       .then(setMessages)
       .catch((e: Error) => setMsgError(e.message))
       .finally(() => setMsgLoading(false));
-    // Uploaded files for this session — best-effort, shown above the transcript.
-    adminData.getSessionUploads(id).then(setUploads).catch(() => setUploads([]));
+    // Uploaded files for this session, shown above the transcript.
+    adminData
+      .getSessionUploads(id)
+      .then(setUploads)
+      .catch((e: Error) => setUploadsError(e.message));
   };
 
   const downloadFile = async (id: string) => {
@@ -226,11 +231,21 @@ const ChatsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) =
           {/* Transcript */}
           {openId && (
             <>
-              {uploads.length > 0 && (
-                <div className="mb-3 rounded-lg border border-border/70 bg-secondary/20 p-3">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Uploaded files
+              <div className="mb-3 rounded-lg border border-border/70 bg-secondary/20 p-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Uploaded files
+                </p>
+                {uploadsError ? (
+                  <p className="text-xs text-destructive">
+                    Couldn't load uploads ({uploadsError}). If it mentions a missing
+                    function, run <code className="rounded bg-secondary/60 px-1">supabase/cv-uploads.sql</code>.
                   </p>
+                ) : uploads.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No files stored for this chat. Files are only kept for uploads made
+                    after the storage feature was deployed.
+                  </p>
+                ) : (
                   <div className="space-y-1.5">
                     {uploads.map((f) => (
                       <div key={f.id} className="flex items-center justify-between gap-3 text-sm">
@@ -252,8 +267,8 @@ const ChatsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) =
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {msgLoading && (
                 <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
