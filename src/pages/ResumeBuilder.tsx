@@ -118,7 +118,7 @@ const ResumeBuilder = () => {
   return (
     <CvAppShell>
       <main
-        className="mx-auto flex min-h-[calc(100svh-3.5rem)] w-full max-w-3xl flex-col px-4 pb-4 pt-6"
+        className="mx-auto flex h-[calc(100svh-3.5rem)] w-full max-w-3xl flex-col px-2 pb-2 pt-0 sm:px-3 sm:pb-3"
         onDragOver={(event) => {
           event.preventDefault();
           if (!busy && !unavailable) setDragging(true);
@@ -126,7 +126,7 @@ const ResumeBuilder = () => {
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
       >
-        <div className="relative flex flex-1 flex-col overflow-hidden rounded-xl border border-border/60 bg-card/50">
+        <div className="relative flex flex-1 flex-col overflow-hidden rounded-b-xl border border-t-0 border-border/60 bg-card/50">
           <AnimatePresence>
             {dragging && (
               <motion.div
