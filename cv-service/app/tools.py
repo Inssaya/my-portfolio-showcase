@@ -16,7 +16,7 @@ import tempfile
 from contextlib import contextmanager, suppress
 
 from .cv.builder import RESUME_FIELDS, STYLES, build_resume, safe_filename
-from .cv.verify import input_years, strip_invented_years
+from .cv.verify import input_years, strip_invented_years, strip_placeholder_values
 from .session import Session
 
 # Compressed on purpose. This text is re-sent on every request of every round,
@@ -161,6 +161,10 @@ def run_tool(session: Session, name: str, arguments: dict | None = None) -> str:
         # the Build button renders from draft state without calling the model
         # at all, so verifying "after a turn" would leave it unprotected.
         content, removed_years = strip_invented_years(content, input_years(session.transcript))
+        # Then strip template/example junk — an uploaded half-filled template's
+        # "kenza@example.com" / "University of Example" placeholders, or the same
+        # values confabulated from a thin extraction. See cv/verify.py.
+        content, removed_placeholders = strip_placeholder_values(content)
 
         session.set_field(field, content)
         stored = session.draft.get(field, "")
@@ -174,6 +178,12 @@ def run_tool(session: Session, name: str, arguments: dict | None = None) -> str:
                 f" Removed unconfirmed year(s) {', '.join(sorted(removed_years))} — "
                 "the visitor never gave a year for this. Ask them if it matters; "
                 "do not guess another one."
+            )
+        if removed_placeholders:
+            note += (
+                f" Removed template placeholder(s) {', '.join(removed_placeholders)} — "
+                "these are example values from a blank template, not the visitor's "
+                "real details. Do not save them; ask the visitor for the real value."
             )
         return note
 

@@ -72,3 +72,85 @@ def strip_invented_years(content: str, allowed: set[str]) -> tuple[str, set[str]
         lines.append(line)
     cleaned = "\n".join(lines)
     return cleaned, invented
+
+
+# --------------------------------------------------------- template placeholders
+# A different failure from an invented year, but the same class: content that
+# never came from the visitor. When someone uploads a CV *template* they only
+# half-filled, its own placeholder junk ("kenza@example.com", "University of
+# Example", "123-456-7890") is extracted and — unless caught — saved verbatim.
+# The model has also been seen to confabulate exactly these values when an
+# upload extracted little real text and it was told to "save every section".
+#
+# builder.py's _PLACEHOLDERS catches single-word labels ("Company Name"); this
+# catches the multi-token, structured placeholders that slip past it. Unlike a
+# year, these DO have a lexical tell, so a pattern is enough — no need to trace
+# them back to the transcript.
+
+# RFC 2606 reserves example.com/.net/.org for documentation — never a real
+# inbox — plus the literal "your email" local part templates lean on.
+_PLACEHOLDER_EMAIL_RE = re.compile(
+    r"\b(?:[\w.+-]+@example\.(?:com|org|net)|your[._]?e?mail@[\w.-]+)\b",
+    re.IGNORECASE,
+)
+
+# Keyboard-walk and reserved-fictional phone numbers. 555-01xx is the range
+# Hollywood/US docs use precisely because it can never be a real line.
+_PLACEHOLDER_PHONE_RE = re.compile(
+    r"(?:\+?\d{1,3}[\s.-]?)?"
+    r"(?:123[\s.-]?456[\s.-]?7890|\(?555\)?[\s.-]?01\d\d|1234567890|0{7,})"
+)
+
+# Whole-value template strings. A value equal to one of these (or a line made
+# only of it) is dropped.
+_PLACEHOLDER_TEXT_RE = re.compile(
+    # Deliberately NOT "John/Jane Doe" — those read as placeholders but are
+    # plausible real names, and blanking someone's actual name is far worse
+    # than leaving a template one for them to correct. Only unambiguous markers.
+    r"\b(?:"
+    r"university of example|example university|your university|your school|"
+    r"your name|your full name|full name here|name here|"
+    r"your company|company name here|your address|your city|"
+    r"lorem ipsum"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# A line left holding only a label ("Email:", "Phone -") once its placeholder
+# value is gone is noise, not data — drop it rather than print a bare label.
+_LABEL_ONLY_RE = re.compile(r"^[A-Za-z /]{1,24}[:\-–—]$")
+
+
+def strip_placeholder_values(content: str) -> tuple[str, list[str]]:
+    """Remove template/example values a real CV never contains.
+
+    Returns the cleaned text and the snippets removed, so the caller can tell
+    the model to ask the visitor for the real value instead of silently
+    blanking it — the same reason strip_invented_years reports what it took.
+    """
+    removed: list[str] = []
+
+    def _capture(pattern: re.Pattern[str], text: str) -> str:
+        def repl(match: re.Match[str]) -> str:
+            removed.append(match.group(0).strip())
+            return ""
+        return pattern.sub(repl, text)
+
+    cleaned = content
+    for pattern in (_PLACEHOLDER_EMAIL_RE, _PLACEHOLDER_PHONE_RE, _PLACEHOLDER_TEXT_RE):
+        cleaned = _capture(pattern, cleaned)
+
+    if not removed:
+        return content, []
+
+    lines = []
+    for line in cleaned.split("\n"):
+        line = re.sub(r"[ \t]+", " ", line)
+        line = re.sub(rf"{_SEPARATORS}+$", "", line).strip()
+        # Drop a line that is now empty, or just a dangling "Label:" — but keep
+        # real headings ("EXPERIENCE", "Skills"), which carry no trailing colon.
+        if line == "" or _LABEL_ONLY_RE.match(line):
+            continue
+        lines.append(line)
+    cleaned = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip("\n")
+    return cleaned, removed
