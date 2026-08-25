@@ -422,6 +422,66 @@ export async function hydrateFromSupabase(): Promise<void> {
   }
 }
 
+// -------------------------------------------------- User Management types
+
+export interface AppUser {
+  id: string;
+  fullName: string;
+  email: string;
+  password: string;
+  createdAt: string;
+  lastLoginAt: string | null;
+  totalCvsCreated: number;
+  totalTimeSpentMs: number;
+  totalTokens: number;
+}
+
+export interface UserCV {
+  id: string;
+  userId: string;
+  title: string;
+  createdAt: string;
+  fileUrl: string | null;
+}
+
+export interface ChatSession {
+  id: string;
+  userId: string;
+  title: string;
+  createdAt: string;
+  lastMessageAt: string | null;
+  messageCount: number;
+}
+
+const mapAppUser = (row: Row): AppUser => ({
+  id: String(row.id),
+  fullName: String(row.full_name ?? row.fullname ?? ""),
+  email: String(row.email ?? ""),
+  password: String(row.password ?? ""),
+  createdAt: String(row.created_at ?? ""),
+  lastLoginAt: (row.last_login_at as string | null) ?? null,
+  totalCvsCreated: Number(row.total_cvs_created ?? 0),
+  totalTimeSpentMs: Number(row.total_time_spent_ms ?? 0),
+  totalTokens: Number(row.total_tokens ?? 0),
+});
+
+const mapUserCV = (row: Row): UserCV => ({
+  id: String(row.id),
+  userId: String(row.user_id),
+  title: String(row.title ?? "Untitled CV"),
+  createdAt: String(row.created_at ?? ""),
+  fileUrl: (row.file_url as string | null) ?? null,
+});
+
+const mapChatSession = (row: Row): ChatSession => ({
+  id: String(row.id),
+  userId: String(row.user_id),
+  title: String(row.title ?? "Chat session"),
+  createdAt: String(row.created_at ?? ""),
+  lastMessageAt: (row.last_message_at as string | null) ?? null,
+  messageCount: Number(row.message_count ?? 0),
+});
+
 // -------------------------------------------------- public API
 
 export const adminData = {
@@ -573,5 +633,38 @@ export const adminData = {
     }
     const { error } = await supabase.from("messages").delete().eq("id", id);
     if (error) throw error;
+  },
+
+  // -- Users -------------------------------------------------------------------
+  getUsers: async (): Promise<AppUser[]> => {
+    if (!supabase) throw new Error("Supabase is not configured.");
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map(mapAppUser);
+  },
+
+  getUserCVs: async (userId: string): Promise<UserCV[]> => {
+    if (!supabase) throw new Error("Supabase is not configured.");
+    const { data, error } = await supabase
+      .from("cvs")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map(mapUserCV);
+  },
+
+  getUserChats: async (userId: string): Promise<ChatSession[]> => {
+    if (!supabase) throw new Error("Supabase is not configured.");
+    const { data, error } = await supabase
+      .from("chat_sessions")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map(mapChatSession);
   },
 };

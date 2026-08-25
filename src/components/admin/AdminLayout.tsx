@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, FolderKanban, MessageSquare, FileText,
-  Link2, GraduationCap, Award, Wrench, Home, LogOut, Menu, X,
+  Link2, GraduationCap, Award, Wrench, Home, LogOut, Menu, Users, X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -15,6 +15,7 @@ const navItems = [
   { to: "/admin/certificates", icon: Award, label: "Certificats" },
   { to: "/admin/projects", icon: FolderKanban, label: "Projets" },
   { to: "/admin/messages", icon: MessageSquare, label: "Messages" },
+  { to: "/admin/users", icon: Users, label: "Users" },
   { to: "/admin/links", icon: Link2, label: "Liens Sociaux" },
 ];
 

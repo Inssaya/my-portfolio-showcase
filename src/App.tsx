@@ -38,6 +38,7 @@ const AdminSkills = lazy(() => import("./pages/admin/AdminSkills.tsx"));
 const AdminEducation = lazy(() => import("./pages/admin/AdminEducation.tsx"));
 const AdminCertificates = lazy(() => import("./pages/admin/AdminCertificates.tsx"));
 const AdminLinks = lazy(() => import("./pages/admin/AdminLinks.tsx"));
+const AdminUserManagement = lazy(() => import("./pages/admin/AdminUserManagement.tsx"));
 const ProtectedRoute = lazy(() => import("./components/admin/ProtectedRoute.tsx"));
 
 const queryClient = new QueryClient();
@@ -139,6 +140,7 @@ const App = () => (
               <Route path="education" element={<AdminEducation />} />
               <Route path="certificates" element={<AdminCertificates />} />
               <Route path="links" element={<AdminLinks />} />
+              <Route path="users" element={<AdminUserManagement />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
