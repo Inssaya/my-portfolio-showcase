@@ -1,7 +1,7 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, Check, Download, FileText, FileUp, RotateCcw, Sparkles, X } from "lucide-react";
+import { ArrowUp, Check, Download, FileText, FileUp, History, Plus, Sparkles, X } from "lucide-react";
 import ChatMarkdown from "@/components/ChatMarkdown";
 import CvAppShell from "@/components/cv/CvAppShell";
 import { useResumeChat } from "@/lib/resume/useResumeChat";
@@ -106,6 +106,27 @@ const ResumeBuilder = () => {
   const unavailable = status === "unavailable";
   const empty = turns.length === 0;
 
+  // Arriving with ?new=1 (the "New CV" button on History) forces a fresh
+  // session, overriding whatever id localStorage was holding — otherwise the
+  // builder would silently resume the last chat instead of starting a new one.
+  const forceNew = searchParams.get("new");
+  useEffect(() => {
+    if (forceNew) reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceNew]);
+
+  // Start a fresh session with its own memory. Non-destructive: the current
+  // chat is already saved server-side and stays reachable under History, so
+  // we only confirm to avoid a surprised "where did my chat go?".
+  const startNew = () => {
+    if (busy) return;
+    if (!empty && !window.confirm("Start a new CV? Your current one stays saved in History.")) {
+      return;
+    }
+    reset();
+    setDraft("");
+  };
+
   return (
     <CvAppShell>
       <main
@@ -117,7 +138,28 @@ const ResumeBuilder = () => {
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
       >
-       
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-foreground/80">
+            <FileText size={16} className="text-accent" />
+            <span className="font-sora text-sm font-semibold">CV Builder</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={startNew}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium text-foreground/80 transition-colors hover:border-accent/50 hover:text-accent disabled:opacity-40"
+            >
+              <Plus size={13} /> New CV
+            </button>
+            <Link
+              to="/cv-builder/mydata"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium text-foreground/80 transition-colors hover:border-accent/50 hover:text-accent"
+            >
+              <History size={13} /> History
+            </Link>
+          </div>
+        </div>
 
         <div className="relative flex flex-1 flex-col overflow-hidden rounded-xl border border-border/60 bg-card/50">
           <AnimatePresence>

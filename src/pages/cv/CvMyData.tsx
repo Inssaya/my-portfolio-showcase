@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FileText, Loader2 } from "lucide-react";
+import { FileText, Loader2, Plus } from "lucide-react";
 import CvAppShell from "@/components/cv/CvAppShell";
 import { fetchSessions, type SessionSummary } from "@/lib/resume/api";
 
@@ -22,17 +22,28 @@ const CvMyData = () => {
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
 
   useEffect(() => {
-    document.title = "CV Builder — My Data";
+    document.title = "CV Builder — History";
     void fetchSessions().then(setSessions);
   }, []);
 
   return (
     <CvAppShell>
       <main className="mx-auto flex min-h-[calc(100svh-3.5rem)] w-full max-w-2xl flex-col px-4 pb-4 pt-6">
-        <h1 className="font-sora text-2xl font-bold">My Data</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Every CV you've started with us. Pick one up where you left off.
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="font-sora text-2xl font-bold">History</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Every CV chat you've started. Each keeps its own memory — pick one
+              up where you left off.
+            </p>
+          </div>
+          <Link
+            to="/cv-builder?new=1"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-accent px-3.5 py-2 text-xs font-semibold text-accent-foreground transition-opacity hover:opacity-90"
+          >
+            <Plus size={13} /> New CV
+          </Link>
+        </div>
 
         <div className="mt-5 space-y-2">
           {sessions === null && (

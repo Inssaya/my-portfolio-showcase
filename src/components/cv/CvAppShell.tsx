@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ArrowLeft, FileText, LogOut, Mail, Menu, User as UserIcon } from "lucide-react";
+import { ArrowLeft, FileText, History, LogOut, Mail, Menu, User as UserIcon } from "lucide-react";
 import {
   Sheet,
   SheetClose,
@@ -20,7 +20,7 @@ import { supabase } from "@/lib/supabase";
 
 const ITEMS = [
   { to: "/cv-builder", label: "CV Builder", icon: FileText },
-  { to: "/cv-builder/mydata", label: "My Data", icon: FileText },
+  { to: "/cv-builder/mydata", label: "History", icon: History },
   { to: "/cv-builder/profile", label: "Profile", icon: UserIcon },
   { to: "/cv-builder/contact", label: "Contact", icon: Mail },
 ];
