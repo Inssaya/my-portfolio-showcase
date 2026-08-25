@@ -13,7 +13,7 @@ import { fetchSessions, type SessionSummary } from "@/lib/resume/api";
  *
  * A photo gallery was part of the original ask, but the current design does
  * not persist photo bytes past this process's own lifetime (see the note in
- * supabase/schema.sql) — only the currently-live session's photo, if any,
+ * supabase/setup.sql) — only the currently-live session's photo, if any,
  * can ever be shown. Rather than fake a "photos" section with nothing real
  * behind it, this page sticks to what genuinely survives: the CVs
  * themselves.

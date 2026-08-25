@@ -4,7 +4,7 @@ WRITES THROUGH WITH THE VISITOR'S OWN ACCESS TOKEN, NEVER service_role
 ------------------------------------------------------------------------
 Same boundary app/auth.py already keeps: this service holds only the anon
 key, and every read or write happens as the visitor themselves, so Postgres'
-own row-level security (see supabase/schema.sql's cv_sessions/cv_messages
+own row-level security (see supabase/setup.sql's cv_sessions/cv_messages
 policies) enforces per-user isolation at the database — this module does not
 re-implement that check, it just carries the token through.
 

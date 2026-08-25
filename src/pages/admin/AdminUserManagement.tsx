@@ -238,7 +238,7 @@ const ChatsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) =
                 {uploadsError ? (
                   <p className="text-xs text-destructive">
                     Couldn't load uploads ({uploadsError}). If it mentions a missing
-                    function, run <code className="rounded bg-secondary/60 px-1">supabase/cv-uploads.sql</code>.
+                    function, run <code className="rounded bg-secondary/60 px-1">supabase/setup.sql</code>.
                   </p>
                 ) : uploads.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
@@ -426,7 +426,7 @@ const AdminUserManagement = () => {
           <p className="text-xs text-muted-foreground">{error}</p>
           <p className="text-xs text-muted-foreground">
             If this says the function doesn't exist, run{" "}
-            <code className="rounded bg-secondary/60 px-1">supabase/admin-user-functions.sql</code>{" "}
+            <code className="rounded bg-secondary/60 px-1">supabase/setup.sql</code>{" "}
             in the Supabase SQL editor.
           </p>
         </div>

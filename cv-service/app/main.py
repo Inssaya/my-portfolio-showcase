@@ -448,7 +448,7 @@ def admin_download(session_id: str, admin: AuthUser = Depends(require_admin)) ->
     The admin never owns these sessions, so the in-memory store won't hold
     them and the visitor-scoped /resume path can't reach them. Instead we load
     the row straight from Postgres — the admin's own JWT passes the "admin read
-    sessions" RLS policy (see supabase/admin-cv-access.sql) — and re-render
+    sessions" RLS policy (see supabase/setup.sql) — and re-render
     from the draft, exactly as the Build button does. No model call, no photo
     (the portrait is never persisted), no mutation of the user's session.
     """

@@ -424,7 +424,7 @@ export async function hydrateFromSupabase(): Promise<void> {
 
 // -------------------------------------------------- User Management types
 // Backed by admin-only SECURITY DEFINER functions (see
-// supabase/admin-user-functions.sql), NOT by direct table reads. The browser
+// supabase/setup.sql), NOT by direct table reads. The browser
 // cannot query auth.users with the anon key, and passwords are never exposed —
 // Supabase stores only a bcrypt hash.
 

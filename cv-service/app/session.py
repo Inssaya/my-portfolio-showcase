@@ -179,7 +179,7 @@ class Session:
 
     def to_row(self) -> dict:
         """This session's cv_sessions columns. photo/pdf bytes are excluded
-        on purpose — see the note at the top of supabase/schema.sql."""
+        on purpose — see the note at the top of supabase/setup.sql."""
         return {
             "id": self.id,
             "user_id": self.user_id,

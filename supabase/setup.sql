@@ -1,22 +1,21 @@
 -- =============================================================================
 -- PORTFOLIO — COMPLETE ONE-SHOT SETUP
 --
--- Run this ONCE and it does everything EXCEPT create the admin account:
---   1. Creates all tables (portfolio content, messages, CV builder)
---   2. Creates the is_admin() gate and all hardened RLS policies
---   3. Creates the public "images" storage bucket + its policies
---   4. Verifies nothing is left wide open
+-- THE one file. Run it and it does everything:
+--   1. All tables (portfolio content, messages, CV builder, uploads)
+--   2. The is_admin() gate + all hardened RLS policies
+--   3. The public "images" storage bucket + policies
+--   4. Every admin function (user management, CV/chat/upload review)
+--   5. The admin login account (only if you set a password below)
+--   6. Verifies nothing is left wide open
 --
 -- HOW: Supabase Dashboard → SQL Editor → New query → paste ALL of this → Run.
--- No edits needed — there are NO secrets in this file, so it is safe to keep
--- in the repo. Idempotent: safe to re-run any time.
+-- Idempotent: safe to re-run any time (nothing is duplicated or overwritten).
 --
--- ┌───────────────────────────────────────────────────────────────────────┐
--- │  ADMIN ACCOUNT is created by a SEPARATE snippet that contains your      │
--- │  password. It is deliberately NOT in this committed file — a password   │
--- │  in a public repo is a credential leak. Run that snippet once, in the   │
--- │  SQL editor, from wherever you were given it.                           │
--- └───────────────────────────────────────────────────────────────────────┘
+-- ADMIN PASSWORD: to create the login the first time, set admin_password in
+-- the ADMIN ACCOUNT block near the bottom (search CHANGE_ME). If the admin
+-- already exists, that block leaves it untouched — so re-running is always
+-- safe, and you never have to keep a real password in this file.
 --
 -- Auth model: this project allows public sign-up (the CV builder), so the
 -- `authenticated` role means "any visitor with an account", NOT "the admin".
@@ -297,7 +296,7 @@ drop policy if exists "admin read cv messages" on public.cv_messages;
 create policy "admin read cv messages" on public.cv_messages
   for select to authenticated using (public.is_admin());
 
--- Uploaded files kept for admin review (see cv-uploads.sql for commentary).
+-- Uploaded files kept for admin review (admin-only review of uploaded files).
 create table if not exists public.cv_uploads (
   id uuid primary key default gen_random_uuid(),
   session_id uuid not null references public.cv_sessions(id) on delete cascade,
@@ -351,7 +350,7 @@ grant execute on function public.admin_get_upload(uuid) to authenticated;
 
 -- ----------------------------------------- admin user-management functions --
 -- Admin-only, SECURITY DEFINER reads of auth.users + CV activity for the
--- User Management page. Never return passwords. See admin-user-functions.sql
+-- User Management page. Never return passwords. See this file above
 -- for the full commentary.
 
 create or replace function public.admin_list_users()
@@ -419,9 +418,47 @@ revoke all on function public.admin_get_session_messages(uuid) from public;
 grant execute on function public.admin_get_session_messages(uuid) to authenticated;
 
 
--- NOTE: the admin account is created by a separate, un-committed snippet that
--- carries the password (see the box at the top of this file). Nothing here
--- stores a credential.
+-- ---------------------------------------------------------- admin account ---
+-- Creates the admin login on a fresh project. Re-run-safe: if the account
+-- already exists it is left completely untouched (no password change), so this
+-- never blocks a re-run and no real password needs to live in this file.
+-- The password is bcrypt-hashed (pgcrypto), never stored as plaintext.
+do $$
+declare
+  admin_email    text := 'yassinsinif4@gmail.com';
+  admin_password text := 'CHANGE_ME';   -- ◄◄ set this ONCE to create the login
+  existing_id    uuid;
+begin
+  select id into existing_id from auth.users where email = admin_email;
+
+  if existing_id is not null then
+    raise notice 'Admin already exists for % — left unchanged.', admin_email;
+  elsif admin_password = 'CHANGE_ME' then
+    raise notice 'Admin NOT created: set admin_password (still CHANGE_ME) to create it.';
+  else
+    insert into auth.users (
+      instance_id, id, aud, role, email,
+      encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+    ) values (
+      '00000000-0000-0000-0000-000000000000',
+      gen_random_uuid(), 'authenticated', 'authenticated', admin_email,
+      crypt(admin_password, gen_salt('bf')), now(),
+      '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()
+    )
+    returning id into existing_id;
+
+    insert into auth.identities (
+      id, provider_id, user_id, identity_data, provider,
+      last_sign_in_at, created_at, updated_at
+    ) values (
+      gen_random_uuid(), existing_id::text, existing_id,
+      jsonb_build_object('sub', existing_id::text, 'email', admin_email, 'email_verified', true),
+      'email', now(), now(), now()
+    );
+    raise notice 'Admin created for %', admin_email;
+  end if;
+end $$;
 
 
 -- ------------------------------------------------------------ verify --------
