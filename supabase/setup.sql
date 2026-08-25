@@ -1,20 +1,21 @@
 -- =============================================================================
 -- PORTFOLIO — COMPLETE ONE-SHOT SETUP
 --
--- Run this ONCE and it does everything:
+-- Run this ONCE and it does everything EXCEPT create the admin account:
 --   1. Creates all tables (portfolio content, messages, CV builder)
 --   2. Creates the is_admin() gate and all hardened RLS policies
 --   3. Creates the public "images" storage bucket + its policies
---   4. Creates (or resets) your admin login account
---   5. Verifies nothing is left wide open
+--   4. Verifies nothing is left wide open
 --
 -- HOW: Supabase Dashboard → SQL Editor → New query → paste ALL of this → Run.
--- Idempotent: safe to re-run any time (tables use IF NOT EXISTS, policies are
--- dropped before recreate, the admin block updates the password if it exists).
+-- No edits needed — there are NO secrets in this file, so it is safe to keep
+-- in the repo. Idempotent: safe to re-run any time.
 --
 -- ┌───────────────────────────────────────────────────────────────────────┐
--- │  ►► BEFORE YOU RUN: change the password on the line marked CHANGE_ME ◄◄ │
--- │     (search for CHANGE_ME below — it is the only thing you must edit).  │
+-- │  ADMIN ACCOUNT is created by a SEPARATE snippet that contains your      │
+-- │  password. It is deliberately NOT in this committed file — a password   │
+-- │  in a public repo is a credential leak. Run that snippet once, in the   │
+-- │  SQL editor, from wherever you were given it.                           │
 -- └───────────────────────────────────────────────────────────────────────┘
 --
 -- Auth model: this project allows public sign-up (the CV builder), so the
@@ -287,69 +288,9 @@ create policy "own messages" on public.cv_messages
   );
 
 
--- ============================================================================
--- ADMIN ACCOUNT — create it fresh, or rotate its password if it exists.
---
--- The password is stored as a bcrypt hash (pgcrypto), never plaintext — the
--- same hashing Supabase's own Auth service uses. email_confirmed_at = now()
--- makes the account usable immediately without an email round-trip.
--- ============================================================================
-
-do $$
-declare
-  admin_email    text := 'yassinsinif4@gmail.com';
-  admin_password text := 'CHANGE_ME';   -- ◄◄◄◄◄ PUT YOUR REAL PASSWORD HERE
-  existing_id    uuid;
-begin
-  if admin_password = 'CHANGE_ME' then
-    raise exception 'Set a real admin_password before running (still says CHANGE_ME).';
-  end if;
-
-  select id into existing_id from auth.users where email = admin_email;
-
-  if existing_id is null then
-    insert into auth.users (
-      instance_id, id, aud, role, email,
-      encrypted_password, email_confirmed_at,
-      raw_app_meta_data, raw_user_meta_data,
-      created_at, updated_at
-    ) values (
-      '00000000-0000-0000-0000-000000000000',
-      gen_random_uuid(),
-      'authenticated',
-      'authenticated',
-      admin_email,
-      crypt(admin_password, gen_salt('bf')),
-      now(),
-      '{"provider":"email","providers":["email"]}'::jsonb,
-      '{}'::jsonb,
-      now(),
-      now()
-    )
-    returning id into existing_id;
-
-    insert into auth.identities (
-      id, provider_id, user_id, identity_data, provider,
-      last_sign_in_at, created_at, updated_at
-    ) values (
-      gen_random_uuid(),
-      existing_id::text,
-      existing_id,
-      jsonb_build_object('sub', existing_id::text, 'email', admin_email, 'email_verified', true),
-      'email',
-      now(), now(), now()
-    );
-
-    raise notice 'Admin created for %', admin_email;
-  else
-    update auth.users
-    set encrypted_password = crypt(admin_password, gen_salt('bf')),
-        updated_at = now()
-    where id = existing_id;
-
-    raise notice 'Admin password reset for %', admin_email;
-  end if;
-end $$;
+-- NOTE: the admin account is created by a separate, un-committed snippet that
+-- carries the password (see the box at the top of this file). Nothing here
+-- stores a credential.
 
 
 -- ------------------------------------------------------------ verify --------
