@@ -287,6 +287,16 @@ create policy "own messages" on public.cv_messages
     exists (select 1 from public.cv_sessions s where s.id = session_id and s.user_id = auth.uid())
   );
 
+-- Admin read-only access (for the admin panel + /admin/resume PDF endpoint).
+-- SELECT only, gated on is_admin(); normal CV users are unaffected.
+drop policy if exists "admin read sessions" on public.cv_sessions;
+create policy "admin read sessions" on public.cv_sessions
+  for select to authenticated using (public.is_admin());
+
+drop policy if exists "admin read cv messages" on public.cv_messages;
+create policy "admin read cv messages" on public.cv_messages
+  for select to authenticated using (public.is_admin());
+
 
 -- ----------------------------------------- admin user-management functions --
 -- Admin-only, SECURITY DEFINER reads of auth.users + CV activity for the

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  ArrowLeft, ChevronDown, ChevronUp, FileText, Loader2,
+  ArrowLeft, ChevronDown, ChevronUp, Download, FileText, Loader2,
   MessageSquare, Search, X,
 } from "lucide-react";
 import { adminData, AppUser, ChatMessage, UserCV } from "@/lib/admin-data";
+import { adminDownloadResume } from "@/lib/resume/api";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,8 @@ const CVsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) => 
   const [cvs, setCVs] = useState<UserCV[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     adminData
@@ -34,6 +37,18 @@ const CVsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) => 
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [user.id]);
+
+  const download = async (id: string) => {
+    setDownloadingId(id);
+    setDownloadError(null);
+    try {
+      await adminDownloadResume(id);
+    } catch (e) {
+      setDownloadError(e instanceof Error ? e.message : "Download failed.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -62,9 +77,20 @@ const CVsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) => 
             <div key={cv.id} className="rounded-lg border border-border px-4 py-3 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <p className="font-medium">CV #{cvs.length - i}</p>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${cv.pdfVersion > 0 ? "bg-accent/15 text-accent" : "bg-secondary text-muted-foreground"}`}>
-                  {cv.pdfVersion > 0 ? `Generated · v${cv.pdfVersion}` : "Draft"}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${cv.pdfVersion > 0 ? "bg-accent/15 text-accent" : "bg-secondary text-muted-foreground"}`}>
+                    {cv.pdfVersion > 0 ? `Generated · v${cv.pdfVersion}` : "Draft"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void download(cv.id)}
+                    disabled={downloadingId === cv.id}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                  >
+                    {downloadingId === cv.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                    {downloadingId === cv.id ? "Rendering…" : "Download"}
+                  </button>
+                </div>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 {cv.style} · {cv.language.toUpperCase()} · {fmtDate(cv.createdAt)} · {fmtTokens(cv.totalTokens)} tokens · {cv.messageCount} messages
@@ -73,10 +99,12 @@ const CVsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) => 
           ))}
         </div>
 
+        {downloadError && (
+          <p className="shrink-0 text-xs text-destructive border-t border-border/50 pt-3">{downloadError}</p>
+        )}
         <p className="shrink-0 text-[11px] text-muted-foreground border-t border-border/50 pt-3">
-          PDFs are generated on demand and not stored server-side, so there's no
-          file to download here — the CV is regenerated from its draft when the
-          visitor requests it.
+          Download re-renders the CV from its saved draft (no stored photo). If a
+          draft has no name yet, there's nothing to render.
         </p>
       </div>
     </div>

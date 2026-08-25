@@ -174,18 +174,35 @@ export async function uploadCv(file: File, sessionId: string | null): Promise<Ch
  * bytes itself and hands the browser a local blob: URL to save instead.
  */
 export async function downloadResume(sessionId: string): Promise<void> {
+  return downloadFromPath(`/resume/${sessionId}.pdf`, "cv.pdf");
+}
+
+/**
+ * Admin download: re-render any user's CV from its stored draft.
+ * Hits /admin/resume/{id}.pdf, which the cv-service gates on the caller's
+ * admin email (see app/auth.py require_admin) — a non-admin token gets a 403.
+ */
+export async function adminDownloadResume(sessionId: string): Promise<void> {
+  return downloadFromPath(`/admin/resume/${sessionId}.pdf`, "cv.pdf");
+}
+
+async function downloadFromPath(path: string, fallbackName: string): Promise<void> {
   if (!resumeApiConfigured) throw new ResumeApiError(NOT_CONFIGURED, 503);
 
-  const response = await fetch(`${BASE_URL}/resume/${sessionId}.pdf`, {
-    headers: await authHeader(),
-  });
+  const response = await fetch(`${BASE_URL}${path}`, { headers: await authHeader() });
   if (!response.ok) {
-    throw new ResumeApiError("Could not download the CV. Try again.", response.status);
+    const detail =
+      response.status === 403
+        ? "You're not authorised to download this."
+        : response.status === 409
+          ? "This CV has no content to render yet."
+          : "Could not download the CV. Try again.";
+    throw new ResumeApiError(detail, response.status);
   }
 
   const blob = await response.blob();
   const filename =
-    response.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] ?? "cv.pdf";
+    response.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] ?? fallbackName;
 
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");

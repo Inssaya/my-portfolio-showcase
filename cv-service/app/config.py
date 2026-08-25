@@ -77,6 +77,12 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_anon_key: str = ""
 
+    # The single admin account, matched by email against the caller's verified
+    # JWT for the /admin/* routes. Kept in sync with the portfolio's
+    # src/lib/adminRole.ts and the is_admin() SQL function. Override per
+    # deployment with ADMIN_EMAIL if the owner ever changes.
+    admin_email: str = "yassinsinif4@gmail.com"
+
     @property
     def auth_configured(self) -> bool:
         return bool(self.supabase_url and self.supabase_anon_key)

@@ -30,7 +30,7 @@ import time
 from dataclasses import dataclass
 
 import httpx
-from fastapi import Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 
 from .config import get_settings
 
@@ -125,4 +125,19 @@ def get_current_user(authorization: str = Header(default="")) -> AuthUser:
         if len(_cache) >= MAX_CACHE_ENTRIES:
             _cache.clear()
         _cache[token] = (now + CACHE_TTL_SECONDS, user)
+    return user
+
+
+def require_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
+    """FastAPI dependency for /admin/* routes: the verified admin, or a 403.
+
+    The email comes from Supabase's own /auth/v1/user response (see
+    _verify_with_supabase), so it cannot be spoofed by the caller. Matched
+    against Settings.admin_email — the same identity the portfolio's
+    src/lib/adminRole.ts and the is_admin() SQL policy use. A signed-in but
+    non-admin visitor (any CV-builder user) gets a 403, never data.
+    """
+    admin_email = (get_settings().admin_email or "").strip().lower()
+    if not admin_email or (user.email or "").strip().lower() != admin_email:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin access only.")
     return user

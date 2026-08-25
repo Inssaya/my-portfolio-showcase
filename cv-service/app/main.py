@@ -18,8 +18,9 @@ from pydantic import BaseModel, Field
 
 from . import db
 from .agent import SessionBudgetExceeded, recover_by_vision, run_turn, seed_uploaded_cv
-from .auth import AuthUser, get_current_user
+from .auth import AuthUser, get_current_user, require_admin
 from .config import get_settings
+from .cv.builder import RESUME_FIELDS, build_resume, safe_filename
 from .cv.extract import ExtractionError, extract_cv, extract_everything
 from .cv.photo import PhotoError, looks_like_an_image, prepare_uploaded_photo
 from .llm import LLMBusy, LLMError, LLMNotConfigured, get_pool
@@ -30,7 +31,7 @@ from .ratelimit import (
     GlobalIpRateLimitMiddleware,
     limit_by_user,
 )
-from .session import store
+from .session import Session, store
 from .tools import ToolError, run_tool
 
 logger = logging.getLogger(__name__)
@@ -427,6 +428,50 @@ def download(session_id: str, user: AuthUser = Depends(get_current_user)) -> Res
         content=session.pdf,
         media_type="application/pdf",
         headers={"content-disposition": f'attachment; filename="{session.pdf_name}"'},
+    )
+
+
+@app.get("/admin/resume/{session_id}.pdf")
+def admin_download(session_id: str, admin: AuthUser = Depends(require_admin)) -> Response:
+    """Render any user's CV from its stored draft, for the admin panel.
+
+    The admin never owns these sessions, so the in-memory store won't hold
+    them and the visitor-scoped /resume path can't reach them. Instead we load
+    the row straight from Postgres — the admin's own JWT passes the "admin read
+    sessions" RLS policy (see supabase/admin-cv-access.sql) — and re-render
+    from the draft, exactly as the Build button does. No model call, no photo
+    (the portrait is never persisted), no mutation of the user's session.
+    """
+    if not db.persistence_configured():
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Persistence is not configured.")
+
+    row = db.load_session_row(session_id, admin.access_token)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "That session was not found.")
+
+    session = Session.from_row(row)
+    if not session.draft.get("full_name", "").strip():
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This draft has no name yet — there is nothing to render.",
+        )
+
+    payload = {field: session.draft.get(field, "") for field in RESUME_FIELDS}
+    try:
+        pdf_bytes, _pages = build_resume(
+            style=session.style, language=session.language, photo="", **payload
+        )
+    except Exception as exc:  # noqa: BLE001 — reportlab raises a wide family
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            f"The PDF renderer failed: {type(exc).__name__}: {exc}",
+        ) from exc
+
+    filename = safe_filename(session.draft.get("full_name", ""))
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"content-disposition": f'attachment; filename="{filename}"'},
     )
 
 
