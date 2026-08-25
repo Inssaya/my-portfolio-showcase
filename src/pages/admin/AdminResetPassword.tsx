@@ -3,12 +3,18 @@ import { motion } from "framer-motion";
 import { CheckCircle2, Eye, EyeOff, Loader2, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import { isAdminEmail } from "@/lib/adminRole";
 
 /**
  * Landing page for the Supabase password-reset email link.
  * Supabase redirects here with an access token in the URL fragment —
  * the client library picks it up automatically via detectSessionInUrl.
- * We just need to let the user type a new password and call updateUser.
+ *
+ * Only the admin email is allowed to complete a reset here. If a recovery
+ * session ever lands with a non-admin email (e.g. a link issued before the
+ * server-side gate was in place, or a link crafted for a different account),
+ * we sign it out on arrival and show "Link expired" — never expose the
+ * new-password form to anyone other than the admin.
  */
 const AdminResetPassword = () => {
   const navigate = useNavigate();
@@ -25,27 +31,49 @@ const AdminResetPassword = () => {
     document.title = "Admin — Reset password";
     if (!supabase) { setNoSession(true); return; }
 
-    // The Supabase client exchanges the fragment token for a real session
-    // automatically. We just wait for that to land.
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
+    const client = supabase;
+
+    // Ensures every recovery session is owned by the admin. A non-admin
+    // recovery is silently killed and shown the generic expired-link page.
+    const accept = async (email: string | null | undefined) => {
+      if (isAdminEmail(email)) {
         setSessionReady(true);
       } else {
-        // Give onAuthStateChange a moment to fire (fragment exchange is async).
-        const { data: sub } = supabase!.auth.onAuthStateChange((event, session) => {
-          if (event === "PASSWORD_RECOVERY" && session) {
-            setSessionReady(true);
-            sub.subscription.unsubscribe();
-          }
-        });
-        // Fallback: if no recovery event in 5s, tell the user the link expired.
-        const t = setTimeout(() => {
-          setNoSession(true);
-          sub.subscription.unsubscribe();
-        }, 5000);
-        return () => clearTimeout(t);
+        await client.auth.signOut();
+        setNoSession(true);
+      }
+    };
+
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const { data: sub } = client.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" && session) {
+        if (timeoutId) clearTimeout(timeoutId);
+        void accept(session.user?.email);
+        sub.subscription.unsubscribe();
       }
     });
+
+    // The fragment exchange may already be complete by the time we get here —
+    // in that case there's no PASSWORD_RECOVERY event to wait for, so read
+    // the existing session directly.
+    client.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        if (timeoutId) clearTimeout(timeoutId);
+        void accept(data.session.user?.email);
+        sub.subscription.unsubscribe();
+      }
+    });
+
+    // Fallback: no recovery in 5s means the link was never valid.
+    timeoutId = setTimeout(() => {
+      setNoSession(true);
+      sub.subscription.unsubscribe();
+    }, 5000);
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   const onSubmit = async (e: FormEvent) => {
