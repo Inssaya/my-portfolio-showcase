@@ -1,17 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import {
-  Sparkles,
-  User as UserIcon,
-  Mail,
-  Calendar,
-  LogOut,
-  RefreshCw,
-  Pencil,
-  Check,
-  X,
-} from "lucide-react";
+import { Sparkles, User as UserIcon, Mail, Calendar, Pencil, Check, X } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import CvAppShell from "@/components/cv/CvAppShell";
 import { supabase } from "@/lib/supabase";
@@ -99,7 +89,7 @@ const CvProfile = () => {
   // --- Handlers ---
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
-    navigate("/login");
+    navigate("/cv-builder/login");
   }, [navigate]);
 
   const handleRefresh = useCallback(async () => {
@@ -200,7 +190,7 @@ const CvProfile = () => {
           <div className="rounded-2xl border p-6 text-center">
             <p className="text-muted-foreground">You are not signed in.</p>
             <Link
-              to="/login"
+              to="/cv-builder/login"
               className="mt-4 inline-block rounded-md bg-accent px-4 py-2 text-sm text-white"
             >
               Sign in
@@ -214,111 +204,93 @@ const CvProfile = () => {
   // --- Profile content ---
   return (
     <CvAppShell>
-      <main className="mx-auto flex min-h-[calc(100svh-3.5rem)] w-full max-w-2xl flex-col px-4 pb-4 pt-6">
+      <main className="mx-auto w-full max-w-md px-5 pb-12 pt-10">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: "easeOut" }}
-          className="rounded-2xl border border-border/60 bg-card/60 p-6 shadow-sm backdrop-blur-sm"
         >
-          {/* Header with avatar, name, email, and actions */}
-          <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent/20 to-accent/5 text-accent">
-              <UserIcon size={24} className="text-accent" />
+          {/* Avatar + identity, centred */}
+          <div className="flex flex-col items-center text-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-accent/25 to-accent/5 ring-1 ring-accent/20">
+              <UserIcon size={34} className="text-accent" />
             </div>
-            <div className="min-w-0 flex-1">
-              {isEditing ? (
-                // Editing mode
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      type="text"
-                      value={editFirstName}
-                      onChange={(e) => setEditFirstName(e.target.value)}
-                      placeholder="First name"
-                      className="rounded border border-border bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
-                    />
-                    <input
-                      type="text"
-                      value={editLastName}
-                      onChange={(e) => setEditLastName(e.target.value)}
-                      placeholder="Last name"
-                      className="rounded border border-border bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleSave}
-                      disabled={isSaving}
-                      className="flex items-center gap-1 rounded bg-accent px-3 py-1 text-xs text-white disabled:opacity-50"
-                    >
-                      <Check size={14} />
-                      {isSaving ? "Saving…" : "Save"}
-                    </button>
-                    <button
-                      onClick={handleEditToggle}
-                      className="flex items-center gap-1 rounded border px-3 py-1 text-xs"
-                    >
-                      <X size={14} />
-                      Cancel
-                    </button>
-                  </div>
+
+            {isEditing ? (
+              <div className="mt-5 w-full space-y-3">
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    type="text"
+                    value={editFirstName}
+                    onChange={(e) => setEditFirstName(e.target.value)}
+                    placeholder="First name"
+                    className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2 text-sm outline-none transition-colors focus:border-accent/50"
+                  />
+                  <input
+                    type="text"
+                    value={editLastName}
+                    onChange={(e) => setEditLastName(e.target.value)}
+                    placeholder="Last name"
+                    className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2 text-sm outline-none transition-colors focus:border-accent/50"
+                  />
                 </div>
-              ) : (
-                // Display mode
-                <>
-                  <div className="flex items-center gap-2">
-                    <h1 className="truncate font-sora text-xl font-bold">
-                      Hey, {displayName}
-                    </h1>
-                    <button
-                      onClick={handleEditToggle}
-                      className="text-muted-foreground hover:text-accent"
-                      aria-label="Edit name"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Mail size={14} className="shrink-0" />
-                    <span className="truncate">{user.email}</span>
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="flex shrink-0 gap-1">
-              <button
-                onClick={handleRefresh}
-                className="rounded-full p-2 text-muted-foreground transition hover:bg-accent/10"
-                aria-label="Refresh profile"
-              >
-                <RefreshCw size={16} />
-              </button>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1 rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-accent/10"
-              >
-                <LogOut size={14} />
-                Sign out
-              </button>
+                <div className="flex justify-center gap-2">
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-xs font-semibold text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+                  >
+                    <Check size={14} />
+                    {isSaving ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    onClick={handleEditToggle}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-4 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <X size={14} />
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="mt-4 flex items-center gap-2">
+                  <h1 className="font-sora text-2xl font-bold">{displayName}</h1>
+                  <button
+                    onClick={handleEditToggle}
+                    className="text-muted-foreground transition-colors hover:text-accent"
+                    aria-label="Edit name"
+                  >
+                    <Pencil size={15} />
+                  </button>
+                </div>
+                <p className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Mail size={14} className="shrink-0" />
+                  <span className="break-all">{user.email}</span>
+                </p>
+              </>
+            )}
+
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3.5 py-1.5 text-xs font-semibold text-accent">
+              <Sparkles size={13} className="shrink-0" />
+              Beta member{memberSince ? ` since ${memberSince}` : ""}
             </div>
           </div>
 
-          {/* Beta badge */}
-          <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent">
-            <Sparkles size={12} className="shrink-0" />
-            <span>Beta member{memberSince ? ` since ${memberSince}` : ""}</span>
-          </div>
-
-          {memberSince && (
-            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-              <Calendar size={14} className="shrink-0" />
-              <span>Joined {memberSince}</span>
-            </div>
-          )}
-
-          <div className="mt-4 space-y-3 text-sm leading-relaxed text-muted-foreground">
-            <p>
+          {/* Details card */}
+          <div className="mt-8 rounded-2xl border border-border/60 bg-card/50 p-5">
+            {memberSince && (
+              <div className="flex items-center gap-2.5 text-sm">
+                <Calendar size={16} className="shrink-0 text-accent" />
+                <span className="text-muted-foreground">Joined</span>
+                <span className="ml-auto font-medium">{memberSince}</span>
+              </div>
+            )}
+            <p
+              className={`text-sm leading-relaxed text-muted-foreground ${
+                memberSince ? "mt-4 border-t border-border/50 pt-4" : ""
+              }`}
+            >
               You're one of the first people using the CV builder — thank you for
               trying it while it's still rough around the edges. Everything you
               build stays private to your account; see{" "}
