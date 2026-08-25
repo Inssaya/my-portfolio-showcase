@@ -122,6 +122,36 @@ def test_a_lorem_ipsum_line_with_no_leading_marker_phrase_is_still_caught() -> N
     assert removed
 
 
+def test_a_short_wrapped_lorem_ipsum_remnant_is_still_caught() -> None:
+    """A wrapped Lorem Ipsum sentence split across lines can leave a
+    two-word tail on its own line ("tristique feugiat.") — too short for
+    the 35%-of-words ratio check, so it needs the stricter all-vocabulary
+    check for short lines."""
+    cleaned, removed = strip_placeholder_values("tristique feugiat.")
+    assert cleaned == ""
+    assert removed
+
+
+def test_short_real_skill_phrases_are_never_mistaken_for_lorem_ipsum() -> None:
+    for phrase in ("Digital Marketing", "Critical Thinking", "Management Skills"):
+        cleaned, removed = strip_placeholder_values(phrase)
+        assert removed == [], f"{phrase!r} was wrongly flagged as filler"
+        assert cleaned == phrase
+
+
+def test_wardiere_canvas_fake_employer_is_removed() -> None:
+    """Confirmed recurring across two independent Canva templates: 'Wardiere
+    University' in one, 'Wardiere Inc.' in another — Canva's own 'Acme
+    Corp'."""
+    cleaned, removed = strip_placeholder_values("Wardiere University | 2020")
+    assert "Wardiere University" not in cleaned
+    assert removed
+
+    cleaned, removed = strip_placeholder_values("Wardiere Inc. / CEO")
+    assert "Wardiere Inc" not in cleaned
+    assert removed
+
+
 def test_genuine_prose_is_never_mistaken_for_lorem_ipsum() -> None:
     text = (
         "Built a maintenance intervention tracking and KPI platform, "

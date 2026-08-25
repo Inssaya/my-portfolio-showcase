@@ -40,6 +40,16 @@ def test_real_values_survive(text: str) -> None:
         assert not _is_placeholder(text)
 
 
+@pytest.mark.parametrize("text", [".", "..", ",", " . ", "-.-", "()"])
+def test_punctuation_only_remnants_are_recognised(text: str) -> None:
+    """A stray "." is what remains of an org field after
+    verify.strip_placeholder_values removes "Wardiere Inc" from "Wardiere
+    Inc." — real fields never end up all-punctuation, so this is treated the
+    same as the explicit "-"/"--"/"..." entries in _PLACEHOLDERS, without
+    having to enumerate every possible remnant."""
+    assert _is_placeholder(text)
+
+
 def test_entry_placeholders_are_stripped() -> None:
     entries = _polish_entries(
         parse_entries("Manager Intern | Company Name | Feb 2021 | Location\n- Managed cash flow.")

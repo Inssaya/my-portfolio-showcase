@@ -119,6 +119,11 @@ _PLACEHOLDER_TEXT_RE = re.compile(
     # ST 12345") — the digits/state/zip vary by template, so only the two
     # invariant phrases are matched.
     r"123 anywhere st|any city|"
+    # "Wardiere" — Canva's own go-to fake employer/school name, its
+    # equivalent of "Acme Corp". Confirmed recurring across two independent
+    # templates ("Wardiere University" in one, "Wardiere Inc." in another),
+    # which is what earns it a place here rather than being a one-off guess.
+    r"wardiere university|wardiere inc\.?|"
     r"lorem ipsum"
     r")\b",
     re.IGNORECASE,
@@ -156,11 +161,20 @@ _LOREM_IPSUM_WORDS = frozenset({
 
 
 def _is_lorem_ipsum_line(line: str) -> bool:
+    """A longer line needs only over a third of its words in the filler
+    vocabulary — real sentences mix in connectives ("in", "at", "and") this
+    set deliberately excludes. A short remnant (a wrapped sentence split
+    across lines can leave one this size on its own, e.g. "tristique
+    feugiat.") gets a stricter all-or-nothing check instead: two consecutive
+    words from a ~45-word invented vocabulary essentially never both occur by
+    chance in real prose, so a full match at just two words is still safe."""
     words = [word.strip(".,;:!?()").lower() for word in line.split()]
     words = [word for word in words if word]
-    if len(words) < 4:
+    if len(words) < 2:
         return False
     hits = sum(1 for word in words if word in _LOREM_IPSUM_WORDS)
+    if len(words) < 4:
+        return hits == len(words)
     return hits / len(words) >= 0.35
 
 

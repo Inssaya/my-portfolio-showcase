@@ -131,7 +131,16 @@ _PLACEHOLDERS = frozenset(
 
 def _is_placeholder(text: str) -> bool:
     cleaned = (text or "").strip().strip("[](){}<>").strip().lower()
-    return cleaned in _PLACEHOLDERS
+    if cleaned in _PLACEHOLDERS:
+        return True
+    # Nothing but punctuation left is the same as empty — e.g. a stray "."
+    # is what remains of an org field after verify.strip_placeholder_values
+    # removes "Wardiere Inc" from "Wardiere Inc." and leaves the trailing
+    # stop behind. Rather than growing the frozenset above with every
+    # possible punctuation remnant, anything with no letter or digit at all
+    # is treated the same way as the explicit "-"/"--"/"..." entries already
+    # are.
+    return not any(character.isalnum() for character in cleaned)
 
 
 def _drop_placeholder(text: str) -> str:
