@@ -280,20 +280,39 @@ const ChatsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) =
                 <p className="text-sm text-center text-muted-foreground py-10">This session has no messages.</p>
               )}
               {messages
-                .filter((m) => m.role === "user" || m.role === "assistant")
-                .map((m) => (
-                  <div key={m.id} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                    <div
-                      className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
-                        m.role === "user"
-                          ? "bg-accent text-accent-foreground"
-                          : "bg-secondary text-foreground/90"
-                      }`}
-                    >
-                      {m.content || <span className="italic opacity-60">(empty)</span>}
+                .filter((m) => m.role === "user" || m.role === "assistant" || m.role === "system")
+                .map((m) => {
+                  // System messages are the seeded upload context — the text the
+                  // extractor pulled out of a CV the visitor uploaded. The
+                  // original file may be gone (only stored since the upload
+                  // feature shipped), but this text is what the bot actually
+                  // read, so it's shown as a distinct full-width block.
+                  if (m.role === "system") {
+                    return (
+                      <details key={m.id} className="rounded-lg border border-amber-500/30 bg-amber-500/5">
+                        <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-amber-500/90">
+                          Extracted from uploaded CV — click to expand
+                        </summary>
+                        <pre className="max-h-64 overflow-auto whitespace-pre-wrap px-3 pb-3 text-xs leading-relaxed text-foreground/80">
+                          {m.content || "(empty)"}
+                        </pre>
+                      </details>
+                    );
+                  }
+                  return (
+                    <div key={m.id} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
+                      <div
+                        className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                          m.role === "user"
+                            ? "bg-accent text-accent-foreground"
+                            : "bg-secondary text-foreground/90"
+                        }`}
+                      >
+                        {m.content || <span className="italic opacity-60">(empty)</span>}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
             </>
           )}
         </div>
