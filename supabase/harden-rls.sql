@@ -124,7 +124,7 @@ create policy "admin delete images" on storage.objects
 select schemaname, tablename, policyname, cmd, qual, with_check
 from pg_policies
 where schemaname in ('public', 'storage')
-  and roles @> array['authenticated']
+  and roles::text[] @> array['authenticated']
   and cmd <> 'SELECT'
   and coalesce(qual, 'true') = 'true'
   and policyname not in ('anyone can send');
