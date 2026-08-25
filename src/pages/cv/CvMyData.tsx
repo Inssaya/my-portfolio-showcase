@@ -41,7 +41,7 @@ const CvMyData = () => {
             to="/cv-builder?new=1"
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-accent px-3.5 py-2 text-xs font-semibold text-accent-foreground transition-opacity hover:opacity-90"
           >
-            <Plus size={13} /> New CV
+            <Plus size={13} /> New chat
           </Link>
         </div>
 

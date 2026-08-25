@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ArrowLeft, FileText, History, LogOut, Mail, Menu, User as UserIcon } from "lucide-react";
+import { ArrowLeft, FileText, History, LogOut, Mail, Menu, Plus, User as UserIcon } from "lucide-react";
 import {
   Sheet,
   SheetClose,
@@ -94,17 +94,31 @@ const CvAppShell = ({ children }: CvAppShellProps) => {
             </SheetContent>
           </Sheet>
 
-          <span className="font-sora text-sm font-semibold text-foreground/80">CV Builder</span>
-
-          <button
-            type="button"
-            onClick={() => void supabase?.auth.signOut()}
-            title="Sign out"
-            aria-label="Sign out"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
-          >
-            <LogOut size={16} />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <Link
+              to="/cv-builder?new=1"
+              className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2.5 py-1.5 text-xs font-medium text-foreground/80 transition-colors hover:border-accent/50 hover:text-accent"
+            >
+              <Plus size={14} />
+              New chat
+            </Link>
+            <Link
+              to="/cv-builder/mydata"
+              className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2.5 py-1.5 text-xs font-medium text-foreground/80 transition-colors hover:border-accent/50 hover:text-accent"
+            >
+              <History size={14} />
+              History
+            </Link>
+            <button
+              type="button"
+              onClick={() => void supabase?.auth.signOut()}
+              title="Sign out"
+              aria-label="Sign out"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
         </div>
       </header>
 
