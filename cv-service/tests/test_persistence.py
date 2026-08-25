@@ -154,13 +154,13 @@ def test_list_session_rows_returns_what_postgrest_sends(monkeypatch) -> None:
     _configure(monkeypatch)
     rows = [{"id": "s1", "draft": {"full_name": "Jane"}}, {"id": "s2", "draft": {}}]
     monkeypatch.setattr(httpx, "get", lambda *a, **k: _response(200, rows))
-    assert db.list_session_rows("token") == rows
+    assert db.list_session_rows("token", "user-1") == rows
 
 
 def test_list_session_rows_degrades_to_empty_on_failure(monkeypatch) -> None:
     _configure(monkeypatch)
     monkeypatch.setattr(httpx, "get", lambda *a, **k: _response(500, {}))
-    assert db.list_session_rows("token") == []
+    assert db.list_session_rows("token", "user-1") == []
 
 
 # ------------------------------------------------------------- Session rows

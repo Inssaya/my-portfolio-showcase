@@ -496,7 +496,7 @@ def list_sessions(user: AuthUser = Depends(get_current_user)) -> dict:
     """
     if not db.persistence_configured():
         return {"sessions": []}
-    rows = db.list_session_rows(user.access_token)
+    rows = db.list_session_rows(user.access_token, user.id)
     return {
         "sessions": [
             {

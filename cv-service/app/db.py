@@ -142,16 +142,23 @@ def store_upload(
         return False
 
 
-def list_session_rows(access_token: str) -> list[dict]:
-    """Every session this visitor owns, newest first — powers "My Data".
-    RLS filters to their own rows; an empty list covers both "no CVs yet" and
-    "could not reach Postgres", which is the right default for a listing
-    (never surface a database hiccup as if the visitor's history was wiped)."""
+def list_session_rows(access_token: str, user_id: str) -> list[dict]:
+    """Every session this visitor owns, newest first — powers "History".
+
+    Filtered explicitly by user_id, NOT left to RLS alone: the admin account
+    also has an "admin read sessions" policy (for the admin panel), so without
+    this filter the owner's own History would show every user's sessions. The
+    filter scopes the personal listing to the caller regardless of policy.
+
+    An empty list covers both "no CVs yet" and "could not reach Postgres",
+    which is the right default for a listing (never surface a database hiccup
+    as if the visitor's history was wiped)."""
     try:
         response = httpx.get(
             f"{_base_url()}/cv_sessions",
             params={
                 "select": "id,draft,style,language,pdf_version,created_at,updated_at",
+                "user_id": f"eq.{user_id}",
                 "order": "updated_at.desc",
             },
             headers=_headers(access_token),
