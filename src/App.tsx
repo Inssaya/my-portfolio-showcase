@@ -39,6 +39,7 @@ const AdminEducation = lazy(() => import("./pages/admin/AdminEducation.tsx"));
 const AdminCertificates = lazy(() => import("./pages/admin/AdminCertificates.tsx"));
 const AdminLinks = lazy(() => import("./pages/admin/AdminLinks.tsx"));
 const AdminUserManagement = lazy(() => import("./pages/admin/AdminUserManagement.tsx"));
+const AdminResetPassword = lazy(() => import("./pages/admin/AdminResetPassword.tsx"));
 const ProtectedRoute = lazy(() => import("./components/admin/ProtectedRoute.tsx"));
 
 const queryClient = new QueryClient();
@@ -122,6 +123,7 @@ const App = () => (
             {/* Login sits outside the guard — otherwise a bounced visitor
                 would ping-pong between /admin and /admin/login forever. */}
             <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin/reset-password" element={<AdminResetPassword />} />
 
             <Route
               path="/admin"

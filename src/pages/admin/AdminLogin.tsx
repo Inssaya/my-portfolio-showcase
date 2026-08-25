@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { Loader2, Lock } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, CheckCircle2, Loader2, Lock } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { WavyUnderline } from "@/components/visuals/Handdrawn";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
@@ -25,6 +25,13 @@ const AdminLogin = () => {
   const [busy, setBusy] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [alreadyIn, setAlreadyIn] = useState(false);
+
+  // forgot-password state
+  const [forgotMode, setForgotMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetBusy, setResetBusy] = useState(false);
 
   const from = (location.state as { from?: string } | null)?.from ?? "/admin";
 
@@ -84,6 +91,26 @@ const AdminLogin = () => {
     navigate(from, { replace: true });
   };
 
+  const onForgot = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!supabase) {
+      setResetError("Password reset requires Supabase to be configured.");
+      return;
+    }
+    setResetBusy(true);
+    setResetError(null);
+    const { error: resetErr } = await supabase.auth.resetPasswordForEmail(
+      resetEmail.trim().toLowerCase(),
+      { redirectTo: `${window.location.origin}/admin/reset-password` },
+    );
+    setResetBusy(false);
+    if (resetErr) {
+      setResetError(resetErr.message);
+    } else {
+      setResetSent(true);
+    }
+  };
+
   return (
     <div className="relative flex min-h-[100svh] items-center justify-center overflow-hidden bg-background px-4 py-16">
       <div className="grid-overlay" />
@@ -94,73 +121,156 @@ const AdminLogin = () => {
         transition={{ duration: 0.5, ease: [0.33, 1, 0.68, 1] }}
         className="relative z-10 w-full max-w-sm rounded-2xl border border-border/60 bg-card/90 p-8 shadow-2xl shadow-black/40 backdrop-blur-xl"
       >
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-accent/15 text-accent">
-            <Lock size={18} />
-          </div>
-          <h1 className="relative inline-block font-playfair text-3xl font-semibold text-foreground">
-            Sign in
-            <WavyUnderline delay={0.35} duration={1.2} />
-          </h1>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Admin panel access. Everyone else, kindly turn back.
-          </p>
-        </div>
-
-        <form onSubmit={onSubmit} className="space-y-4">
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Email
-            </span>
-            <input
-              type="email"
-              autoComplete="username"
-              autoFocus
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              disabled={busy}
-              className="w-full rounded-lg border border-border/60 bg-secondary/50 px-3 py-2.5 text-sm outline-none transition-colors focus:border-accent/50 disabled:opacity-60"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Password
-            </span>
-            <input
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              disabled={busy}
-              className="w-full rounded-lg border border-border/60 bg-secondary/50 px-3 py-2.5 text-sm outline-none transition-colors focus:border-accent/50 disabled:opacity-60"
-            />
-          </label>
-
-          {error && (
-            <p
-              role="alert"
-              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        <AnimatePresence mode="wait">
+          {!forgotMode ? (
+            <motion.div
+              key="login"
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.22 }}
             >
-              {error}
-            </p>
+              <div className="mb-8 text-center">
+                <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-accent/15 text-accent">
+                  <Lock size={18} />
+                </div>
+                <h1 className="relative inline-block font-playfair text-3xl font-semibold text-foreground">
+                  Sign in
+                  <WavyUnderline delay={0.35} duration={1.2} />
+                </h1>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Admin panel access. Everyone else, kindly turn back.
+                </p>
+              </div>
+
+              <form onSubmit={onSubmit} className="space-y-4">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Email
+                  </span>
+                  <input
+                    type="email"
+                    autoComplete="username"
+                    autoFocus
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={busy}
+                    className="w-full rounded-lg border border-border/60 bg-secondary/50 px-3 py-2.5 text-sm outline-none transition-colors focus:border-accent/50 disabled:opacity-60"
+                  />
+                </label>
+
+                <label className="block">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Password
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { setForgotMode(true); setResetEmail(email); }}
+                      className="text-[11px] text-muted-foreground hover:text-accent transition-colors"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={busy}
+                    className="w-full rounded-lg border border-border/60 bg-secondary/50 px-3 py-2.5 text-sm outline-none transition-colors focus:border-accent/50 disabled:opacity-60"
+                  />
+                </label>
+
+                {error && (
+                  <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    {error}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={busy || !email.trim() || !password}
+                  className="flex w-full items-center justify-center gap-2 rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {busy && <Loader2 size={14} className="animate-spin" />}
+                  {busy ? "Signing in…" : "Sign in"}
+                </button>
+              </form>
+
+              <p className="mt-6 text-center text-[11px] italic text-muted-foreground">
+                Session persists on this device until you sign out.
+              </p>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="forgot"
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 12 }}
+              transition={{ duration: 0.22 }}
+            >
+              <button
+                type="button"
+                onClick={() => { setForgotMode(false); setResetSent(false); setResetError(null); }}
+                className="mb-6 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ArrowLeft size={13} /> Back to sign in
+              </button>
+
+              <div className="mb-8 text-center">
+                <h2 className="font-playfair text-2xl font-semibold">Reset password</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Enter your email and we'll send a reset link.
+                </p>
+              </div>
+
+              {resetSent ? (
+                <div className="flex flex-col items-center gap-3 py-4 text-center">
+                  <CheckCircle2 size={36} className="text-accent" />
+                  <p className="text-sm font-medium">Email sent!</p>
+                  <p className="text-xs text-muted-foreground">
+                    Check your inbox for a password reset link. It expires in 1 hour.
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={onForgot} className="space-y-4">
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Email
+                    </span>
+                    <input
+                      type="email"
+                      autoFocus
+                      required
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      disabled={resetBusy}
+                      className="w-full rounded-lg border border-border/60 bg-secondary/50 px-3 py-2.5 text-sm outline-none transition-colors focus:border-accent/50 disabled:opacity-60"
+                    />
+                  </label>
+
+                  {resetError && (
+                    <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                      {resetError}
+                    </p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={resetBusy || !resetEmail.trim()}
+                    className="flex w-full items-center justify-center gap-2 rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {resetBusy && <Loader2 size={14} className="animate-spin" />}
+                    {resetBusy ? "Sending…" : "Send reset link"}
+                  </button>
+                </form>
+              )}
+            </motion.div>
           )}
-
-          <button
-            type="submit"
-            disabled={busy || !email.trim() || !password}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {busy && <Loader2 size={14} className="animate-spin" />}
-            {busy ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-[11px] italic text-muted-foreground">
-          Session persists on this device until you sign out.
-        </p>
+        </AnimatePresence>
       </motion.div>
     </div>
   );
