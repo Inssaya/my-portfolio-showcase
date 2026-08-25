@@ -458,6 +458,31 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+export interface UploadFileMeta {
+  id: string;
+  filename: string;
+  contentType: string | null;
+  byteSize: number;
+  createdAt: string;
+}
+
+const mapUpload = (row: Row): UploadFileMeta => ({
+  id: String(row.id),
+  filename: String(row.filename ?? "file"),
+  contentType: (row.content_type as string | null) ?? null,
+  byteSize: Number(row.byte_size ?? 0),
+  createdAt: String(row.created_at ?? ""),
+});
+
+/** Decode a base64 string to a Blob without pulling the whole thing through a
+ *  data: URL — handles the multi-MB CV uploads cleanly. */
+function base64ToBlob(base64: string, type: string): Blob {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: type || "application/octet-stream" });
+}
+
 const mapAppUser = (row: Row): AppUser => ({
   id: String(row.id),
   fullName: (row.full_name as string | null) ?? null,
@@ -663,5 +688,30 @@ export const adminData = {
     const { data, error } = await supabase.rpc("admin_get_session_messages", { sid: sessionId });
     if (error) throw new Error(error.message);
     return ((data as Row[]) ?? []).map(mapChatMessage);
+  },
+
+  getSessionUploads: async (sessionId: string): Promise<UploadFileMeta[]> => {
+    if (!supabase) throw new Error("Supabase is not configured.");
+    const { data, error } = await supabase.rpc("admin_list_session_uploads", { sid: sessionId });
+    if (error) throw new Error(error.message);
+    return ((data as Row[]) ?? []).map(mapUpload);
+  },
+
+  /** Fetch one upload's bytes and hand the browser a download. */
+  downloadUpload: async (uploadId: string): Promise<void> => {
+    if (!supabase) throw new Error("Supabase is not configured.");
+    const { data, error } = await supabase.rpc("admin_get_upload", { upload_id: uploadId });
+    if (error) throw new Error(error.message);
+    const row = ((data as Row[]) ?? [])[0];
+    if (!row) throw new Error("That file is no longer available.");
+    const blob = base64ToBlob(String(row.content_base64 ?? ""), String(row.content_type ?? ""));
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = String(row.filename ?? "file");
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
 };

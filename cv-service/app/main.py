@@ -327,6 +327,16 @@ async def upload(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
     session = store.get_or_create(session_id, user.id, user.access_token)
+
+    # Keep the original file so the admin can later download exactly what the
+    # visitor uploaded, to review chatbot quality. Best-effort — the session
+    # row exists by now (get_or_create wrote it), so the FK holds; a failure
+    # here must not break the upload the visitor is waiting on.
+    if db.persistence_configured():
+        db.store_upload(
+            session.id, user.id, filename, file.content_type or "", data, user.access_token
+        )
+
     if extraction.get("photo"):
         session.photo = extraction["photo"]
 

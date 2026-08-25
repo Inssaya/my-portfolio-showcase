@@ -297,6 +297,57 @@ drop policy if exists "admin read cv messages" on public.cv_messages;
 create policy "admin read cv messages" on public.cv_messages
   for select to authenticated using (public.is_admin());
 
+-- Uploaded files kept for admin review (see cv-uploads.sql for commentary).
+create table if not exists public.cv_uploads (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.cv_sessions(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  filename text not null,
+  content_type text,
+  byte_size integer not null default 0,
+  content_base64 text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists cv_uploads_session_idx on public.cv_uploads(session_id, created_at);
+alter table public.cv_uploads enable row level security;
+
+drop policy if exists "own uploads insert" on public.cv_uploads;
+create policy "own uploads insert" on public.cv_uploads
+  for insert to authenticated with check (auth.uid() = user_id);
+drop policy if exists "admin read uploads" on public.cv_uploads;
+create policy "admin read uploads" on public.cv_uploads
+  for select to authenticated using (public.is_admin());
+
+create or replace function public.admin_list_session_uploads(sid uuid)
+returns table (
+  id uuid, filename text, content_type text, byte_size integer, created_at timestamptz
+)
+language plpgsql stable security definer set search_path = public
+as $$
+begin
+  if not public.is_admin() then raise exception 'Not authorized'; end if;
+  return query
+  select u.id, u.filename, u.content_type, u.byte_size, u.created_at
+  from public.cv_uploads u where u.session_id = sid order by u.created_at asc;
+end;
+$$;
+revoke all on function public.admin_list_session_uploads(uuid) from public;
+grant execute on function public.admin_list_session_uploads(uuid) to authenticated;
+
+create or replace function public.admin_get_upload(upload_id uuid)
+returns table (filename text, content_type text, content_base64 text)
+language plpgsql stable security definer set search_path = public
+as $$
+begin
+  if not public.is_admin() then raise exception 'Not authorized'; end if;
+  return query
+  select u.filename, u.content_type, u.content_base64
+  from public.cv_uploads u where u.id = upload_id;
+end;
+$$;
+revoke all on function public.admin_get_upload(uuid) from public;
+grant execute on function public.admin_get_upload(uuid) to authenticated;
+
 
 -- ----------------------------------------- admin user-management functions --
 -- Admin-only, SECURITY DEFINER reads of auth.users + CV activity for the

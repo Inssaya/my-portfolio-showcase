@@ -3,8 +3,14 @@ import {
   ArrowLeft, ChevronDown, ChevronUp, Download, FileText, Loader2,
   MessageSquare, Search, X,
 } from "lucide-react";
-import { adminData, AppUser, ChatMessage, UserCV } from "@/lib/admin-data";
+import { adminData, AppUser, ChatMessage, UploadFileMeta, UserCV } from "@/lib/admin-data";
 import { adminDownloadResume } from "@/lib/resume/api";
+
+function fmtBytes(n: number) {
+  if (n >= 1_048_576) return `${(n / 1_048_576).toFixed(1)} MB`;
+  if (n >= 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${n} B`;
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -123,6 +129,8 @@ const ChatsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) =
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [msgLoading, setMsgLoading] = useState(false);
   const [msgError, setMsgError] = useState<string | null>(null);
+  const [uploads, setUploads] = useState<UploadFileMeta[]>([]);
+  const [dlId, setDlId] = useState<string | null>(null);
 
   useEffect(() => {
     adminData
@@ -136,11 +144,25 @@ const ChatsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) =
     setOpenId(id);
     setMsgLoading(true);
     setMsgError(null);
+    setUploads([]);
     adminData
       .getSessionMessages(id)
       .then(setMessages)
       .catch((e: Error) => setMsgError(e.message))
       .finally(() => setMsgLoading(false));
+    // Uploaded files for this session — best-effort, shown above the transcript.
+    adminData.getSessionUploads(id).then(setUploads).catch(() => setUploads([]));
+  };
+
+  const downloadFile = async (id: string) => {
+    setDlId(id);
+    try {
+      await adminData.downloadUpload(id);
+    } catch {
+      /* surfaced by the disabled state resetting; keep the modal quiet */
+    } finally {
+      setDlId(null);
+    }
   };
 
   return (
@@ -204,6 +226,35 @@ const ChatsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) =
           {/* Transcript */}
           {openId && (
             <>
+              {uploads.length > 0 && (
+                <div className="mb-3 rounded-lg border border-border/70 bg-secondary/20 p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Uploaded files
+                  </p>
+                  <div className="space-y-1.5">
+                    {uploads.map((f) => (
+                      <div key={f.id} className="flex items-center justify-between gap-3 text-sm">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{f.filename}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {fmtBytes(f.byteSize)} · {fmtDate(f.createdAt)}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void downloadFile(f.id)}
+                          disabled={dlId === f.id}
+                          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                        >
+                          {dlId === f.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                          Download
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {msgLoading && (
                 <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
                   <Loader2 size={16} className="animate-spin" /> Loading transcript…

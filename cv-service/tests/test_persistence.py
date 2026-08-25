@@ -378,3 +378,40 @@ def test_save_does_not_advance_the_cursor_when_the_write_fails(monkeypatch) -> N
     store.save(session, access_token="token")
 
     assert session._persisted_message_count == 0
+
+
+# --------------------------------------------------------------- store_upload
+
+def test_store_upload_posts_base64_of_the_file(monkeypatch) -> None:
+    _configure(monkeypatch)
+    captured: dict = {}
+
+    def fake_post(url, *a, **k):
+        captured["url"] = url
+        captured["json"] = k.get("json")
+        return _response(201, {})
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+
+    ok = db.store_upload("sess-1", "user-1", "kenza.pdf", "application/pdf", b"PDFDATA", "token")
+
+    assert ok is True
+    assert captured["url"].endswith("/cv_uploads")
+    body = captured["json"]
+    assert body["session_id"] == "sess-1"
+    assert body["user_id"] == "user-1"
+    assert body["filename"] == "kenza.pdf"
+    assert body["byte_size"] == len(b"PDFDATA")
+    import base64
+    assert base64.b64decode(body["content_base64"]) == b"PDFDATA"
+
+
+def test_store_upload_swallows_network_errors(monkeypatch) -> None:
+    _configure(monkeypatch)
+
+    def boom(*a, **k):
+        raise httpx.ConnectError("down")
+
+    monkeypatch.setattr(httpx, "post", boom)
+
+    assert db.store_upload("s", "u", "f.pdf", "application/pdf", b"x", "token") is False

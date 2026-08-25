@@ -104,6 +104,44 @@ def update_session_row(session_id: str, row: dict, access_token: str) -> bool:
         return False
 
 
+def store_upload(
+    session_id: str,
+    user_id: str,
+    filename: str,
+    content_type: str,
+    data: bytes,
+    access_token: str,
+) -> bool:
+    """Persist one uploaded file (base64 in cv_uploads) so the admin can later
+    download exactly what the visitor sent — for reviewing chatbot quality.
+
+    Best-effort like save(): a failure here must never break the upload the
+    visitor is waiting on, so it is logged and swallowed. RLS ("own uploads
+    insert") ties the row to the writer; only the admin can read it back."""
+    import base64
+
+    payload = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "filename": filename,
+        "content_type": content_type or "application/octet-stream",
+        "byte_size": len(data),
+        "content_base64": base64.b64encode(data).decode("ascii"),
+    }
+    try:
+        response = httpx.post(
+            f"{_base_url()}/cv_uploads",
+            json=payload,
+            headers=_headers(access_token, prefer="return=minimal"),
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        return True
+    except httpx.HTTPError as exc:
+        logger.warning("could not store upload for session %s: %s", session_id, exc)
+        return False
+
+
 def list_session_rows(access_token: str) -> list[dict]:
     """Every session this visitor owns, newest first — powers "My Data".
     RLS filters to their own rows; an empty list covers both "no CVs yet" and
