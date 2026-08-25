@@ -225,11 +225,23 @@ def extract_cv(data: bytes, filename: str) -> dict:
     phones = [p.strip() for p in PHONE_RE.findall(text) if len(re.sub(r"\D", "", p)) >= 8]
 
     # The name is nearly always the first substantial line that is not contact.
+    #
+    # A two-column sidebar layout breaks this assumption: pypdf's extractor
+    # follows the PDF's internal drawing order, not the visual reading order,
+    # and a design where every section LABEL is drawn before any section BODY
+    # (seen on a real upload) puts "Contact / Language / Skills / Experience /
+    # About Me" all inside the first six lines, ahead of the actual name. A
+    # heading-shaped candidate — including a fragment like "About M e" that
+    # still matches the "about" needle — is never the name, so it is skipped
+    # rather than accepted as one; the model still has to find the real name
+    # itself, but at least is not handed a confidently wrong one.
     estimated_name = ""
     for line in lines[:6]:
         if EMAIL_RE.search(line) or URL_RE.search(line):
             continue
         if len(re.sub(r"\D", "", line)) >= 6:
+            continue
+        if _looks_like_heading(line):
             continue
         if 2 <= len(line.split()) <= 5 and len(line) <= 50:
             estimated_name = line

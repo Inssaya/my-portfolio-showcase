@@ -133,6 +133,36 @@ _LABEL_ONLY_RE = re.compile(r"^[A-Za-z /]{1,24}[:\-–—]$")
 # leaves only the comma and full stop that used to separate them.
 _PUNCT_ONLY_RE = re.compile(r"^[\s,.\-–—·|]*$")
 
+# The pseudo-Latin vocabulary "Lorem Ipsum" filler draws from (garbled
+# Cicero). A real upload's "About Me" and every "Experience" bullet came
+# through as unedited Lorem Ipsum — a template body the visitor never
+# touched — and the marker-phrase check above only strips the two words
+# "Lorem ipsum" from the front, leaving "dolor sit amet, consectetur
+# adipiscing elit..." sitting in the field: a paragraph that reads as
+# nonsense to anyone who looks, which is worse than a wrong contact detail
+# because it is immediately, visibly wrong. These tokens are distinctive
+# enough that genuine English (or French) CV prose essentially never
+# contains them, so a line built mostly out of this vocabulary is dropped
+# whole rather than trimmed.
+_LOREM_IPSUM_WORDS = frozenset({
+    "lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing",
+    "elit", "sed", "eiusmod", "incididunt", "labore", "dolore", "magna",
+    "aliqua", "nullam", "pharetra", "laoreet", "donec", "hendrerit",
+    "libero", "eget", "tempus", "arcu", "elementum", "tristique", "feugiat",
+    "vestibulum", "ante", "primis", "faucibus", "orci", "luctus", "ultrices",
+    "posuere", "cubilia", "curae", "risus", "eros", "fermentum", "congue",
+    "vivamus", "suscipit", "mauris", "condimentum", "sagittis", "purus",
+})
+
+
+def _is_lorem_ipsum_line(line: str) -> bool:
+    words = [word.strip(".,;:!?()").lower() for word in line.split()]
+    words = [word for word in words if word]
+    if len(words) < 4:
+        return False
+    hits = sum(1 for word in words if word in _LOREM_IPSUM_WORDS)
+    return hits / len(words) >= 0.35
+
 
 def strip_placeholder_values(content: str) -> tuple[str, list[str]]:
     """Remove template/example values a real CV never contains.
@@ -152,6 +182,17 @@ def strip_placeholder_values(content: str) -> tuple[str, list[str]]:
     cleaned = content
     for pattern in (_PLACEHOLDER_EMAIL_RE, _PLACEHOLDER_PHONE_RE, _PLACEHOLDER_TEXT_RE):
         cleaned = _capture(pattern, cleaned)
+
+    # Whole-line check, run even when nothing above matched: a Lorem Ipsum
+    # sentence with no literal "lorem ipsum" bigram in it (the opener was on
+    # an earlier line, or got edited away) would otherwise sail through.
+    surviving_lines = []
+    for line in cleaned.split("\n"):
+        if _is_lorem_ipsum_line(line):
+            removed.append(line.strip())
+        else:
+            surviving_lines.append(line)
+    cleaned = "\n".join(surviving_lines)
 
     if not removed:
         return content, []

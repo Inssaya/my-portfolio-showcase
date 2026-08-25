@@ -77,6 +77,32 @@ def test_letter_spaced_text_is_repaired_before_heading_and_name_detection() -> N
     assert "Wardiere University" in result["sections"]["education"]
 
 
+# A real upload — a two-column sidebar-layout Canva template — exposed a
+# second, unrelated failure: pypdf's extractor followed the PDF's internal
+# drawing order, which put every section LABEL ("Contact", "Language",
+# "Skills", "Experience", "About Me") ahead of the visible name in the first
+# six lines. "About Me" survives as "About M e" after the per-glyph-spacing
+# repair, and — because it still contains the word "about" — used to pass
+# the name heuristic's checks and get accepted as the name.
+SIDEBAR_LAYOUT_CV = (
+    "Contact\n"
+    "Language\n"
+    "Skills\n"
+    "Experience\n"
+    "About M e\n"
+    "hello@reallygreatsite.com\n"
+    "+123-456-7890\n"
+)
+
+
+def test_a_heading_fragment_is_never_accepted_as_the_name() -> None:
+    result = extract_cv(SIDEBAR_LAYOUT_CV.encode("utf-8"), "cv.txt")
+    assert result["estimated_name"] != "About M e"
+    # No confident-but-wrong name is a better outcome than a wrong one — the
+    # model still has to find the real name itself, but is not misled.
+    assert result["estimated_name"] == ""
+
+
 def test_short_real_words_are_not_mistaken_for_letter_spacing() -> None:
     """The repair must not fire on ordinary text that happens to contain
     several short single-letter or two-letter tokens — the failure mode

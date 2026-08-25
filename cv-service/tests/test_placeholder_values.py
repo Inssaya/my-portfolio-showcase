@@ -91,6 +91,48 @@ def test_a_real_street_address_is_left_alone() -> None:
     assert cleaned == text
 
 
+# --------------------------------------------------------------- Lorem Ipsum
+# A second real upload had "About Me" and every "Experience" bullet as
+# unedited Lorem Ipsum. The marker-phrase check only strips the two words
+# "Lorem ipsum" from the front of a line — leaving the rest of the Latin
+# filler ("dolor sit amet, consectetur adipiscing elit...") sitting in the
+# field, which is worse than a wrong contact detail: it's immediately,
+# visibly wrong to anyone who reads it.
+
+def test_a_lorem_ipsum_paragraph_is_removed_whole_not_just_its_opener() -> None:
+    text = (
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n"
+        "Nullam pharetra in lorem at laoreet. Donec hendrerit libero\n"
+        "eget est tempor, quis tempus arcu elementum. In\n"
+        "elementum elit at dui tristique feugiat."
+    )
+    cleaned, removed = strip_placeholder_values(text)
+    assert cleaned == ""
+    assert "dolor sit amet" not in cleaned
+    assert "adipiscing" not in cleaned
+
+
+def test_a_lorem_ipsum_line_with_no_leading_marker_phrase_is_still_caught() -> None:
+    """The opener ("Lorem ipsum") might be on an earlier, separate line — or
+    edited away — leaving a line that is still recognisably Latin filler with
+    no literal "lorem ipsum" bigram in it at all."""
+    text = "Nullam pharetra in lorem at laoreet. Donec hendrerit libero eget est tempor."
+    cleaned, removed = strip_placeholder_values(text)
+    assert cleaned == ""
+    assert removed
+
+
+def test_genuine_prose_is_never_mistaken_for_lorem_ipsum() -> None:
+    text = (
+        "Built a maintenance intervention tracking and KPI platform, "
+        "replacing a manual Excel workflow, and owned its technical "
+        "specification end to end."
+    )
+    cleaned, removed = strip_placeholder_values(text)
+    assert removed == []
+    assert cleaned == text
+
+
 def test_real_headings_and_content_survive() -> None:
     text = "EXPERIENCE\nIntern | Aptiv | Feb 2024\nSkills: Python, Java"
     cleaned, removed = strip_placeholder_values(text)
