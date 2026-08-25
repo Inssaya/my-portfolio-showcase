@@ -74,7 +74,9 @@ const AdminLogin = () => {
   useEffect(() => {
     document.title = "Admin — Sign in";
     if (!supabase) {
-      setAlreadyIn(localStorage.getItem("portfolio_admin_static") === "1");
+      // No Supabase → no admin auth on this build. Never treat a
+      // localStorage flag as a session (it's attacker-writable).
+      setAlreadyIn(false);
       setCheckingSession(false);
       return;
     }
@@ -99,30 +101,13 @@ const AdminLogin = () => {
     setError(null);
 
     if (!supabaseEnabled || !supabase) {
-      // Static-password fallback.
-      const ok =
-        email.trim().toLowerCase() === "yassinsinif4@gmail.com" &&
-        password === "YaSsine2004@gmail.com";
-
-      if (ok) {
-        recordSuccess();
-        localStorage.setItem("portfolio_admin_static", "1");
-        navigate(from, { replace: true });
-      } else {
-        const next = recordFailure();
-        setLockStatus(next);
-        if (next.locked) {
-          setError(null); // banner replaces the inline error when locked
-        } else {
-          const left = next.attemptsLeft ?? 0;
-          setError(
-            left === 1
-              ? "Wrong email or password. 1 attempt left before 10-minute lockout."
-              : `Wrong email or password. ${left} attempts left.`,
-          );
-        }
-        setBusy(false);
-      }
+      // No static-password fallback. A hardcoded credential here would be
+      // compiled into the public JS bundle and readable by anyone who opens
+      // devtools — a credential leak, not a login. Admin auth requires
+      // Supabase, which is configured on the production deployment. Failing
+      // closed (no access) is the correct behaviour for a build without it.
+      setError("Admin sign-in isn't available on this deployment (Supabase not configured).");
+      setBusy(false);
       return;
     }
 

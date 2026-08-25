@@ -29,10 +29,12 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   useEffect(() => {
     if (!supabaseEnabled || !supabase) {
-      // No Supabase — the static-fallback flag is only set by the
-      // hardcoded-credentials branch in AdminLogin, which itself only
-      // accepts the admin email. So the flag alone is sufficient here.
-      setStatus(localStorage.getItem("portfolio_admin_static") === "1" ? "authorized" : "denied");
+      // No Supabase configured — admin auth is unavailable, so deny. We do
+      // NOT honour any localStorage flag here: a flag is attacker-writable
+      // from the devtools console (`localStorage.setItem(...)`), so trusting
+      // it would be a trivial client-side auth bypass. Real auth requires a
+      // signed Supabase session, checked below.
+      setStatus("denied");
       return;
     }
 

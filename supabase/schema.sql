@@ -9,15 +9,17 @@
 --   - All tables the frontend needs (projects, hero, social, about, education,
 --     experience, skills, certificates, messages)
 --   - Row-Level Security policies: the public reads portfolio content and can
---     submit contact messages; only authenticated users (i.e. you) can edit
---     content, read the inbox, or delete anything
+--     submit contact messages; only the ADMIN (checked by email in the JWT via
+--     is_admin()) can edit content, read the inbox, or delete anything
 --   - A public "images" storage bucket with the same rule shape — anyone can
---     view, only you can upload/delete
+--     view, only the admin can upload/delete
 --
--- Auth model: Supabase doesn't allow anonymous sign-up on this project, so
--- "authenticated" == "an admin you created in the dashboard". If you ever
--- enable public sign-up, tighten these policies to check a specific email or
--- role in auth.jwt().
+-- Auth model: this project DOES allow public sign-up (the CV builder at
+-- /cv-builder/signup), so `authenticated` no longer means "the admin" — it
+-- means "any visitor with an account". Every admin-only policy is therefore
+-- keyed on is_admin(), NOT on the bare `authenticated` role. Do not add a
+-- policy that grants write/inbox access to `authenticated` with a `true`
+-- qualifier — that is the exact bug harden-rls.sql exists to fix.
 -- =============================================================================
 
 
@@ -31,6 +33,21 @@ begin
   return new;
 end;
 $$;
+
+-- "Is this request the site owner?" — the single source of truth for every
+-- admin-only policy below. Keyed on the email claim in the caller's signed
+-- JWT, which a user cannot forge or change to the admin's without controlling
+-- the admin's inbox. Keep this email in sync with src/lib/adminRole.ts.
+create or replace function public.is_admin() returns boolean
+  language sql
+  stable
+  security definer
+  set search_path = public
+as $$
+  select coalesce(auth.jwt() ->> 'email', '') = 'yassinsinif4@gmail.com';
+$$;
+revoke all on function public.is_admin() from public;
+grant execute on function public.is_admin() to anon, authenticated;
 
 
 -- --------------------------------------------------------------- tables -----
@@ -163,12 +180,15 @@ begin
   ] loop
     execute format('drop policy if exists "public read" on public.%I', content_table);
     execute format('drop policy if exists "auth write" on public.%I', content_table);
+    execute format('drop policy if exists "admin write" on public.%I', content_table);
     execute format(
       'create policy "public read" on public.%I for select using (true)',
       content_table
     );
+    -- Admin-only writes. NOT `to authenticated using (true)` — that would let
+    -- any signed-up CV user edit the whole site.
     execute format(
-      'create policy "auth write" on public.%I for all to authenticated using (true) with check (true)',
+      'create policy "admin write" on public.%I for all to authenticated using (public.is_admin()) with check (public.is_admin())',
       content_table
     );
   end loop;
@@ -183,18 +203,21 @@ drop policy if exists "anyone can send" on public.messages;
 drop policy if exists "auth read messages" on public.messages;
 drop policy if exists "auth update messages" on public.messages;
 drop policy if exists "auth delete messages" on public.messages;
+drop policy if exists "admin read messages" on public.messages;
+drop policy if exists "admin update messages" on public.messages;
+drop policy if exists "admin delete messages" on public.messages;
 
 create policy "anyone can send" on public.messages
   for insert to anon, authenticated with check (true);
 
-create policy "auth read messages" on public.messages
-  for select to authenticated using (true);
+create policy "admin read messages" on public.messages
+  for select to authenticated using (public.is_admin());
 
-create policy "auth update messages" on public.messages
-  for update to authenticated using (true) with check (true);
+create policy "admin update messages" on public.messages
+  for update to authenticated using (public.is_admin()) with check (public.is_admin());
 
-create policy "auth delete messages" on public.messages
-  for delete to authenticated using (true);
+create policy "admin delete messages" on public.messages
+  for delete to authenticated using (public.is_admin());
 
 
 -- ------------------------------------------------------- storage bucket ----
@@ -210,18 +233,21 @@ drop policy if exists "public read images" on storage.objects;
 drop policy if exists "auth upload images" on storage.objects;
 drop policy if exists "auth update images" on storage.objects;
 drop policy if exists "auth delete images" on storage.objects;
+drop policy if exists "admin upload images" on storage.objects;
+drop policy if exists "admin update images" on storage.objects;
+drop policy if exists "admin delete images" on storage.objects;
 
 create policy "public read images" on storage.objects
   for select using (bucket_id = 'images');
 
-create policy "auth upload images" on storage.objects
-  for insert to authenticated with check (bucket_id = 'images');
+create policy "admin upload images" on storage.objects
+  for insert to authenticated with check (bucket_id = 'images' and public.is_admin());
 
-create policy "auth update images" on storage.objects
-  for update to authenticated using (bucket_id = 'images') with check (bucket_id = 'images');
+create policy "admin update images" on storage.objects
+  for update to authenticated using (bucket_id = 'images' and public.is_admin()) with check (bucket_id = 'images' and public.is_admin());
 
-create policy "auth delete images" on storage.objects
-  for delete to authenticated using (bucket_id = 'images');
+create policy "admin delete images" on storage.objects
+  for delete to authenticated using (bucket_id = 'images' and public.is_admin());
 
 
 -- ------------------------------------------------------- CV builder tables --
