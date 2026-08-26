@@ -20,10 +20,9 @@ reproduces Yassine's own CV design.
 route requires a signed-in Supabase user and a session belongs to exactly one
 account (verified live: an unauthenticated request gets a real 401). A
 session's draft and transcript now write through to Postgres and read back on
-a miss (`app/db.py`, `NEXT.md` Step 2b/2c) — **not yet proven against the live
-project**, since that needs `supabase/schema.sql`'s new tables actually run in
-the Supabase dashboard first; do that before trusting this in production. 289
-tests pass, hermetic (auth is faked at the network boundary, and a new
+a miss (`app/db.py`, `NEXT.md` Step 2b/2c); the schema it needs has been run
+against the live project (`supabase/setup.sql` — one file, idempotent, and now
+the only SQL in the repo). 357 tests pass, hermetic (auth is faked at the network boundary, and a new
 autouse fixture keeps Postgres persistence off by default too — see
 `tests/conftest.py`, `tests/test_auth.py`, `tests/test_persistence.py`).
 
@@ -95,6 +94,44 @@ reason.
 
 **Measured on 20 real CVs: 20 `good`, 0 vision calls.** Only `failed` costs money.
 
+#### A fourth outcome: readable, but in the wrong order
+
+The table above assumes text that comes out is text that can be trusted. Two
+real uploads showed that is not so. `pypdf` emits text in *drawing* order, and
+a sidebar template draws every section **label** before any section **body** —
+so the splitter produced four confidently-labelled sections holding entirely
+different parts of the page, with `contact` containing the single word
+"Language". That grades `good`. It is the most dangerous input the model can
+get: it looks parsed, so nothing downstream doubts it.
+
+Three defences now sit in front of that, in the order they fire:
+
+1. **Reading-order reconstruction** (`app/cv/layout.py`). Positions come from
+   `extract_text(visitor_text=…)`, columns are found by locating a real
+   gutter, and each column is emitted whole. This is *never trusted blindly* —
+   it is scored against the naive ordering on "headings that own a body", and
+   must also preserve the original word count, so a reconstruction that drops
+   or duplicates content loses to the text we already had.
+2. **Coherence check** (`app/cv/extract.py`). If a section plainly contradicts
+   its own heading — `contact` with no email, phone or link — the entire split
+   is discarded rather than passed off as correct, and the document is handed
+   over unsplit with a note saying so. Sets `layout_unreliable`.
+3. **Vision escalation** (`app/main.py`). `layout_unreliable` now reaches
+   vision just like `failed` does. A scrambled CV is a *text* PDF with no
+   embedded image, so `photo.render_pdf_page` rasterises the page (pypdfium2,
+   self-contained wheels) to give vision something to read.
+
+**Uploads are routed by content, never by extension.** An image used to go
+straight down the "this is a portrait" branch, so anyone who photographed or
+screenshotted their CV — the only option for a paper one — had it filed as
+their headshot and the CV never read, with a cheerful "Photo added" in reply.
+`agent.read_uploaded_image` looks at it and either transcribes a document or
+returns `NOT_A_DOCUMENT`. A local ink/whitespace heuristic exists
+(`photo.looks_like_a_document`) and is **off** (`Settings.cheap_image_routing`):
+it is a pure cost lever and it is measurably wrong on dark-theme and
+coloured-sidebar CVs — including this service's own `modern` style — which it
+reads as "not a document". `tests/test_image_cv_upload.py` pins that.
+
 > **On TF-IDF:** it was proposed and rejected, deliberately. TF-IDF ranks terms
 > by rarity *across a corpus*; here there is one document, so there is no IDF to
 > compute. Section segmentation is a parsing problem, and a CV containing
@@ -114,6 +151,10 @@ reason.
 | `app/llm.py` | OpenAI client, retry policy, truncation detection. |
 | `app/keypool.py` | Key scheduler — 429 = wrong key, 401 = dead key. |
 | `app/cv/builder.py` | Draft → PDF. Typography and placeholder scrubbing. |
+| `app/cv/layout.py` | Reading-order reconstruction for two-column PDFs. Self-scoring: it only wins if it reads better *and* preserves the text. |
+| `app/cv/photo.py` | Portrait extraction, plus `render_pdf_page` (rasterise for vision) and `looks_like_a_document` (the off-by-default cost gate). |
+| `app/cv/verify.py` | Write-time scrubbing of invented years and template placeholders. |
+| `app/cv/_cvbold.py` | Third template: single column, photo masthead, coloured rules. |
 | `app/cv/_cvmodern.py` | **Vendored renderer.** Measured geometry — do not "tidy". |
 | `app/cv/_cvdesign.py` | Vendored classic template. |
 | `app/cv/extract.py` | Text extraction + sectioning. |
@@ -189,7 +230,7 @@ cd cv-service && docker compose up --build          # :8000
 # frontend (repo root)
 npm run dev                                          # :8080 → /cv-builder
 
-cd cv-service && .venv/Scripts/python -m pytest -q  # 289 tests, no network needed
+cd cv-service && .venv/Scripts/python -m pytest -q  # 357 tests, no network needed
 ```
 
 Python **3.13** — 3.14 has no wheels for pydantic-core/pillow and tries to

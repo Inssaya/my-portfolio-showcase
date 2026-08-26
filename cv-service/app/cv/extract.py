@@ -14,7 +14,13 @@ from __future__ import annotations
 import io
 import re
 
-from .photo import extract_page_image, extract_portrait, extract_portrait_from_docx
+from . import layout
+from .photo import (
+    extract_page_image,
+    extract_portrait,
+    extract_portrait_from_docx,
+    render_pdf_page,
+)
 from .quality import Assessment, Grade, assess
 
 # Enough to carry a section's substance, short enough that a padded CV cannot
@@ -189,6 +195,95 @@ def _looks_like_heading(line: str) -> str | None:
     return None
 
 
+# Sections whose contents are self-evident enough to check. If one of these
+# holds nothing of the kind its own heading promises, the split is wrong —
+# the labels came from somewhere other than the text beneath them.
+_LANGUAGE_HINTS = re.compile(
+    r"\b(?:english|french|arabic|spanish|german|italian|portuguese|chinese|"
+    r"anglais|fran[cç]ais|arabe|espagnol|allemand|"
+    r"native|fluent|bilingual|mother\s*tongue|natif|maternelle|courant|"
+    r"basic|beginner|intermediate|advanced|notions|d[ée]butant|"
+    r"[abc][12])\b",
+    re.I,
+)
+_EDUCATION_HINTS = re.compile(
+    r"\b(?:university|universit[ée]|school|[ée]cole|college|institut\w*|"
+    r"bachelor|master|licence|diplom\w*|degree|bac\+?\d?|phd|doctorat|"
+    r"engineering|ing[ée]nieur|19\d{2}|20\d{2})\b",
+    re.I,
+)
+
+
+def _section_is_incoherent(name: str, body: str) -> bool:
+    """True when a section plainly does not contain what its heading claims."""
+    text = (body or "").strip()
+    if not text:
+        return False
+    if name == "contact":
+        # A contact block always carries at least one machine-checkable thing.
+        return not (EMAIL_RE.search(text) or PHONE_RE.search(text) or URL_RE.search(text))
+    if name == "languages":
+        return not _LANGUAGE_HINTS.search(text)
+    if name == "education":
+        return not _EDUCATION_HINTS.search(text)
+    return False
+
+
+def _best_pdf_text(data: bytes) -> str:
+    """Naive drawing-order text, or reading-order text when that reads better.
+
+    `pypdf` emits text in drawing order, which for a two-column CV interleaves
+    the sidebar with the main column and hands the section splitter labelled
+    sections whose contents belong somewhere else (see `layout.py`). The
+    reading-order reconstruction is best-effort and cannot be trusted blindly,
+    so both candidates are scored on the same property — headings that
+    actually own a body — and the winner is used. A tie keeps the naive text,
+    so a file today's code already handles well can only stay the same.
+    """
+    naive = _text_from_pdf(data)
+    try:
+        reordered = layout.text_in_reading_order(data)
+    except Exception:  # noqa: BLE001 — a reconstruction failure is not fatal
+        return naive
+    if not reordered.strip():
+        return naive
+
+    naive_clean = _clean(naive)
+    reordered_clean = _clean(reordered)
+
+    # Reordering may only change the ORDER of the text, never its substance.
+    # A reconstruction that drops a section or prints the masthead three times
+    # is worse than a scrambled-but-complete read, and the heading score alone
+    # would not notice either. Word counts are compared rather than exact
+    # strings because line breaks legitimately move when columns are split.
+    if not _preserves_content(naive_clean, reordered_clean):
+        return naive
+
+    if layout.score_layout(
+        reordered_clean.splitlines(), _looks_like_heading
+    ) > layout.score_layout(naive_clean.splitlines(), _looks_like_heading):
+        return reordered
+    return naive
+
+
+# How far the reordered text's word count may drift from the original before
+# it is rejected: a little slack absorbs whitespace rejoining at column edges,
+# while real duplication or a lost column moves it far past this.
+_CONTENT_DRIFT_TOLERANCE = 0.12
+
+
+def _preserves_content(original: str, candidate: str) -> bool:
+    original_words = original.split()
+    if not original_words:
+        return False
+    candidate_words = candidate.split()
+    drift = abs(len(candidate_words) - len(original_words)) / len(original_words)
+    if drift > _CONTENT_DRIFT_TOLERANCE:
+        return False
+    # Cheap check that it is the same text and not merely the same length.
+    return len(set(candidate_words) & set(original_words)) >= len(set(original_words)) * 0.9
+
+
 def extract_cv(data: bytes, filename: str) -> dict:
     """Turn an uploaded CV into labelled, capped sections.
 
@@ -198,7 +293,7 @@ def extract_cv(data: bytes, filename: str) -> dict:
     """
     name = (filename or "").lower()
     if name.endswith(".pdf"):
-        raw = _text_from_pdf(data)
+        raw = _best_pdf_text(data)
     elif name.endswith((".docx", ".doc")):
         raw = _text_from_docx(data)
     elif name.endswith((".txt", ".md")):
@@ -268,7 +363,29 @@ def extract_cv(data: bytes, filename: str) -> dict:
     if estimated_name:
         notes.append(f"Name is probably '{estimated_name}' (first line).")
 
-    if not trimmed:
+    # A heading that owns text belonging to a different part of the page is
+    # the worst possible outcome: it looks parsed, so the model trusts it, and
+    # what it then "reads" is somebody else's section. When even one section
+    # plainly contradicts its own label the split cannot be trusted at all, so
+    # the labels are dropped and the whole document is handed over unsplit —
+    # the same treatment as a CV with no recognisable headings, which the
+    # model already knows how to handle.
+    incoherent = [key for key, body in trimmed.items() if _section_is_incoherent(key, body)]
+    if incoherent:
+        notes.append(
+            f"The heading split looked wrong ({', '.join(sorted(incoherent))} did not "
+            "contain what that heading promises), so it was discarded and the text "
+            "is unsplit under 'full_text'. This usually means a two-column layout "
+            "was read out of order. Read it yourself and map it to the CV fields."
+        )
+        trimmed = {"full_text": text[:TOTAL_CAP]}
+
+    if incoherent:
+        # Already handled above, and deliberately not described as "recognised
+        # sections" below — the whole point is that nothing was recognised
+        # reliably.
+        pass
+    elif not trimmed:
         # No heading matched, so every line ended up in `preamble` — the whole
         # CV. It goes through the fallback bucket, which has the larger cap;
         # treating it as a masthead would truncate the document to SECTION_CAP.
@@ -307,6 +424,9 @@ def extract_cv(data: bytes, filename: str) -> dict:
         "sections": trimmed,
         "notes": notes,
         "characters": len(text),
+        # Text came out, but not in an order that can be trusted. The caller
+        # uses this to escalate to vision even though the grade is not FAILED.
+        "layout_unreliable": bool(incoherent),
     }
     result["assessment"] = assess(result).as_dict()
     return result
@@ -351,8 +471,22 @@ def extract_everything(data: bytes, filename: str) -> dict:
         result["photo"] = extract_portrait_from_docx(data)
     else:
         result["photo"] = None
-    # Only fetched when the text tier failed: it is only ever used as vision
-    # input, and decoding a full page raster costs real memory.
-    needs_vision = (result.get("assessment") or {}).get("grade") == "failed"
-    result["page_image"] = extract_page_image(data) if (is_pdf and needs_vision) else None
+    # Vision input, fetched only when the text tier could not be trusted —
+    # decoding a full page raster costs real memory, so it is never done
+    # speculatively.
+    #
+    # Two different failures qualify, not one. `failed` means no usable text
+    # came out (a scan). `layout_unreliable` means plenty of text came out in
+    # the wrong order — a two-column design whose sidebar interleaves with the
+    # main column, which produced confidently-labelled sections holding other
+    # sections' content. The second case is the more dangerous of the two,
+    # because it looks like a successful parse.
+    assessment = result.get("assessment") or {}
+    needs_vision = assessment.get("grade") == "failed" or result.get("layout_unreliable")
+    if is_pdf and needs_vision:
+        # An embedded image is the cheaper read when the PDF is a scan; a text
+        # PDF has none, so the page is drawn instead.
+        result["page_image"] = extract_page_image(data) or render_pdf_page(data)
+    else:
+        result["page_image"] = None
     return result

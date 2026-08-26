@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from app.cv.photo import PhotoError, looks_like_an_image, prepare_uploaded_photo
+from app.llm import Completion
 from app.main import app
 from app.session import store
 from conftest import TEST_USER_ID
@@ -41,10 +42,23 @@ def test_routing_by_extension() -> None:
     assert not looks_like_an_image("cv.pdf") and not looks_like_an_image("cv.docx")
 
 
-def test_a_photo_upload_attaches_without_calling_the_model(monkeypatch, client: TestClient) -> None:
-    """Attaching a photo needs no reasoning, so it must cost no tokens."""
+def test_a_photo_upload_attaches_without_a_reasoning_turn(monkeypatch, client: TestClient) -> None:
+    """Attaching a photo needs no reasoning, so no chat turn is spent on it.
+
+    An image now passes through vision first, because only the pixels can say
+    whether it is a headshot or a photographed CV (see
+    `tests/test_image_cv_upload.py`). That one look is the whole cost: once it
+    answers "not a document", the reply is written here and the conversational
+    model is never invoked.
+    """
     from app import agent as agent_module
 
+    monkeypatch.setattr(
+        agent_module, "read_image",
+        lambda *a, **k: Completion(
+            content=agent_module.NOT_A_DOCUMENT, prompt_tokens=700, completion_tokens=5
+        ),
+    )
     monkeypatch.setattr(
         agent_module, "complete",
         lambda *a, **k: (_ for _ in ()).throw(AssertionError("model must not run")),
@@ -54,7 +68,8 @@ def test_a_photo_upload_attaches_without_calling_the_model(monkeypatch, client: 
 
     assert "Photo added" in body["reply"]
     assert body["actions"] == ["Added the photo"]
-    assert body["usage"]["total"] == 0
+    # Exactly the one look that did the routing — nothing further was spent.
+    assert body["usage"]["total"] == 705
 
     session = store.get(body["session_id"], TEST_USER_ID)
     assert session.photo is not None

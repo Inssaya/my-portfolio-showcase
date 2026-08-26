@@ -228,6 +228,134 @@ class PhotoError(Exception):
     """The upload is not a usable portrait. Carries a message for the visitor."""
 
 
+# Wide enough that 9-10pt body text on a phone photo of an A4 page stays
+# legible to the vision model, small enough that the image does not blow up
+# the request. Vision is billed by tile, so this is a cost lever as well as a
+# legibility one.
+VISION_EDGE_PX = 1600
+
+
+# A page of text is overwhelmingly paper with a little ink on it. A portrait
+# is a subject filling the frame in continuous mid-tones — even shot against a
+# white backdrop, the person occupies enough of it to pull these below the
+# thresholds. Tuned to be permissive in the document direction: a portrait
+# wrongly sent to vision costs one cheap call and is then correctly identified,
+# whereas a CV wrongly kept out of vision is never read at all.
+_DOC_MIN_WHITE = 0.55
+_DOC_MIN_INK = 0.005
+
+
+def looks_like_a_document(data: bytes) -> bool:
+    """Cheap, local guess at "page of text" vs "photograph of a person".
+
+    Exists purely as a cost gate in front of the vision call in
+    `agent.read_uploaded_image`: attaching a portrait is supposed to cost no
+    tokens at all, and for an ordinary photograph this answers False without
+    any model involved. Anything ambiguous answers True and lets vision — which
+    can actually read the image — make the real decision.
+    """
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:  # pragma: no cover - Pillow is declared
+        return True
+
+    image = _decode(data)
+    if image is None:
+        return False
+    try:
+        image = ImageOps.exif_transpose(image).convert("L")
+        image.thumbnail((220, 220), Image.LANCZOS)
+        pixels = list(image.getdata())
+    except Exception:  # noqa: BLE001
+        return True
+    if not pixels:
+        return False
+
+    total = len(pixels)
+    white = sum(1 for value in pixels if value > 200) / total
+    ink = sum(1 for value in pixels if value < 110) / total
+    return white >= _DOC_MIN_WHITE and ink >= _DOC_MIN_INK
+
+
+# 2x gives roughly 150dpi on a Letter page — enough for 9pt body text to
+# survive as glyphs a vision model reads reliably, without producing a raster
+# so large it dominates the request.
+PAGE_RENDER_SCALE = 2
+
+
+def render_pdf_page(pdf_bytes: bytes, index: int = 0) -> bytes | None:
+    """Rasterise one PDF page to PNG, or None if it cannot be rendered.
+
+    `extract_page_image` only recovers an image the PDF already *contains*,
+    which covers a scan but not the harder case: a real text PDF whose layout
+    defeats extraction. A two-column CV whose sidebar and main column
+    interleave has plenty of text and no embedded page image, so there was
+    nothing to hand vision and the model was left with scrambled sections.
+    Drawing the page ourselves gives that case something to read.
+
+    Uses pypdfium2, which ships self-contained wheels — no poppler, no system
+    package, so the container still builds from `pip install` alone.
+    """
+    try:
+        import pypdfium2
+    except ImportError:  # pragma: no cover - declared, but never fatal
+        return None
+
+    document = None
+    try:
+        document = pypdfium2.PdfDocument(io.BytesIO(pdf_bytes))
+        if len(document) <= index:
+            return None
+        image = document[index].render(scale=PAGE_RENDER_SCALE).to_pil()
+        if image.mode not in ("RGB", "L"):
+            image = image.convert("RGB")
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG", optimize=True)
+        return buffer.getvalue()
+    except Exception as exc:  # noqa: BLE001 — a render failure is not fatal
+        logger.info("could not rasterise page %s: %s", index, type(exc).__name__)
+        return None
+    finally:
+        if document is not None:
+            try:
+                document.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+
+def to_vision_png(data: bytes) -> bytes | None:
+    """Re-encode any uploaded image as PNG for the vision endpoint, or None.
+
+    `llm.read_image` builds a `data:image/png` URL, so handing it JPEG or HEIC
+    bytes would declare a mime type the payload does not match. Rotation is
+    applied from EXIF for the same reason it is in `prepare_uploaded_photo`: a
+    phone photo of a CV is very often recorded sideways, and a sideways page
+    transcribes far worse.
+
+    Returns None rather than raising — an image that cannot be decoded is not
+    an error here, it just means the vision route is unavailable for it and
+    the caller should fall back.
+    """
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:  # pragma: no cover - Pillow is declared
+        return None
+
+    image = _decode(data)
+    if image is None:
+        return None
+    try:
+        image = ImageOps.exif_transpose(image)
+        if image.mode not in ("RGB", "L"):
+            image = image.convert("RGB")
+        image.thumbnail((VISION_EDGE_PX, VISION_EDGE_PX), Image.LANCZOS)
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG", optimize=True)
+        return buffer.getvalue()
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def prepare_uploaded_photo(data: bytes, filename: str) -> bytes:
     """Validate and normalise a portrait the visitor uploaded directly.
 

@@ -106,13 +106,34 @@ def test_good_grade_needs_no_vision() -> None:
     ).needs_vision is False
 
 
+
+# The two round-trip tests below used to point `photo=` at
+# "C:/Users/yassi/portfolio/cv/photo.png" — a path that exists only on the
+# machine the test was written on. Everywhere else `build_resume` silently
+# skipped the photo (a bad portrait must never lose the CV, by design), so the
+# tests failed on the assertion that a photo came back out, and had been
+# failing on every other host and in CI ever since. Generating the portrait
+# here keeps them testing the round trip they claim to test, on any machine.
+@pytest.fixture
+def portrait_path(tmp_path):
+    from PIL import Image, ImageDraw
+
+    image = Image.new("RGB", (420, 420), (238, 226, 214))
+    draw = ImageDraw.Draw(image)
+    draw.ellipse([110, 70, 310, 270], fill=(176, 137, 116))
+    draw.rectangle([80, 255, 340, 420], fill=(58, 72, 96))
+    path = tmp_path / "portrait.png"
+    image.save(path, format="PNG")
+    return str(path)
+
+
 # -------------------------------------------------------------------- photo
 
-def test_portrait_is_extracted_from_a_generated_cv() -> None:
+def test_portrait_is_extracted_from_a_generated_cv(portrait_path) -> None:
     """Round-trip: a CV built with a photo must give that photo back."""
     pdf_bytes, _ = build_resume(
         full_name="Yassine Sinif",
-        photo=r"C:/Users/yassi/portfolio/cv/photo.png",
+        photo=portrait_path,
         skills="Languages: Python",
     )
 
@@ -142,15 +163,22 @@ def test_photo_extraction_survives_a_broken_file() -> None:
     assert extract_page_image(b"") is None
 
 
-def test_page_image_ignores_a_small_portrait() -> None:
+def test_page_image_ignores_a_small_portrait(portrait_path) -> None:
     """extract_page_image feeds vision. A headshot tells vision nothing, so it
     must not trigger a paid call — this is why it is separate from
-    extract_portrait, which deliberately rejects page-sized images."""
+    extract_portrait, which deliberately rejects page-sized images.
+
+    Previously the photo path did not resolve, so nothing was embedded and
+    this asserted None against a CV with no image in it at all — passing
+    without exercising the rejection it exists to pin.
+    """
     pdf_bytes, _ = build_resume(
         full_name="Yassine Sinif",
-        photo=r"C:/Users/yassi/portfolio/cv/photo.png",
+        photo=portrait_path,
         skills="Languages: Python",
     )
+    # The portrait really is in there; extract_page_image must still decline it.
+    assert extract_portrait(pdf_bytes) is not None
 
     assert extract_page_image(pdf_bytes) is None
 
@@ -165,14 +193,14 @@ def test_page_image_is_only_fetched_when_vision_is_needed() -> None:
 
 # ------------------------------------------------------- photo into the CV
 
-def test_extracted_photo_can_be_rebuilt_into_a_new_cv() -> None:
+def test_extracted_photo_can_be_rebuilt_into_a_new_cv(portrait_path) -> None:
     """The point of extracting it: a rebuild keeps the visitor's face."""
     import os
     import tempfile
 
     original, _ = build_resume(
         full_name="Yassine Sinif",
-        photo=r"C:/Users/yassi/portfolio/cv/photo.png",
+        photo=portrait_path,
         skills="Languages: Python",
     )
     portrait = extract_portrait(original)
@@ -193,19 +221,25 @@ def test_extracted_photo_can_be_rebuilt_into_a_new_cv() -> None:
     assert extract_portrait(rebuilt) is not None, "photo lost on rebuild"
 
 
-def test_docx_photo_is_extracted() -> None:
+def test_docx_photo_is_extracted(portrait_path) -> None:
     """Word is what most people write a CV in; without this every .docx upload
-    silently loses its photo on rebuild."""
-    import glob
+    silently loses its photo on rebuild.
+
+    Built here rather than globbed out of the author's Downloads folder, which
+    is what this did before — so it skipped on every other machine and in CI,
+    leaving the .docx photo path with no coverage at all.
+    """
+    import docx
 
     from app.cv.photo import extract_portrait_from_docx
 
-    candidates = glob.glob(r"C:/Users/yassi/Downloads/*CV_Photo*.docx")
-    if not candidates:
-        pytest.skip("no .docx CV with a photo available locally")
+    document = docx.Document()
+    document.add_paragraph("Yassine Sinif")
+    document.add_picture(portrait_path)
+    buffer = io.BytesIO()
+    document.save(buffer)
 
-    with open(candidates[0], "rb") as fh:
-        portrait = extract_portrait_from_docx(fh.read())
+    portrait = extract_portrait_from_docx(buffer.getvalue())
 
     assert portrait is not None
     assert portrait[:8] == b"\x89PNG\r\n\x1a\n"

@@ -77,6 +77,21 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_anon_key: str = ""
 
+    # --- upload routing ------------------------------------------------------
+    # An uploaded image is either the visitor's CV (photographed, scanned or
+    # screenshotted) or a portrait to print on it, and only looking at the
+    # pixels can tell them apart. By default every image goes to vision, which
+    # reads it and decides.
+    #
+    # Setting this True instead runs a local ink/whitespace heuristic first and
+    # only pays for vision when that says "page of text". It is a pure cost
+    # lever and it is OFF because it is measurably wrong on real CVs: a
+    # dark-theme template, a coloured-sidebar design — including this service's
+    # own `modern` style — reads as "not a document" and would be filed as the
+    # visitor's headshot, losing their CV entirely. Turn it on only if vision
+    # spend actually becomes a problem, and accept that failure with it.
+    cheap_image_routing: bool = False
+
     # The single admin account, matched by email against the caller's verified
     # JWT for the /admin/* routes. Kept in sync with the portfolio's
     # src/lib/adminRole.ts and the is_admin() SQL function. Override per

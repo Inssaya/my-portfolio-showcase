@@ -317,6 +317,57 @@ VISION_PROMPT = (
 )
 
 
+NOT_A_DOCUMENT = "NOT_A_DOCUMENT"
+
+# One prompt does the routing *and* the transcription, because they are the
+# same act of looking: deciding "is this a CV or a headshot?" from an image
+# requires reading it, so asking twice would pay for vision twice.
+IMAGE_ROUTING_PROMPT = (
+    "A visitor uploaded this image to a CV builder. It is either a document "
+    "(their CV — perhaps photographed with a phone, scanned, or screenshotted) "
+    "or a portrait photograph of themselves to print on the CV.\n\n"
+    "If it is a document, transcribe everything you can see, preserving the "
+    "sections and their order, as plain text under headings. Do not invent "
+    "anything that is not visible; if a part is unreadable, write [unreadable].\n\n"
+    f"If it is NOT a document — a portrait photo, a logo, a screenshot of "
+    f"something else — reply with exactly {NOT_A_DOCUMENT} and nothing else."
+)
+
+
+def read_uploaded_image(session: Session, image_png: bytes) -> str | None:
+    """Transcribe an uploaded image if it is a document, else None.
+
+    Why this exists: uploads used to be routed by file extension alone, so
+    every image went down the "this is a portrait" path. Someone who
+    photographed or screenshotted their CV — an ordinary thing to do, and the
+    only option for a paper CV — had it silently filed as their headshot and
+    was told "Photo added", with the CV never read at all.
+
+    Deciding from pixels needs a model, so this costs one vision call per
+    image upload, including on genuine portraits where it buys nothing. That
+    is a deliberate trade: images are a small share of uploads, a low-detail
+    vision call is cents, and the alternative failure destroys the visitor's
+    actual CV. A local heuristic (ink density, aspect ratio) was considered and
+    rejected — a studio headshot on white and a phone photo of a page are not
+    reliably separable that way, and guessing wrong is the expensive direction.
+    """
+    try:
+        result = read_image(IMAGE_ROUTING_PROMPT, image_png, sticky_key=session.key_label)
+    except LLMError as exc:
+        # Vision unavailable or unconfigured: fall back to treating it as a
+        # portrait, which is what this endpoint did before it could look.
+        logger.info("image routing failed for session %s: %s", session.id, exc)
+        return None
+
+    session.usage.add(result.prompt_tokens, result.completion_tokens)
+    session.key_label = result.key_label or session.key_label
+
+    text = (result.content or "").strip()
+    if not text or text.upper().startswith(NOT_A_DOCUMENT):
+        return None
+    return text
+
+
 def recover_by_vision(session: Session, image_png: bytes) -> str | None:
     """Read a CV that yielded no text, using the vision endpoint.
 

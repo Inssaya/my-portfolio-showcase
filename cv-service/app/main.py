@@ -17,12 +17,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from . import db
-from .agent import SessionBudgetExceeded, recover_by_vision, run_turn, seed_uploaded_cv
+from .agent import (
+    SessionBudgetExceeded,
+    read_uploaded_image,
+    recover_by_vision,
+    run_turn,
+    seed_uploaded_cv,
+)
 from .auth import AuthUser, get_current_user, require_admin
 from .config import get_settings
 from .cv.builder import RESUME_FIELDS, build_resume, safe_filename
 from .cv.extract import ExtractionError, extract_cv, extract_everything
-from .cv.photo import PhotoError, looks_like_an_image, prepare_uploaded_photo
+from .cv.photo import (
+    PhotoError,
+    looks_like_a_document,
+    looks_like_an_image,
+    prepare_uploaded_photo,
+    to_vision_png,
+)
 from .llm import LLMBusy, LLMError, LLMNotConfigured, get_pool
 from .ratelimit import (
     CHAT_PER_USER,
@@ -299,6 +311,61 @@ async def upload(
     # it would be pure cost. The reply is written here.
     if looks_like_an_image(filename):
         session = store.get_or_create(session_id, user.id, user.access_token)
+
+        # Keep the original for admin review, exactly as the document branch
+        # does — a photographed CV is a CV upload and belongs in that record.
+        if db.persistence_configured():
+            db.store_upload(
+                session.id, user.id, filename, file.content_type or "", data,
+                user.access_token,
+            )
+
+        # Route by what the image *is*, not by its extension. A phone photo or
+        # screenshot of a CV is an image file and used to be filed as the
+        # visitor's headshot, so their CV was never read — see
+        # agent.read_uploaded_image.
+        # Only the pixels can say whether this is a CV or a headshot, so by
+        # default vision looks at every image. `cheap_image_routing` swaps in a
+        # local heuristic to save the call; see the note on that setting for
+        # why it is off, and what it gets wrong when it is on.
+        transcribed = None
+        if not limits.cheap_image_routing or looks_like_a_document(data):
+            page = to_vision_png(data)
+            transcribed = read_uploaded_image(session, page) if page else None
+
+        if transcribed:
+            extraction = {
+                "estimated_name": "",
+                "contact_candidates": [],
+                # Unsplit on purpose: a transcription's headings are the
+                # model's own reading of the page, not something the
+                # deterministic splitter verified, so it is handed over whole
+                # for the model to map — the same contract as a CV whose
+                # layout did not parse.
+                "sections": {"full_text": transcribed},
+                "notes": [],
+                "characters": len(transcribed),
+                # 'recovered' makes seed_uploaded_cv warn that this text came
+                # from an image and that names, dates and numbers should be
+                # confirmed rather than trusted.
+                "assessment": {"grade": "recovered", "reasons": ["read from an image"]},
+            }
+            seed_uploaded_cv(session, extraction, filename)
+            outcome = _turn_or_http_error(
+                session,
+                "I've uploaded my CV. Save every section you can into the draft with "
+                "update_resume, then tell me what you got.",
+                user.access_token,
+            )
+            return ChatResponse(
+                session_id=session.id,
+                reply=outcome["reply"],
+                actions=outcome["actions"],
+                pdf_ready=outcome["pdf_ready"],
+                pdf_version=session.pdf_version,
+                usage=session.usage.as_dict(),
+            )
+
         try:
             session.photo = prepare_uploaded_photo(data, filename)
         except PhotoError as exc:
@@ -341,17 +408,35 @@ async def upload(
         session.photo = extraction["photo"]
 
     # --- the extraction cascade -------------------------------------------
-    # Deterministic parsing handles most CVs for free. Only a file that yielded
-    # no usable text is worth a vision call, which costs several times a text
-    # turn. See app/cv/quality.py for the grading.
+    # Deterministic parsing handles most CVs for free. Vision is the expensive
+    # tier and is reached for two distinct reasons (see app/cv/quality.py and
+    # extract.extract_everything):
+    #
+    #   failed             no usable text came out — a scan or an image-only PDF.
+    #   layout_unreliable  text came out in the wrong order. A two-column design
+    #                      whose sidebar interleaves with the main column yields
+    #                      sections that look parsed and hold other sections'
+    #                      content, which is the most dangerous input the model
+    #                      can be given: it has no way to tell it is wrong.
+    #
+    # The second case is why this no longer keys on `failed` alone. A text PDF
+    # has no embedded image to read, so extract_everything rasterises the page.
     assessment = extraction.get("assessment") or {}
-    if assessment.get("grade") == "failed":
+    unreadable = assessment.get("grade") == "failed"
+    if unreadable or extraction.get("layout_unreliable"):
         page_image = extraction.get("page_image")
         recovered = recover_by_vision(session, page_image) if page_image else None
         if recovered:
             logger.info("session %s: recovered %s by vision", session.id, filename)
             extraction["sections"] = {"full_text": recovered}
             extraction["assessment"] = {**assessment, "grade": "recovered"}
+            extraction["layout_unreliable"] = False
+        elif not unreadable:
+            # The text is scrambled but present. Keeping it — already collapsed
+            # to unsplit `full_text` with a note saying the split was discarded
+            # — is far better than refusing a file the visitor can plainly read.
+            logger.info("session %s: vision unavailable for %s, using raw text",
+                        session.id, filename)
         else:
             # Nothing readable by either route. Say what to do instead — an
             # error page would leave the visitor stuck holding a file.
