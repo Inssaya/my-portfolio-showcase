@@ -62,16 +62,18 @@ jobs:
       - name: Verify nothing is left wide open
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        # The same check that closes setup.sql, but as a build failure rather
-        # than rows a human has to notice. Any row here means a table still
-        # grants write or inbox access to every authenticated user with no
-        # admin gate — and "authenticated" now includes guests.
+        # The same two checks that close setup.sql, as a build failure rather
+        # than rows a human has to notice.
+        #
+        # Both matter because `authenticated` now includes guests — anyone who
+        # opened the site — so an ungated policy is public access, whether it
+        # grants writes or only reads.
         run: |
           psql "$DB_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
           do $$
-          declare open_count integer;
+          declare writes integer; reads integer;
           begin
-            select count(*) into open_count
+            select count(*) into writes
             from pg_policies
             where schemaname in ('public', 'storage')
               and roles::text[] @> array['authenticated']
@@ -79,8 +81,20 @@ jobs:
               and coalesce(qual, 'true') = 'true'
               and coalesce(with_check, 'true') = 'true'
               and policyname not in ('anyone can send');
-            if open_count > 0 then
-              raise exception '% ungated authenticated write policy/policies', open_count;
+
+            select count(*) into reads
+            from pg_policies
+            where schemaname = 'public'
+              and tablename in ('messages', 'cv_sessions', 'cv_messages',
+                                'cv_uploads', 'cv_usage')
+              and roles::text[] @> array['authenticated']
+              and cmd in ('SELECT', 'ALL')
+              and coalesce(qual, 'true') = 'true';
+
+            if writes > 0 or reads > 0 then
+              raise exception
+                '% ungated write policy/policies, % ungated read(s) of personal data',
+                writes, reads;
             end if;
             raise notice 'RLS verify passed.';
           end $$;

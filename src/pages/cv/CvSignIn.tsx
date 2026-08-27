@@ -44,7 +44,12 @@ const CvSignIn = () => {
   const [alreadyIn, setAlreadyIn] = useState(false);
   const [asGuest, setAsGuest] = useState(false);
 
-  const from = (location.state as { from?: string } | null)?.from ?? "/cv-builder";
+  const routed = location.state as { from?: string; guestUnavailable?: boolean } | null;
+  const from = routed?.from ?? "/cv-builder";
+  // Set by CvProtectedRoute when signInAnonymously() failed. Landing here at
+  // all means guest mode did not work — without saying so, the product just
+  // looks like it still demands an account.
+  const guestBlocked = Boolean(routed?.guestUnavailable);
 
   useEffect(() => {
     document.title = "CV Builder — Sign in";
@@ -300,6 +305,14 @@ const CvSignIn = () => {
             Sign in to pick up your saved CVs.
           </p>
         </div>
+
+        {guestBlocked && (
+          <p className="mb-5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs leading-relaxed text-amber-200">
+            Building without an account isn't available right now, so this page
+            is asking you to sign in. If this is your site: turn on Supabase →
+            Authentication → Providers → Anonymous.
+          </p>
+        )}
 
         {asGuest && (
           // They are mid-session as a guest and chose to sign in to an

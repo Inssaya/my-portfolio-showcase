@@ -24,7 +24,7 @@ Phase 1 is complete and tested. Phase 2 auth is done — every route requires a
 signed-in Supabase user (`app/auth.py`, verified live: unauthenticated
 requests get a real 401). Session **persistence** is done too: `app/db.py`
 writes sessions and transcripts through to Postgres and reads them back on a
-miss, so a session survives a restart (`app/session.py`). 378 tests pass.
+miss, so a session survives a restart (`app/session.py`). 393 tests pass.
 
 Signing up is no longer the first thing a visitor meets: with no session they
 are signed in **anonymously** and build a CV straight away, and the account
@@ -33,8 +33,19 @@ choose to keep it. Two rules that look like details and are not: a guest must
 be *converted* (`updateUser`) and never re-registered with `signUp`, which
 would abandon everything they built; and a rate limit keyed on a guest's
 account is not a limit, because the account is free to mint — anonymous
-callers are rationed by IP instead. `HANDOFF.md` §10 has the whole picture;
-`src/lib/cv/guest.ts` is the one place that knows how conversion works.
+callers are rationed by IP instead — and by how fast they may *open*
+conversations, without which a per-conversation token ceiling bounds nothing.
+
+The two ceilings have different shapes on purpose: a guest is rationed per
+conversation (80k), an account per rolling week across all of them (300k) with
+no per-session cap at all. The weekly figure comes from the `cv_usage` ledger
+in Postgres, because a week has to survive the restarts Render does routinely.
+
+One more thing that changed under the surface: `authenticated` in RLS no longer
+means "signed up", it means *anyone who opened the site*. Every policy must key
+on `is_admin()` or `auth.uid() = user_id`; the schema workflow fails the build
+if one does not. `HANDOFF.md` §10 has the whole picture; `app/quota.py` owns the
+limits and `src/lib/cv/guest.ts` owns conversion.
 
 Quick orientation:
 

@@ -35,6 +35,7 @@ interface CvProtectedRouteProps {
  */
 const CvProtectedRoute = ({ children }: CvProtectedRouteProps) => {
   const [status, setStatus] = useState<Status>("checking");
+  const [guestUnavailable, setGuestUnavailable] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -62,7 +63,13 @@ const CvProtectedRoute = ({ children }: CvProtectedRouteProps) => {
         // Providers → Anonymous). If it is off, or rate-limited, fall back to
         // the sign-in page rather than leaving the visitor on a blank screen —
         // the old behaviour, which still works.
+        //
+        // Flagged rather than silent: with the provider off, every visitor
+        // lands on a sign-in wall and the product looks like it was never
+        // changed. The sign-in page says what happened, so the cause is
+        // visible from the outside instead of only in this console line.
         console.warn("anonymous sign-in unavailable, falling back to login", error);
+        setGuestUnavailable(true);
         setStatus("denied");
         return;
       }
@@ -94,7 +101,13 @@ const CvProtectedRoute = ({ children }: CvProtectedRouteProps) => {
   }
 
   if (status === "denied") {
-    return <Navigate to="/cv-builder/login" replace state={{ from: location.pathname }} />;
+    return (
+      <Navigate
+        to="/cv-builder/login"
+        replace
+        state={{ from: location.pathname, guestUnavailable }}
+      />
+    );
   }
 
   return <>{children}</>;

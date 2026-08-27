@@ -22,11 +22,16 @@
 -- already exists, that block leaves it untouched — so re-running is always
 -- safe, and you never have to keep a real password in this file.
 --
--- Auth model: this project allows public sign-up (the CV builder), so the
--- `authenticated` role means "any visitor with an account", NOT "the admin".
--- Every admin-only policy is keyed on is_admin() (your email in the signed
--- JWT). Never grant write/inbox access to bare `authenticated` with `true`.
--- Keep the admin email in sync with src/lib/adminRole.ts.
+-- AUTH MODEL — the one thing to get right in this file:
+-- `authenticated` does NOT mean "the admin", and since anonymous sign-in was
+-- turned on it does not even mean "someone who signed up". A guest is signed
+-- in the moment they open /cv-builder and holds a valid JWT with exactly that
+-- role, so **a grant to bare `authenticated` is a grant to the public
+-- internet** — for reads as much as for writes.
+-- The only things that separate people are is_admin() (your email, in the
+-- signed JWT, unforgeable) and `auth.uid() = user_id`. Every policy here uses
+-- one or the other; the verify at the bottom fails the build if a new one
+-- does not. Keep the admin email in sync with src/lib/adminRole.ts.
 -- =============================================================================
 
 
@@ -301,6 +306,56 @@ drop policy if exists "admin read cv messages" on public.cv_messages;
 create policy "admin read cv messages" on public.cv_messages
   for select to authenticated using (public.is_admin());
 
+-- The usage ledger, which is what the weekly account limit is read from.
+--
+-- A ledger and not a counter on cv_sessions, because the question is "how
+-- much did this account spend in the last seven days" and a per-session
+-- counter cannot answer it: summing sessions attributes every token a
+-- long-lived conversation ever cost to whenever it was last touched. Rows are
+-- append-only and small; the index is the shape of the only query there is.
+create table if not exists public.cv_usage (
+  id bigserial primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  -- Nullable and ON DELETE SET NULL: deleting one conversation must not
+  -- silently refund the week it was spent in.
+  session_id uuid references public.cv_sessions(id) on delete set null,
+  prompt_tokens integer not null default 0,
+  completion_tokens integer not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists cv_usage_user_idx on public.cv_usage(user_id, created_at desc);
+alter table public.cv_usage enable row level security;
+
+-- Insert and read your own; no update or delete policy exists at all, for
+-- anyone. An append-only ledger nobody can edit is the point — a row that can
+-- be deleted by the account it bills is not a limit.
+drop policy if exists "own usage insert" on public.cv_usage;
+create policy "own usage insert" on public.cv_usage
+  for insert to authenticated with check (auth.uid() = user_id);
+drop policy if exists "own usage read" on public.cv_usage;
+create policy "own usage read" on public.cv_usage
+  for select to authenticated using (auth.uid() = user_id or public.is_admin());
+
+-- This account's tokens over the last rolling seven days.
+--
+-- Keys on auth.uid() rather than taking a user id: there is then no argument
+-- to spoof, and asking about somebody else's week is not expressible. Runs as
+-- the caller (no SECURITY DEFINER), so the RLS policy above applies too — two
+-- independent reasons the answer can only ever be your own.
+create or replace function public.cv_weekly_tokens()
+returns bigint
+language sql stable
+set search_path = public
+as $$
+  select coalesce(sum(prompt_tokens + completion_tokens), 0)::bigint
+  from public.cv_usage
+  where user_id = auth.uid()
+    and created_at >= now() - interval '7 days';
+$$;
+revoke all on function public.cv_weekly_tokens() from public;
+grant execute on function public.cv_weekly_tokens() to authenticated;
+
+
 -- Uploaded files kept for admin review (admin-only review of uploaded files).
 create table if not exists public.cv_uploads (
   id uuid primary key default gen_random_uuid(),
@@ -541,13 +596,36 @@ end $$;
 
 
 -- ------------------------------------------------------------ verify --------
--- Should return ZERO rows. Any row = a table still grants write/inbox access
--- to every authenticated user with no admin gate — i.e. still exploitable.
-select schemaname, tablename, policyname, cmd, qual, with_check
+-- Should return ZERO rows. Any row is a live hole.
+--
+-- READ THIS BEFORE ADDING A POLICY: `authenticated` no longer means "someone
+-- who signed up and confirmed an email". Anonymous sign-in is on, so it means
+-- *anybody who opened the site* — a guest holds a valid JWT with the same
+-- role. Every grant to bare `authenticated` is therefore a grant to the
+-- public internet, and the only thing that distinguishes the owner is
+-- is_admin() or an auth.uid() = user_id test.
+--
+-- Both checks below exist because of that. The first catches ungated writes;
+-- the second catches ungated *reads* of the tables that hold personal data,
+-- which before anonymous sign-in were merely "logged-in only" and are now
+-- world-readable if left that way.
+select 'ungated write' as problem, schemaname, tablename, policyname, cmd
 from pg_policies
 where schemaname in ('public', 'storage')
   and roles::text[] @> array['authenticated']
   and cmd <> 'SELECT'
   and coalesce(qual, 'true') = 'true'
   and coalesce(with_check, 'true') = 'true'
-  and policyname not in ('anyone can send');
+  -- The contact form: an unauthenticated visitor must be able to send one,
+  -- and the table is admin-only to read. Deliberate, and the one exception.
+  and policyname not in ('anyone can send')
+
+union all
+
+select 'ungated read of personal data', schemaname, tablename, policyname, cmd
+from pg_policies
+where schemaname = 'public'
+  and tablename in ('messages', 'cv_sessions', 'cv_messages', 'cv_uploads', 'cv_usage')
+  and roles::text[] @> array['authenticated']
+  and cmd in ('SELECT', 'ALL')
+  and coalesce(qual, 'true') = 'true';

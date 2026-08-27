@@ -192,3 +192,72 @@ def append_messages(session_id: str, messages: list[dict], access_token: str) ->
             "could not save %d message(s) for session %s: %s", len(messages), session_id, exc
         )
         return False
+
+
+def record_usage(
+    user_id: str,
+    session_id: str | None,
+    prompt_tokens: int,
+    completion_tokens: int,
+    access_token: str,
+) -> bool:
+    """Append one row to the usage ledger.
+
+    A ledger rather than a counter on the session row, because the weekly
+    limit asks a question a counter cannot answer: *how much did this account
+    spend in the last seven days*. Summing sessions would attribute every
+    token a long-lived conversation ever cost to whenever it was last touched.
+
+    Best-effort like everything else here. A lost row under-counts somebody's
+    week, which is the right way for this to fail — the alternative is a
+    visitor refused service because Postgres blinked.
+    """
+    if prompt_tokens <= 0 and completion_tokens <= 0:
+        return True
+    try:
+        response = httpx.post(
+            f"{_base_url()}/cv_usage",
+            json={
+                "user_id": user_id,
+                "session_id": session_id,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+            },
+            headers=_headers(access_token, prefer="return=minimal"),
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        return True
+    except httpx.HTTPError as exc:
+        logger.warning("could not record usage for user %s: %s", user_id, exc)
+        return False
+
+
+def weekly_token_total(access_token: str) -> int | None:
+    """This account's tokens over the last rolling 7 days, or None if the
+    figure could not be obtained.
+
+    None is not zero, and callers must not treat it as either: it means "no
+    answer", and app/quota.py deliberately lets the visitor through on it
+    rather than refusing service over a database hiccup.
+
+    The window and the identity both live in `cv_weekly_tokens()`
+    (supabase/setup.sql), which keys on auth.uid() — so the sum is scoped by
+    the caller's own token and there is no user id to pass, spoof or forget.
+    """
+    try:
+        response = httpx.post(
+            f"{_base_url()}/rpc/cv_weekly_tokens",
+            json={},
+            headers=_headers(access_token),
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        logger.warning("could not read weekly usage: %s", exc)
+        return None
+    try:
+        return int(response.json())
+    except (TypeError, ValueError):
+        logger.warning("weekly usage came back in an unexpected shape")
+        return None

@@ -31,7 +31,7 @@ against the live project (`supabase/setup.sql` — one file, idempotent, and now
 the only SQL in the repo). A visitor no longer has to sign up first: with no
 session they are signed in anonymously and build a CV straight away, and the
 account becomes permanent — keeping the same id, and so all their work — only
-when they choose to save it (**§10**). 378 tests pass, hermetic (auth is faked at the network boundary, and a new
+when they choose to save it (**§10**). 393 tests pass, hermetic (auth is faked at the network boundary, and a new
 autouse fixture keeps Postgres persistence off by default too — see
 `tests/conftest.py`, `tests/test_auth.py`, `tests/test_persistence.py`).
 
@@ -384,29 +384,93 @@ Two related consequences, both handled:
   rather than converting, so the guest CV stays behind. The sign-in page says
   so rather than letting them find out afterwards.
 
+### Two ceilings, deliberately different shapes
+
+Not one number with a discount for signing up — the *question* being asked is
+different for each, and that is the whole design (`app/quota.py`):
+
+| | Guest | Account |
+|---|---|---|
+| Rationed per | **conversation** (`GUEST_SESSION_TOKENS`, 80k) | **rolling week**, across every conversation (`ACCOUNT_WEEKLY_TOKENS`, 300k) |
+| Per-session ceiling | yes | **none** |
+| Weekly ceiling | none | yes |
+| Where the figure lives | the session in memory | the `cv_usage` ledger in Postgres |
+
+A guest has no account worth attaching a longer-term total to — the identity
+is one request old and free to mint — so a weekly figure keyed on it would
+measure nothing. What a per-conversation ceiling does buy is a hard stop on
+one runaway session.
+
+Somebody who came back is the opposite case: they should be able to start as
+many CVs as they like and revise one for as long as it takes, and the only
+thing that runs out is the week.
+
+**The weekly figure is read from Postgres, not from memory.** A rolling week
+has to survive the restarts a single Render instance does routinely; in-process
+state would reset the window on every deploy, which is the same as having no
+weekly limit at all. It is a *ledger* (`cv_usage`) and not a counter on the
+session row, because summing sessions would attribute everything a long-lived
+conversation ever cost to whenever it was last touched.
+
+`weekly_token_total` returns `None` — not 0 — when it cannot get an answer, and
+`quota.check` **lets the visitor through** on it. Failing closed would refuse
+service over a database hiccup that has nothing to do with them, and the
+rate limiter below still caps requests, so an outage cannot become unbounded
+spend. `tests/test_weekly_quota.py` pins both halves of that, including that
+`None` is never quietly read as zero.
+
 ### What an anonymous identity costs, and what pays for it
 
 An anonymous account is **free to mint**. Every limit that rations by account
 therefore stops being a limit — a script that signs in again before each
-request never hits one, while spending real OpenAI budget every call. Two
-defences, both in this repo rather than in a prompt:
+request never hits one, while spending real OpenAI budget every call. Three
+defences, all in this repo rather than in a prompt:
 
 1. **Rationed by IP, not by account.** `limit_by_account`
    (`app/ratelimit.py`) keys anonymous callers on `ANON_*_PER_IP` and
    signed-up ones on the existing per-account rules — members legitimately
    share an IP (a school, an office, CGNAT); guests are the ones whose
-   "account" is worthless as a subject. Pinned by
-   `tests/test_anonymous_visitors.py`, which proves a fresh identity per
-   request still hits the wall.
-2. **A smaller token ceiling.** `MAX_ANONYMOUS_SESSION_TOKENS` (25k, vs 60k)
-   is applied in `run_turn` from `session.is_anonymous`. The flag is
-   **re-stamped from the verified token on every request**, never persisted —
-   which is exactly what makes signing up lift the ceiling mid-session
-   without touching the session object.
+   "account" is worthless as a subject.
+2. **A cap on opening conversations, not just on using them.**
+   `ANON_SESSION_PER_IP` (5/hour) exists because of the table above: a guest
+   ceiling that is per-conversation bounds one conversation and nothing else,
+   and opening the next one costs nothing. Without this rule, N conversations
+   is N allowances and the ceiling is decorative. `_session_for` in
+   `app/main.py` is deliberately not `store.get_or_create` so that *opening*
+   can be charged while *continuing* is free — rationing a guest for answering
+   questions in the conversation they already have would be exactly backwards.
+   Members are exempt: their limit is weekly and account-wide, so opening
+   conversations gains them nothing.
+3. **The per-conversation token ceiling** itself, applied in `quota.check`
+   from `session.is_anonymous`. The flag is **re-stamped from the verified
+   token on every request**, never persisted — which is what makes signing up
+   change the limit mid-session without touching the session object.
 
-`GLOBAL_PER_IP` still sits above both, but it is a flood backstop, not an
+`GLOBAL_PER_IP` still sits above all of it, but it is a flood backstop, not an
 economic control: 120 requests a minute of a model that bills per call is not
 a budget.
+
+### The security consequence nobody sees coming
+
+`authenticated` used to mean "someone who signed up and confirmed an email".
+It now means **anybody who opened the site** — a guest holds a valid JWT with
+that exact role. So every RLS grant to bare `authenticated` became a grant to
+the public internet, for reads as much as for writes.
+
+Everything in `supabase/setup.sql` was already keyed on `is_admin()` or
+`auth.uid() = user_id`, so nothing was actually exposed — but the invariant is
+now load-bearing in a way it was not, and it is one `create policy` away from
+being lost. The verify block at the end of that file has a second check for
+exactly this (ungated *reads* of `messages`, `cv_sessions`, `cv_messages`,
+`cv_uploads`, `cv_usage`), and `.github/workflows/supabase-schema.yml` runs
+both as a build failure.
+
+The other half is session ownership: `/chat` and `/upload` resolve sessions
+through `_session_for` now rather than `store.get_or_create`, and a rewrite
+like that is exactly where an ownership check goes missing. Someone else's
+session id must read as one that does not exist — not an error, which would
+let ids be enumerated by the shape of the response. Pinned in
+`tests/test_anonymous_visitors.py`.
 
 ### Housekeeping
 

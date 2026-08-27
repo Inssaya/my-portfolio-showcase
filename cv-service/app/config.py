@@ -71,29 +71,36 @@ class Settings(BaseSettings):
     # worse outage than briefly having no rate limiting at all).
     rate_limit_enabled: bool = True
 
-    # Ceiling on one session's total tokens. Not a per-minute limit — there is
-    # none in this service; a "too many requests" message can only ever be
-    # OpenAI's own, relayed.
+    # --- how much a visitor may spend ----------------------------------------
+    # Two different shapes for two different subjects, not one number with a
+    # discount:
     #
-    # 60k, from measurement rather than taste. One finished CV costs ~12.7k via
-    # upload and ~34.7k via a full interview, so a 30k cap would cut a real
-    # interview off partway — the worst possible moment, with the draft written
-    # and no PDF. 60k leaves room to finish and then revise a few times.
+    #   A GUEST is rationed per CONVERSATION. There is no account to attach a
+    #   longer-term total to — the identity is free to mint, so a weekly figure
+    #   keyed on it would mean nothing. What a per-conversation ceiling does
+    #   buy is a hard stop on any single runaway session.
     #
-    # Set MAX_SESSION_TOKENS=0 to disable the ceiling entirely.
-    max_session_tokens: int = 60_000
+    #   AN ACCOUNT is rationed per WEEK, across every conversation, and has no
+    #   per-session ceiling at all. That is the right shape for somebody who
+    #   came back: they can start as many CVs as they like, revise one as long
+    #   as they need, and the only thing that runs out is the week's total.
+    #
+    # Both are generous against measured cost — a finished CV runs ~12.7k
+    # tokens by upload and ~34.7k by full interview.
+    #
+    # 80k lets a guest do a full interview and then revise it substantially.
+    guest_session_tokens: int = 80_000
 
-    # A signed-up visitor is a known person who came back; an anonymous one is
-    # a free identity a script can mint per request. Both get enough budget to
-    # build a real CV end to end — that is the whole point of letting somebody
-    # in before they sign up — but the anonymous ceiling is lower, because it
-    # is the one an abuser gets to spend over and over.
+    # 300k is roughly eight full interviews a week, rolling — not a calendar
+    # week, so nobody is locked out until an arbitrary Monday.
     #
-    # Reaching it is not a dead end: the draft survives, the Build button still
-    # renders it without the model (app/tools.py), and signing up lifts the
-    # ceiling on the same account (Supabase keeps the user id when an anonymous
-    # account is converted), so nothing built so far is lost.
-    max_anonymous_session_tokens: int = 25_000
+    # This is enforced from the `cv_usage` ledger in Postgres, not from
+    # in-process state: a weekly window has to survive the restarts a single
+    # Render instance does routinely. See app/quota.py.
+    account_weekly_tokens: int = 300_000
+
+    # Both accept 0 to disable that ceiling entirely, which is the escape
+    # hatch if the accounting itself ever misbehaves.
 
     # --- auth ------------------------------------------------------------------
     # The same project the portfolio's admin panel already uses

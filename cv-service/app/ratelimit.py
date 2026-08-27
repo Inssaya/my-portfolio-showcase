@@ -84,6 +84,20 @@ ANON_CHAT_PER_IP = Rule(40, 3600)      # 40 chat turns / hour / IP
 ANON_UPLOAD_PER_IP = Rule(20, 3600)    # 20 uploads / hour / IP
 ANON_GENERATE_PER_IP = Rule(30, 3600)  # 30 renders / hour / IP
 
+# The multiplier, and the reason this rule exists at all.
+#
+# A guest's token ceiling is per *conversation* (app/quota.py). That bounds
+# one conversation and nothing else: starting a fresh one costs nothing and
+# resets the allowance, so N conversations is N ceilings and the per-session
+# limit stops meaning anything at scale. Capping how fast new conversations
+# can be opened from one address is what turns it back into a real bound.
+#
+# Five an hour is far above genuine use — a visitor builds one CV, occasionally
+# restarts once or twice — and far below what makes farming the allowance
+# worthwhile. Signed-up visitors are not subject to it: their limit is weekly
+# and account-wide, so opening conversations gains them nothing.
+ANON_SESSION_PER_IP = Rule(5, 3600)    # 5 new conversations / hour / IP
+
 
 class SlidingWindow:
     """Thread-safe sliding-window counters with bounded memory.
@@ -193,6 +207,24 @@ def limit_by_account(rule: Rule, anon_rule: Rule, scope: str, what: str):
             _enforce(f"{scope}:user:{user.id}", rule, what)
 
     return Depends(dependency)
+
+
+def guard_new_guest_session(request: Request, user: AuthUser) -> None:
+    """Called on the path that is about to open a *new* conversation.
+
+    Not a dependency, because a dependency cannot know whether the session id
+    in the body resolved to an existing conversation — and charging somebody
+    for continuing one they already have is exactly the wrong behaviour. The
+    call sites in main.py do the lookup first and only reach this when they
+    are genuinely about to create.
+    """
+    if not user.is_anonymous:
+        return
+    _enforce(
+        f"session:anon-ip:{client_ip(request)}",
+        ANON_SESSION_PER_IP,
+        "new conversations started without an account",
+    )
 
 
 class GlobalIpRateLimitMiddleware(BaseHTTPMiddleware):

@@ -94,6 +94,15 @@ const CvSaveWorkPrompt = ({ open, onClose, onSaved }: CvSaveWorkPromptProps) => 
                       CV and come back to it from any device — nothing you've built is
                       lost, it stays exactly as it is.
                     </p>
+                    {/* Concrete, because "create an account" on its own reads
+                        as a toll gate. As a guest each conversation has its own
+                        allowance; an account replaces that with a weekly one
+                        across all of them, so a long CV never runs out mid-way. */}
+                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                      An account also lifts the per-conversation limit — you get a
+                      weekly allowance across every CV instead, so a long one never
+                      stops halfway.
+                    </p>
                   </div>
                   <button
                     type="button"

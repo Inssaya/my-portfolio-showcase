@@ -24,7 +24,13 @@ from app.auth import AuthUser, get_current_user, require_admin
 from app.config import get_settings
 from app.llm import Completion
 from app.main import app
-from app.ratelimit import ANON_CHAT_PER_IP, Rule, limit_by_account, limiter
+from app.ratelimit import (
+    ANON_CHAT_PER_IP,
+    ANON_SESSION_PER_IP,
+    Rule,
+    limit_by_account,
+    limiter,
+)
 from app.session import store
 
 ANON = AuthUser(id="anon-a", email=None, access_token="t-a", is_anonymous=True)
@@ -150,17 +156,21 @@ def test_a_guest_and_a_member_do_not_draw_on_the_same_bucket() -> None:
     check(request, MEMBER)  # no raise
 
 
-def test_the_chat_route_really_is_wired_to_the_anonymous_rule(
+def test_opening_conversation_after_conversation_is_what_gets_capped(
     monkeypatch, client: TestClient
 ) -> None:
-    """End to end against the real ANON_CHAT_PER_IP, because the keying being
-    correct is worth nothing if the route is not actually behind it. The
-    message distinguishes it from the global flood backstop, which would
-    otherwise be an easy false pass."""
+    """End to end, and the rule that makes the guest token ceiling mean
+    anything at all.
+
+    A guest's allowance is per conversation, and opening one costs nothing —
+    so without this, N conversations is N allowances and the ceiling bounds
+    nothing. Every request here is a brand-new identity opening a brand-new
+    conversation, which is precisely the shape of the abuse.
+    """
     _replies(monkeypatch)
     refusal = None
 
-    for index in range(ANON_CHAT_PER_IP.times + 1):
+    for index in range(ANON_SESSION_PER_IP.times + 1):
         _as(AuthUser(id=f"anon-{index}", email=None, access_token="t",
                      is_anonymous=True))
         response = client.post("/chat", json={"message": "hi"})
@@ -169,37 +179,79 @@ def test_the_chat_route_really_is_wired_to_the_anonymous_rule(
             break
 
     assert refusal is not None, "a fresh guest account per request bypassed the limit"
+    # Named, not just a 429: the global flood backstop would otherwise be an
+    # easy false pass, and it is far too loose to be an economic control.
+    assert "new conversations" in refusal
+
+
+def test_continuing_one_conversation_is_not_charged_as_a_new_one(
+    monkeypatch, client: TestClient
+) -> None:
+    """The other half. Rationing new conversations must not ration *talking* —
+    a guest who keeps answering questions in the one conversation they opened
+    is exactly the behaviour this product wants."""
+    _replies(monkeypatch)
+    _as(ANON)
+
+    first = client.post("/chat", json={"message": "hi"})
+    assert first.status_code == 200
+    session_id = first.json()["session_id"]
+
+    for _ in range(ANON_SESSION_PER_IP.times * 3):
+        again = client.post("/chat", json={"message": "and more", "session_id": session_id})
+        assert again.status_code == 200, again.json()
+
+
+def test_a_long_guest_conversation_still_meets_the_chat_rule(
+    monkeypatch, client: TestClient
+) -> None:
+    """Not unlimited, though: continuing costs tokens, so the per-IP chat rule
+    is what bounds one very long conversation."""
+    _replies(monkeypatch)
+    _as(ANON)
+
+    session_id = client.post("/chat", json={"message": "hi"}).json()["session_id"]
+    refusal = None
+
+    for _ in range(ANON_CHAT_PER_IP.times + 2):
+        response = client.post("/chat", json={"message": "more", "session_id": session_id})
+        if response.status_code == 429:
+            refusal = response.json()["detail"]
+            break
+
+    assert refusal is not None, "a guest conversation ran without any chat limit"
     assert "chat messages" in refusal
 
 
 # ------------------------------------------------------------ token budget
 
-def test_a_guest_session_has_a_smaller_token_budget() -> None:
+def test_a_guest_is_rationed_per_conversation() -> None:
     settings = get_settings()
-    assert settings.max_anonymous_session_tokens < settings.max_session_tokens
 
     session = store.create(user_id=ANON.id)
     session.is_anonymous = True
-    session.usage.add(settings.max_anonymous_session_tokens, 0)
+    session.usage.add(settings.guest_session_tokens, 0)
 
     with pytest.raises(SessionBudgetExceeded) as caught:
         run_turn(session, "carry on")
 
-    # The message has to say the draft survives and that signing up lifts the
-    # ceiling — a guest told only "limit reached" assumes their work is gone.
+    # The message has to say the draft survives and what the ways forward
+    # are — a guest told only "limit reached" assumes their work is gone.
     message = str(caught.value).lower()
     assert "guest" in message
     assert "account" in message
 
 
 def test_the_same_usage_is_fine_for_a_signed_up_visitor(monkeypatch) -> None:
-    """Proves the lower ceiling is about the account type, not the number."""
+    """Signing up changes the *shape* of the limit, not just the number: an
+    account has no per-conversation ceiling at all, only a weekly one across
+    every conversation (test_weekly_quota.py)."""
     settings = get_settings()
     _replies(monkeypatch, "ok")
 
     session = store.create(user_id=MEMBER.id)
     session.is_anonymous = False
-    session.usage.add(settings.max_anonymous_session_tokens, 0)
+    session.usage.add(settings.guest_session_tokens, 0)
 
     assert run_turn(session, "carry on")["reply"] == "ok"
 
@@ -214,10 +266,55 @@ def test_signing_up_lifts_the_ceiling_on_the_same_session(monkeypatch) -> None:
 
     session = store.create(user_id="same-id")
     session.is_anonymous = True
-    session.usage.add(settings.max_anonymous_session_tokens, 0)
+    session.usage.add(settings.guest_session_tokens, 0)
     with pytest.raises(SessionBudgetExceeded):
         run_turn(session, "hi")
 
     session.is_anonymous = False  # they signed up; the id did not change
 
     assert run_turn(session, "hi")["reply"] == "ok"
+
+
+# ------------------------------------------------- guests cannot reach across
+
+def test_a_guest_presenting_someone_elses_session_id_gets_a_new_one(
+    monkeypatch, client: TestClient
+) -> None:
+    """Isolation over the wire, not just in the store.
+
+    /chat and /upload no longer call `store.get_or_create` — they resolve the
+    session themselves so that opening a *new* conversation can be rationed
+    separately (see `_session_for` in app/main.py). That rewrite is exactly
+    the kind that can quietly drop an ownership check, and a guest id costs
+    nothing to obtain, so anyone could sit and guess.
+
+    The behaviour that must survive: someone else's session reads as one that
+    does not exist. Not an error — an error that distinguishes "not yours"
+    from "no such thing" is itself a way to enumerate ids.
+    """
+    _replies(monkeypatch)
+
+    victim = store.create(user_id="someone-else")
+    victim.set_field("full_name", "Ahmed Sefriui")
+
+    _as(ANON)
+    response = client.post(
+        "/chat", json={"message": "hi", "session_id": victim.id}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["session_id"] != victim.id
+
+
+def test_the_new_conversation_guard_does_not_apply_to_members(
+    monkeypatch, client: TestClient
+) -> None:
+    """Rationing how fast conversations can be opened only makes sense for
+    guests: an account's limit is weekly and account-wide, so opening a new
+    conversation gains them nothing to farm."""
+    _replies(monkeypatch)
+    _as(MEMBER)
+
+    for _ in range(ANON_SESSION_PER_IP.times * 2):
+        response = client.post("/chat", json={"message": "new one"})
+        assert response.status_code == 200, response.json()

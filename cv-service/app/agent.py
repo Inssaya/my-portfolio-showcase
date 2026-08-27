@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 
+from . import quota
 from .config import get_settings
 from .llm import Completion, LLMError, complete, read_image
 from .session import Session
@@ -21,14 +22,13 @@ from .tools import TOOL_SCHEMAS, ToolError, run_tool
 logger = logging.getLogger(__name__)
 
 
-class SessionBudgetExceeded(Exception):
-    """This session has spent its token ceiling.
-
-    Deliberately not an LLMError: nothing is wrong upstream, and the visitor
-    keeps everything they have. The draft is still there and the Build button
-    still renders it — which is why that button not depending on the model
-    matters more than it first appears.
-    """
+# Re-exported under its original name: what counts as "over budget" now
+# depends on whether the visitor has an account (app/quota.py), but from this
+# module's point of view it is still the one thing it was — nothing is wrong
+# upstream, and the visitor keeps everything they have. The draft is still
+# there and the Build button still renders it, which is why that button not
+# depending on the model matters more than it first appears.
+SessionBudgetExceeded = quota.BudgetExceeded
 
 SYSTEM_PROMPT = """\
 You are a resume writer. You interview a visitor and build them a professional \
@@ -224,36 +224,26 @@ def _record_assistant_turn(session: Session, result: Completion) -> None:
     )
 
 
-def run_turn(session: Session, user_message: str) -> dict:
+def run_turn(
+    session: Session, user_message: str, access_token: str | None = None
+) -> dict:
     """Run one visitor turn to completion. Returns what the API should send back.
 
     Raises LLMError if the provider is unusable; every other failure is turned
     into something the model or the visitor can act on.
+
+    `access_token` is what lets the account-wide weekly ceiling be checked —
+    the figure lives in Postgres and is read as the visitor themselves. Without
+    one only the guest per-session ceiling applies, which is correct for the
+    direct callers that have no HTTP request behind them.
     """
     settings = get_settings()
 
-    # Checked before the turn, not during: stopping mid-turn would bill for the
-    # rounds already spent and still leave the visitor without an answer.
-    budget = (
-        settings.max_anonymous_session_tokens
-        if session.is_anonymous
-        else settings.max_session_tokens
-    )
-    if budget and session.usage.total >= budget:
-        if session.is_anonymous:
-            # Not a dead end, and worth saying so precisely: the draft is
-            # intact, the Build button renders it without the model, and
-            # signing up raises the ceiling on this same account rather than
-            # starting them over.
-            raise SessionBudgetExceeded(
-                "This conversation has reached the limit for a guest session. "
-                "Nothing is lost — use the Build button to get your CV now, and "
-                "creating an account keeps this same CV and lets you carry on."
-            )
-        raise SessionBudgetExceeded(
-            "This conversation has reached its limit. Your draft is saved — use "
-            "the Build button to get your CV, or start over for a fresh session."
-        )
+    # Before the turn, not during: stopping mid-turn would bill for the rounds
+    # already spent and still leave the visitor without an answer. Which
+    # ceiling applies — a guest's per-conversation one or an account's weekly
+    # one — is app/quota.py's decision, not this module's.
+    quota.check(session, access_token)
 
     session.history.append({"role": "user", "content": user_message})
     session.transcript.append({"role": "user", "content": user_message})

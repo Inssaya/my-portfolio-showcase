@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import (
+    Body, Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile, status,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from . import db
+from . import db, quota
 from .agent import (
     SessionBudgetExceeded,
     read_uploaded_image,
@@ -44,6 +46,7 @@ from .ratelimit import (
     GENERATE_PER_USER,
     UPLOAD_PER_USER,
     GlobalIpRateLimitMiddleware,
+    guard_new_guest_session,
     limit_by_account,
 )
 from .session import Session, store
@@ -117,6 +120,35 @@ class ChatResponse(BaseModel):
     usage: dict
 
 
+def _session_for(request: Request, session_id: str | None, user: AuthUser) -> Session:
+    """Continue this visitor's conversation, or open a new one.
+
+    Deliberately not `store.get_or_create`: a guest's token allowance is
+    per-conversation, so *opening* one is the moment worth rationing, while
+    continuing one they already have must never be charged for. Splitting the
+    two here is what lets `guard_new_guest_session` sit on exactly the first
+    case — see the rule's comment in app/ratelimit.py for why an unrationed
+    new conversation would make the per-session ceiling meaningless.
+
+    The ownership check inside `store.get` is what makes passing somebody
+    else's session id useless: a session that is not yours reads as one that
+    does not exist, and you get a new empty one rather than their CV.
+    """
+    if session_id:
+        existing = store.get(session_id, user.id, user.access_token)
+        if existing is not None:
+            # Re-stamped from the verified token every request, so a session
+            # started as a guest switches to the account-wide weekly limit the
+            # moment its owner signs up — same session, same id, same CV.
+            existing.is_anonymous = user.is_anonymous
+            return existing
+
+    guard_new_guest_session(request, user)
+    session = store.create(user.id, user.access_token)
+    session.is_anonymous = user.is_anonymous
+    return session
+
+
 def _turn_or_http_error(session, message: str, access_token: str | None = None) -> dict:
     """Run a turn, translating model-layer failures into honest HTTP.
 
@@ -131,9 +163,10 @@ def _turn_or_http_error(session, message: str, access_token: str | None = None) 
     SessionBudgetExceeded and LLMBusy below, which say the same thing about
     what the *response* carries.
     """
+    spent_before = (session.usage.prompt, session.usage.completion)
     try:
         try:
-            return run_turn(session, message)
+            return run_turn(session, message, access_token)
         except SessionBudgetExceeded as exc:
             # 402-adjacent, but nothing is owed while the service is free, so
             # 429 with an explicit reason. The draft survives and /generate
@@ -182,6 +215,16 @@ def _turn_or_http_error(session, message: str, access_token: str | None = None) 
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, "upstream_error") from exc
     finally:
         store.save(session, access_token)
+        # The ledger the weekly account limit is read from. In the `finally`
+        # for the same reason the save is: a turn that ends in an error can
+        # still have run paid rounds first, and tokens that were spent must be
+        # counted whether or not the visitor got an answer for them.
+        quota.record(
+            session,
+            session.usage.prompt - spent_before[0],
+            session.usage.completion - spent_before[1],
+            access_token,
+        )
 
 
 @app.get("/health")
@@ -255,11 +298,12 @@ def _as_pasted_document(text: str) -> dict | None:
     response_model=ChatResponse,
     dependencies=[limit_by_account(CHAT_PER_USER, ANON_CHAT_PER_IP, "chat", "chat messages")],
 )
-def chat(payload: ChatRequest = Body(...), user: AuthUser = Depends(get_current_user)) -> ChatResponse:
-    session = store.get_or_create(payload.session_id, user.id, user.access_token)
-    # Re-stamped from the verified token every request, so a session started
-    # anonymously gets the full budget the moment its owner signs up.
-    session.is_anonymous = user.is_anonymous
+def chat(
+    request: Request,
+    payload: ChatRequest = Body(...),
+    user: AuthUser = Depends(get_current_user),
+) -> ChatResponse:
+    session = _session_for(request, payload.session_id, user)
     message = payload.message.strip()
 
     pasted = _as_pasted_document(message)
@@ -292,6 +336,7 @@ def chat(payload: ChatRequest = Body(...), user: AuthUser = Depends(get_current_
     dependencies=[limit_by_account(UPLOAD_PER_USER, ANON_UPLOAD_PER_IP, "upload", "uploads")],
 )
 async def upload(
+    request: Request,
     file: UploadFile = File(...),
     session_id: str | None = Form(default=None),
     user: AuthUser = Depends(get_current_user),
@@ -316,8 +361,7 @@ async def upload(
     # No model call: attaching a photo needs no reasoning, so spending a turn on
     # it would be pure cost. The reply is written here.
     if looks_like_an_image(filename):
-        session = store.get_or_create(session_id, user.id, user.access_token)
-        session.is_anonymous = user.is_anonymous
+        session = _session_for(request, session_id, user)
 
         # Keep the original for admin review, exactly as the document branch
         # does — a photographed CV is a CV upload and belongs in that record.
@@ -400,8 +444,7 @@ async def upload(
         # message says how, so it is a 400 with real text rather than a 500.
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
-    session = store.get_or_create(session_id, user.id, user.access_token)
-    session.is_anonymous = user.is_anonymous
+    session = _session_for(request, session_id, user)
 
     # Keep the original file so the admin can later download exactly what the
     # visitor uploaded, to review chatbot quality. Best-effort — the session
