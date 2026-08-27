@@ -158,7 +158,7 @@ def read_image(prompt: str, image_png: bytes, sticky_key: str | None = None) -> 
     input is billed by image tiles and costs multiples of a text turn, so it is
     the fallback for a small minority of uploads, never the default path.
 
-    Same model as everything else — gpt-4o-mini reads a CV page perfectly well,
+    Same model as everything else — no second model to configure or pay for,
     and a second model would mean a second thing to configure and pay for.
     """
     import base64

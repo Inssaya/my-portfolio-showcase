@@ -22,7 +22,7 @@ account (verified live: an unauthenticated request gets a real 401). A
 session's draft and transcript now write through to Postgres and read back on
 a miss (`app/db.py`, `NEXT.md` Step 2b/2c); the schema it needs has been run
 against the live project (`supabase/setup.sql` — one file, idempotent, and now
-the only SQL in the repo). 357 tests pass, hermetic (auth is faked at the network boundary, and a new
+the only SQL in the repo). 368 tests pass, hermetic (auth is faked at the network boundary, and a new
 autouse fixture keeps Postgres persistence off by default too — see
 `tests/conftest.py`, `tests/test_auth.py`, `tests/test_persistence.py`).
 
@@ -34,7 +34,7 @@ cv-service (FastAPI + ReportLab → Render, Docker)
         │                    │
         ▼                    ▼
    OpenAI                Supabase (GET /auth/v1/user — verifies the
-(gpt-4o-mini,              token; this service never touches the
+(gpt-4o,                   token; this service never touches the
  pooled keys)               database directly, see §8)
 ```
 
@@ -60,7 +60,16 @@ Instead the draft is server state (`app/session.py`). The model patches one
 section (`update_resume`), reads a summary when it needs to check itself
 (`review_draft`), and renders from state (`generate_resume`). A one-line
 correction late in a session costs a few dozen output tokens instead of a full
-restatement. **That is why `gpt-4o-mini` is enough.**
+restatement. **That is what keeps every request small, whatever model runs.**
+
+The default was `gpt-4o-mini` on exactly that argument, and for the mechanical
+work it holds. Judgement is where it broke: handed an unedited template it
+saved "123 Anywhere St., Any City", "hello@reallygreatsite.com" and four Lorem
+Ipsum job descriptions as the visitor's own details, where a frontier model
+reads the same page and asks for the real ones. `cv/verify.py` exists to catch
+that deterministically and does catch the placeholders we can enumerate — it
+cannot catch the ones nobody has seen yet. The default is now `gpt-4o`;
+`LLM_MODEL` still switches it back where cost outweighs judgement.
 
 Almost everything else follows from this:
 
@@ -230,7 +239,7 @@ cd cv-service && docker compose up --build          # :8000
 # frontend (repo root)
 npm run dev                                          # :8080 → /cv-builder
 
-cd cv-service && .venv/Scripts/python -m pytest -q  # 357 tests, no network needed
+cd cv-service && .venv/Scripts/python -m pytest -q  # 368 tests, no network needed
 ```
 
 Python **3.13** — 3.14 has no wheels for pydantic-core/pillow and tries to

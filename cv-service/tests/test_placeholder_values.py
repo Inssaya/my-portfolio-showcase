@@ -302,3 +302,55 @@ def test_the_build_button_never_sees_a_template_placeholder(session: Session) ->
     run_tool(session, "update_resume", {"field": "full_name", "content": "Kenza Mrabet"})
     run_tool(session, "update_resume", {"field": "contact", "content": "kenza@example.com"})
     assert "example.com" not in session.draft.get("contact", "")
+
+
+# ------------------------------------------------------- duplicated entries
+# An unedited template repeats its example row so the visitor can see where
+# the next one goes. A real upload carried "BA Sales and Commerce | Wardiere
+# University | 2011 - 2015" twice; a frontier model saved both and printed the
+# same degree twice on the finished CV.
+
+def test_an_entry_repeated_verbatim_is_collapsed(session: Session) -> None:
+    session.transcript.append(
+        {"role": "system", "kind": "upload", "content": "2011 - 2015 BA Sales and Commerce"}
+    )
+    note = run_tool(
+        session, "update_resume",
+        {"field": "education", "content":
+            "BA Sales and Commerce | Wardiere University | 2011 - 2015\n"
+            "BA Sales and Commerce | Wardiere University | 2011 - 2015"},
+    )
+
+    assert session.draft["education"].count("BA Sales and Commerce") == 1
+    assert "duplicate entr" in note
+    # The real qualification and its years survive; only the invented school goes.
+    assert "2011" in session.draft["education"]
+    assert "Wardiere" not in session.draft["education"]
+
+
+def test_two_real_roles_at_one_employer_both_survive(session: Session) -> None:
+    """The false positive that would matter: someone promoted inside the same
+    company has two entries naming it, and neither may be deleted."""
+    run_tool(
+        session, "update_resume",
+        {"field": "experience", "content":
+            "Junior/Investment Analyst | Ingoude Company | 2015 - 2020\n"
+            "Sales Agent | Ingoude Company | 2010 - 2012"},
+    )
+
+    assert session.draft["experience"].count("Ingoude Company") == 2
+
+
+def test_a_repeated_bullet_is_left_to_the_visitor(session: Session) -> None:
+    """Prose is not deduplicated: two jobs can share a responsibility, and
+    repeated wording is the visitor's to fix, not ours to silently delete."""
+    run_tool(
+        session, "update_resume",
+        {"field": "experience", "content":
+            "Sales Agent | Acme | 2020\n"
+            "- Monitored brand consistency across channels.\n"
+            "Analyst | Beta | 2018\n"
+            "- Monitored brand consistency across channels."},
+    )
+
+    assert session.draft["experience"].count("Monitored brand consistency") == 2

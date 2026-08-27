@@ -24,13 +24,16 @@ Phase 1 is complete and tested. Phase 2 auth is done — every route requires a
 signed-in Supabase user (`app/auth.py`, verified live: unauthenticated
 requests get a real 401). Session **persistence** is done too: `app/db.py`
 writes sessions and transcripts through to Postgres and reads them back on a
-miss, so a session survives a restart (`app/session.py`). 357 tests pass.
+miss, so a session survives a restart (`app/session.py`). 368 tests pass.
 
 Quick orientation:
 
 - The CV draft lives in **server state**, not in the conversation. That single
-  decision is why a small model suffices, why history can be compacted, and why
-  the "Build my CV" button can bypass the model entirely.
+  decision is what keeps every request small, why history can be compacted, and
+  why the "Build my CV" button can bypass the model entirely. It once justified
+  a *small* model too; `LLM_MODEL` now defaults to `gpt-4o` because judging
+  "these are template placeholders, not your details" is where a small one
+  broke. See `HANDOFF.md` §2.
 - **An upload is routed by what it contains, never by its extension.** An image
   may be a portrait *or* a photographed/screenshotted CV, and a PDF may be
   readable, unreadable, or readable-but-scrambled. `app/main.py`'s `/upload`

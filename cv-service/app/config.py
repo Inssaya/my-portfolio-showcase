@@ -28,9 +28,24 @@ class Settings(BaseSettings):
     openai_api_keys: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
 
-    # A small model is the point of the tool-heavy design: the draft lives
-    # server-side, so the model never has to hold or restate the whole CV.
-    llm_model: str = "gpt-4o-mini"
+    # The tool-heavy design means the model never holds or restates the whole
+    # CV — the draft lives server-side — so a small model *can* do the job, and
+    # `gpt-4o-mini` was the default on that basis.
+    #
+    # What a small model cannot do is judge. Given an unedited template it
+    # dutifully saved "123 Anywhere St., Any City", "hello@reallygreatsite.com"
+    # and four Lorem Ipsum job descriptions as though they were the visitor's,
+    # where a frontier model reads the same page and says "those are
+    # placeholders, give me the real ones". The deterministic guards in
+    # `cv/verify.py` exist because of that gap and catch the placeholders we
+    # can enumerate; they cannot catch the ones we have never seen.
+    #
+    # So the default is the larger model. The architecture still pays for
+    # itself — it is what keeps a full CV out of every request either way —
+    # it is simply no longer carrying a weak model on its own. Set LLM_MODEL
+    # to override; `gpt-4o-mini` remains a working choice if cost matters more
+    # than judgement on a given deployment.
+    llm_model: str = "gpt-4o"
     llm_temperature: float = 0.3
 
     # Output cap per response. This is a ceiling, not a charge — you pay for

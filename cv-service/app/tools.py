@@ -16,7 +16,12 @@ import tempfile
 from contextlib import contextmanager, suppress
 
 from .cv.builder import RESUME_FIELDS, STYLES, build_resume, safe_filename
-from .cv.verify import input_years, strip_invented_years, strip_placeholder_values
+from .cv.verify import (
+    drop_duplicate_entries,
+    input_years,
+    strip_invented_years,
+    strip_placeholder_values,
+)
 from .session import Session
 
 # Compressed on purpose. This text is re-sent on every request of every round,
@@ -162,6 +167,11 @@ def run_tool(session: Session, name: str, arguments: dict | None = None) -> str:
         # here, at write time, because it is the only path into session.draft —
         # the Build button renders from draft state without calling the model
         # at all, so verifying "after a turn" would leave it unprotected.
+        # Duplicates go first, while the lines are still byte-identical: the
+        # scrubbers below rewrite them (a removed school leaves a different
+        # remnant each time), after which two copies of the same entry no
+        # longer match and both survive.
+        content, duplicate_entries = drop_duplicate_entries(content)
         content, removed_years = strip_invented_years(content, input_years(session.transcript))
         # Then strip template/example junk — an uploaded half-filled template's
         # "kenza@example.com" / "University of Example" placeholders, or the same
@@ -180,6 +190,13 @@ def run_tool(session: Session, name: str, arguments: dict | None = None) -> str:
                 f" Removed unconfirmed year(s) {', '.join(sorted(removed_years))} — "
                 "the visitor never gave a year for this. Ask them if it matters; "
                 "do not guess another one."
+            )
+        if duplicate_entries:
+            note += (
+                f" Dropped {duplicate_entries} duplicate entr"
+                f"{'y' if duplicate_entries == 1 else 'ies'} — the same line appeared "
+                "more than once, which is what an unedited template looks like. "
+                "Check with the visitor that nothing real was repeated."
             )
         if removed_placeholders:
             note += (

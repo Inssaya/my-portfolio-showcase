@@ -196,6 +196,34 @@ def _is_lorem_ipsum_line(line: str) -> bool:
     return hits / len(words) >= 0.35
 
 
+def drop_duplicate_entries(content: str) -> tuple[str, int]:
+    """Collapse identical entry lines, keeping the first.
+
+    An unedited template repeats its example row so the visitor can see where
+    the next one goes — a real upload listed "BA Sales and Commerce | Wardiere
+    University | 2011 - 2015" twice, and both a frontier model and this one
+    saved both, printing the same degree twice on the finished CV.
+
+    Restricted to lines carrying the "|" column separator, i.e. entry headers.
+    Prose is deliberately left alone: two jobs can legitimately share a
+    responsibility, and a repeated bullet is the visitor's wording to fix, not
+    a template artifact to delete. An identical *entry* never is.
+    """
+    seen: set[str] = set()
+    kept: list[str] = []
+    dropped = 0
+    for line in (content or "").split("\n"):
+        stripped = line.strip()
+        if "|" in stripped and stripped:
+            key = " ".join(stripped.lower().split())
+            if key in seen:
+                dropped += 1
+                continue
+            seen.add(key)
+        kept.append(line)
+    return "\n".join(kept), dropped
+
+
 def strip_placeholder_values(content: str) -> tuple[str, list[str]]:
     """Remove template/example values a real CV never contains.
 
