@@ -356,6 +356,29 @@ export async function generateResume(sessionId: string): Promise<ChatResponse> {
   return parse(response);
 }
 
+/**
+ * Switch the template a session will render with.
+ *
+ * Kept tiny on purpose: this only records the choice. The visitor still hits
+ * "Build my CV" (or "Rebuild") to spend tokens on a re-render — a picker
+ * change should not silently replace a file they may be reading. Returns the
+ * saved style so the caller can confirm what the server accepted.
+ */
+export async function setSessionStyle(
+  sessionId: string,
+  style: string,
+): Promise<string | null> {
+  if (!resumeApiConfigured) return null;
+  const response = await fetch(`${BASE_URL}/session/${sessionId}/style`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", ...(await authHeader()) },
+    body: JSON.stringify({ style }),
+  });
+  if (!response.ok) return null;
+  const body = (await response.json()) as { style: string };
+  return body.style ?? null;
+}
+
 export interface SessionSummary {
   id: string;
   name: string | null;

@@ -1,7 +1,7 @@
 import { ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import type { User } from "@supabase/supabase-js";
-import { ArrowLeft, FileText, History, LogOut, Mail, Menu, Plus, User as UserIcon } from "lucide-react";
+import { ArrowLeft, FileText, History, LayoutTemplate, LogOut, Mail, Menu, Plus, User as UserIcon } from "lucide-react";
 import {
   Sheet,
   SheetClose,
@@ -12,6 +12,10 @@ import {
 } from "@/components/ui/sheet";
 import { supabase } from "@/lib/supabase";
 import CvSaveWorkPrompt from "@/components/cv/CvSaveWorkPrompt";
+import CvTemplatePicker, {
+  CvTemplate,
+  readPreferredTemplate,
+} from "@/components/cv/CvTemplatePicker";
 import { guestName, isGuest } from "@/lib/cv/guest";
 
 /**
@@ -37,6 +41,12 @@ interface CvAppShellProps {
    * rather than once per rebuild.
    */
   cvReady?: boolean;
+  /**
+   * The current session's id, if a page is inside a live conversation. The
+   * template picker needs this to save the choice server-side; without it,
+   * picking still works and is remembered locally for the next session.
+   */
+  sessionId?: string | null;
 }
 
 interface GuestAccount {
@@ -63,11 +73,13 @@ const GuestAccountContext = createContext<GuestAccount>({
  */
 export const useGuestAccount = () => useContext(GuestAccountContext);
 
-const CvAppShell = ({ children, cvReady = false }: CvAppShellProps) => {
+const CvAppShell = ({ children, cvReady = false, sessionId = null }: CvAppShellProps) => {
   const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [savePromptOpen, setSavePromptOpen] = useState(false);
   const [asked, setAsked] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [template, setTemplate] = useState<CvTemplate>(() => readPreferredTemplate());
 
   useEffect(() => {
     if (!supabase) return;
@@ -97,6 +109,13 @@ const CvAppShell = ({ children, cvReady = false }: CvAppShellProps) => {
     >
     <div className="min-h-[100svh] bg-background">
       <CvSaveWorkPrompt open={savePromptOpen} onClose={() => setSavePromptOpen(false)} />
+      <CvTemplatePicker
+        open={templateOpen}
+        onClose={() => setTemplateOpen(false)}
+        sessionId={sessionId}
+        current={template}
+        onPicked={setTemplate}
+      />
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
           <Sheet>
@@ -165,13 +184,18 @@ const CvAppShell = ({ children, cvReady = false }: CvAppShellProps) => {
               <Plus size={14} />
               New chat
             </Link>
-            <Link
-              to="/cv-builder/mydata"
+            {/* History lives in the burger menu already, so it doesn't need a
+                second spot here — the topbar reserves its space for actions
+                that belong to the CV in front of you. */}
+            <button
+              type="button"
+              onClick={() => setTemplateOpen(true)}
               className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2.5 py-1.5 text-xs font-medium text-foreground/80 transition-colors hover:border-accent/50 hover:text-accent"
+              title={`Template: ${template === "modern" ? "Modern" : "Classic"}`}
             >
-              <History size={14} />
-              History
-            </Link>
+              <LayoutTemplate size={14} />
+              Template
+            </button>
             {guest ? (
               // A guest needs a permanent way to convert, not just the one
               // prompt shown after their first CV — dismissing that must not

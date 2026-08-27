@@ -48,6 +48,7 @@ const ResumeBuilder = () => {
     canBuild,
     hasPhoto,
     photoBlobUrl,
+    sessionId,
     send,
     upload,
     build,
@@ -128,7 +129,7 @@ const ResumeBuilder = () => {
   // there rather than here because this page renders the provider and so sits
   // outside its own context.
   return (
-    <CvAppShell cvReady={pdfVersion > 0}>
+    <CvAppShell cvReady={pdfVersion > 0} sessionId={sessionId}>
       {/* Opened by the download button when the visitor is still a guest.
           Deliberately the same conversion form used elsewhere — a guest who
           creates the account here keeps this exact CV, because converting

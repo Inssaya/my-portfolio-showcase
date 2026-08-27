@@ -15,7 +15,7 @@ import os
 import tempfile
 from contextlib import contextmanager, suppress
 
-from .cv.builder import RESUME_FIELDS, STYLES, build_resume, safe_filename
+from .cv.builder import PICKABLE_STYLES, RESUME_FIELDS, STYLES, build_resume, safe_filename
 from .cv.verify import (
     drop_duplicate_entries,
     input_years,
@@ -95,13 +95,12 @@ TOOL_SCHEMAS: list[dict] = [
                 "properties": {
                     "style": {
                         "type": "string",
-                        "enum": list(STYLES),
+                        "enum": list(PICKABLE_STYLES),
                         "description": (
                             "'modern' is the default house style: teal sidebar, cream page. "
-                            "'classic' is serif with a photo header. 'bold' is single-column "
-                            "with a circular photo masthead and coloured section rules — offer "
-                            "it if the visitor wants a photo but not a sidebar layout. Only "
-                            "pass this if the visitor expressed a preference."
+                            "'classic' is serif with a photo header. Only pass this if the "
+                            "visitor expressed a preference — the picker in the UI is where "
+                            "they usually make this choice."
                         ),
                     },
                     "language": {

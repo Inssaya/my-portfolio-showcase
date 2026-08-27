@@ -29,7 +29,7 @@ from .agent import (
 )
 from .auth import AuthUser, get_current_user, require_admin
 from .config import get_settings
-from .cv.builder import RESUME_FIELDS, build_resume, safe_filename
+from .cv.builder import PICKABLE_STYLES, RESUME_FIELDS, build_resume, safe_filename
 from .cv.extract import ExtractionError, extract_cv, extract_everything
 from .cv.photo import (
     PhotoError,
@@ -732,6 +732,39 @@ def draft(session_id: str, user: AuthUser = Depends(get_current_user)) -> dict:
         "has_photo": session.photo is not None,
         "usage": session.usage.as_dict(),
     }
+
+
+class StyleUpdate(BaseModel):
+    style: str = Field(..., description="One of PICKABLE_STYLES.")
+
+
+@app.patch("/session/{session_id}/style")
+def set_session_style(
+    session_id: str,
+    body: StyleUpdate,
+    user: AuthUser = Depends(get_current_user),
+) -> dict:
+    """Switch the template a session renders with.
+
+    Kept small on purpose: this only records the choice. Re-rendering is a
+    separate action the visitor already has a button for — the Build button —
+    so a picker change does not silently spend tokens or replace a file the
+    visitor is currently reading. `pdf_version` is unchanged; the existing PDF
+    stays downloadable in the old style until the next build.
+    """
+    if body.style not in PICKABLE_STYLES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Unknown template. Pick one of: {', '.join(PICKABLE_STYLES)}.",
+        )
+
+    session = store.get(session_id, user.id, user.access_token)
+    if session is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "That session has expired.")
+
+    session.style = body.style
+    store.save(session, user.access_token)
+    return {"session_id": session.id, "style": session.style}
 
 
 @app.get("/photo/{session_id}")

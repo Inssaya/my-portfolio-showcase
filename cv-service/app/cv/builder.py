@@ -48,6 +48,11 @@ RESUME_FIELDS = (
 
 STYLES = ("modern", "classic", "bold")
 
+# What the visitor may pick from in the UI. The renderer still knows how to
+# draw all three — `bold` remains reachable for stored sessions and tests — but
+# the picker keeps the choice narrow so the decision is genuine.
+PICKABLE_STYLES = ("modern", "classic")
+
 # ------------------------------------------------------------- typography ---
 # The reference CV distinguishes three separators that a model — and most
 # people — type as a plain hyphen:
