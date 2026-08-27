@@ -1,0 +1,47 @@
+# Typecheck and tests, on every push and pull request.
+#
+# There was none of this, and the gap had already cost a broken production
+# build: `tsc --noEmit` against the root tsconfig checks no files at all (see
+# the comment at the top of tsconfig.json), so the only thing standing between
+# a syntax error and Vercel was somebody remembering to run `vite build`
+# locally.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      # Explicitly, and not just via `npm run build`: when this fails the log
+      # should say "typecheck", not "build".
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  cv-service:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cv-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: cv-service/requirements.txt
+      - run: pip install -r requirements.txt
+      # The suite is hermetic by design — auth is faked at the network
+      # boundary and Postgres persistence is off by default (tests/conftest.py)
+      # — so it needs no secrets and none are given to it.
+      - run: python -m pytest -q

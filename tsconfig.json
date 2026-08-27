@@ -1,3 +1,14 @@
+// SOLUTION-STYLE CONFIG — it deliberately compiles nothing.
+//
+// `"files": []` plus `references` means this file checks ZERO files, so
+// `tsc --noEmit` against it exits 0 no matter what is broken. That is not a
+// mistake in the config, it is how project references work — but it silently
+// turned the obvious "did it typecheck?" command into a no-op, and a JSX
+// syntax error reached a production build because of it.
+//
+// Use `npm run typecheck`, which points tsc at the two real projects. It also
+// runs as part of `npm run build`, so a type error fails the deploy rather
+// than the deploy failing later for a reason nobody connects to this.
 {
   "compilerOptions": {
     "allowJs": true,
