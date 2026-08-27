@@ -101,6 +101,12 @@ class Session:
     # Not persisted — it is a property of the caller, not of the draft.
     is_anonymous: bool = False
 
+    # Digests of the files already uploaded in this session, so the same one
+    # arriving twice is recognised. Not persisted: it is a guard against a
+    # double tap or an impatient retry within one conversation, and a restored
+    # session re-reading a file once is harmless.
+    seen_uploads: set[str] = field(default_factory=set)
+
     # The most recent render, held so the browser can download it by session
     # without us needing a blob store yet.
     pdf: bytes | None = None

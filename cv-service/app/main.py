@@ -10,6 +10,7 @@ session now survives this process restarting too.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 
 from fastapi import (
@@ -354,6 +355,34 @@ async def upload(
 
     filename = file.filename or "your CV"
 
+    # The same file arriving twice in one conversation.
+    #
+    # Not hypothetical: a visitor whose first upload was misread sent the
+    # identical screenshot three times in a row, and each one paid for a fresh
+    # vision call and a fresh copy of the extracted text in the context. Three
+    # identical documents then rode along on every round of every subsequent
+    # turn, and an 80k guest allowance was gone in four messages.
+    #
+    # Answering directly costs nothing and is also the more honest reply —
+    # re-reading a file that has already been read cannot produce a different
+    # answer, so offering to work with what is there is the useful move.
+    digest = hashlib.sha256(data).hexdigest()
+    existing = store.get(session_id, user.id, user.access_token) if session_id else None
+    if existing is not None and digest in existing.seen_uploads:
+        existing.is_anonymous = user.is_anonymous
+        return ChatResponse(
+            session_id=existing.id,
+            reply=(
+                "That's the same file you already sent, so I've kept what I read "
+                "from it the first time. Tell me what was wrong with it and I'll "
+                "fix that directly — or send a different file if you have one."
+            ),
+            actions=[],
+            pdf_ready=False,
+            pdf_version=existing.pdf_version,
+            usage=existing.usage.as_dict(),
+        )
+
     # One drop target, routed by content. A visitor with a photo and a visitor
     # with a CV both reach for the same button, and telling them "unsupported
     # file type" for their own headshot would be absurd.
@@ -362,6 +391,7 @@ async def upload(
     # it would be pure cost. The reply is written here.
     if looks_like_an_image(filename):
         session = _session_for(request, session_id, user)
+        session.seen_uploads.add(digest)
 
         # Keep the original for admin review, exactly as the document branch
         # does — a photographed CV is a CV upload and belongs in that record.
@@ -445,6 +475,7 @@ async def upload(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
     session = _session_for(request, session_id, user)
+    session.seen_uploads.add(digest)
 
     # Keep the original file so the admin can later download exactly what the
     # visitor uploaded, to review chatbot quality. Best-effort — the session

@@ -116,6 +116,58 @@ Write in the visitor's language if they write in French or Arabic, else English.
 VERBATIM_WINDOW = 6
 
 
+# How an uploaded document announces itself in the history. Matched as a
+# prefix rather than carried as an extra dict key, because these dicts go
+# straight to the API and anything unexpected in them is the API's problem.
+UPLOAD_MARKER = "[The visitor uploaded a CV:"
+
+# A single upload may not dominate the context. A real CV is 4-8k characters;
+# a vision transcription of a dense screenshot can run much longer, and it is
+# re-sent on every round of the tool loop, so an uncapped one multiplies.
+MAX_UPLOAD_CHARS = 12_000
+
+
+def _collapse_old_uploads(history: list[dict]) -> list[dict]:
+    """Keep only the newest uploaded document verbatim.
+
+    THE BUG THIS FIXES
+    ------------------
+    A visitor uploaded the same screenshot three times and exhausted an 80k
+    guest allowance in four turns. Each upload injects the extracted text as a
+    user message, `_compact` keeps the last six messages verbatim, and the
+    whole kept window is re-sent on *every round* of the tool loop — so three
+    documents in the window cost three documents times up to eight rounds,
+    every turn. The context grew fastest exactly when the visitor was doing
+    the thing the product is for.
+
+    Dropping them is safe for the same reason `_compact` is safe at all: the
+    moment the model saves a section, the content is authoritative server
+    state, and replaying the document that produced it is redundant with
+    reading the draft. The newest one stays because it may not have been read
+    yet.
+    """
+    last_upload = -1
+    for index, message in enumerate(history):
+        if str(message.get("content", "")).startswith(UPLOAD_MARKER):
+            last_upload = index
+    if last_upload < 0:
+        return history
+
+    collapsed = []
+    for index, message in enumerate(history):
+        if index != last_upload and str(message.get("content", "")).startswith(UPLOAD_MARKER):
+            collapsed.append({
+                "role": message["role"],
+                "content": (
+                    "[An earlier upload. Its content is already in the saved "
+                    "draft — call review_draft to read it back.]"
+                ),
+            })
+        else:
+            collapsed.append(message)
+    return collapsed
+
+
 def _compact(session: Session) -> list[dict]:
     """Cap the transcript sent upstream, replacing old turns with the draft.
 
@@ -149,7 +201,9 @@ def _compact(session: Session) -> list[dict]:
     to be followed by its matching `tool` results, so slicing at an arbitrary
     index can orphan a tool call and get the request rejected outright.
     """
-    history = session.history
+    # Before the window is even considered: two uploads inside it cost two
+    # documents on every round, which is the fastest way this context grows.
+    history = _collapse_old_uploads(session.history)
     if len(history) <= VERBATIM_WINDOW:
         return history
 
@@ -442,5 +496,13 @@ def seed_uploaded_cv(session: Session, extraction: dict, filename: str) -> None:
         parts.append("Extraction notes: " + " ".join(extraction["notes"]))
 
     blob = "\n".join(parts)
+    if len(blob) > MAX_UPLOAD_CHARS:
+        # Truncated with a note rather than silently: a model that is told the
+        # text stops early asks for the rest, where one that is not assumes
+        # the CV simply ended there and writes a half CV.
+        blob = blob[:MAX_UPLOAD_CHARS] + (
+            "\n\n[The rest of this document was too long to include. Ask the "
+            "visitor about anything that seems to be missing.]"
+        )
     session.history.append({"role": "user", "content": blob})
     session.transcript.append({"role": "system", "content": blob, "kind": "upload"})

@@ -93,6 +93,54 @@ const NOT_CONFIGURED =
   "The CV builder isn't switched on for this deployment yet.";
 const NOT_SIGNED_IN = "Sign in to use the CV builder.";
 
+/**
+ * How long to wait before giving up on a request.
+ *
+ * There was no limit at all, and on a phone that is worse than a long one: a
+ * mobile network drops a connection that has been quiet for a while, `fetch`
+ * rejects with a bare TypeError indistinguishable from being offline, and the
+ * visitor is told to check a connection that is fine. Meanwhile the server
+ * finished the work and billed for it.
+ *
+ * An upload is the slow one by a distance — it can pay for a vision call and
+ * then a full tool loop that saves every section, inside the one request — so
+ * it gets three minutes. Both numbers are deliberately generous: the point is
+ * a *deterministic, recognisable* failure, not a short one.
+ */
+const CHAT_TIMEOUT_MS = 120_000;
+const UPLOAD_TIMEOUT_MS = 180_000;
+
+/** 408 is not a status the service sends; it is how a local give-up is
+ *  labelled so the UI can tell it apart from a real network failure and go
+ *  looking for work the server may have finished anyway. */
+export const TIMED_OUT = 408;
+
+const TIMED_OUT_MESSAGE =
+  "That took longer than expected. Checking whether it went through…";
+
+/**
+ * fetch with a deadline, turning an abort into something recognisable.
+ *
+ * AbortSignal.timeout is used rather than a hand-rolled AbortController plus
+ * setTimeout because it cancels itself — a manual timer has to be cleared on
+ * every exit path, and the one that gets missed leaks on every request.
+ */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+  } catch (caught) {
+    const aborted =
+      caught instanceof DOMException &&
+      (caught.name === "TimeoutError" || caught.name === "AbortError");
+    if (aborted) throw new ResumeApiError(TIMED_OUT_MESSAGE, TIMED_OUT);
+    throw caught;
+  }
+}
+
 async function parse(response: Response): Promise<ChatResponse> {
   if (response.ok) return (await response.json()) as ChatResponse;
 
@@ -142,11 +190,15 @@ async function parse(response: Response): Promise<ChatResponse> {
 export async function sendMessage(message: string, sessionId: string | null): Promise<ChatResponse> {
   if (!resumeApiConfigured) throw new ResumeApiError(NOT_CONFIGURED, 503);
 
-  const response = await fetch(`${BASE_URL}/chat`, {
-    method: "POST",
-    headers: { "content-type": "application/json", ...(await authHeader()) },
-    body: JSON.stringify({ message, session_id: sessionId }),
-  });
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/chat`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(await authHeader()) },
+      body: JSON.stringify({ message, session_id: sessionId }),
+    },
+    CHAT_TIMEOUT_MS,
+  );
   return parse(response);
 }
 
@@ -157,11 +209,11 @@ export async function uploadCv(file: File, sessionId: string | null): Promise<Ch
   form.append("file", file);
   if (sessionId) form.append("session_id", sessionId);
 
-  const response = await fetch(`${BASE_URL}/upload`, {
-    method: "POST",
-    headers: await authHeader(),
-    body: form,
-  });
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/upload`,
+    { method: "POST", headers: await authHeader(), body: form },
+    UPLOAD_TIMEOUT_MS,
+  );
   return parse(response);
 }
 

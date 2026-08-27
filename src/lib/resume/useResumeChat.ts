@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChatResponse,
   ResumeApiError,
+  TIMED_OUT,
   downloadResume,
   fetchDraft,
   fetchPhotoUrl,
+  fetchSessions,
   generateResume,
   removePhoto,
   resumeApiConfigured,
@@ -196,6 +198,58 @@ export function useResumeChat(initialSessionId?: string | null) {
     [applyResponse, busy, handleFailure, status],
   );
 
+  /**
+   * After a failed upload, find out whether it actually failed.
+   *
+   * An upload can pay for a vision call and then a whole tool loop inside one
+   * request. On a phone the connection is dropped long before that finishes,
+   * `fetch` rejects, and the visitor is told to check a connection that is
+   * working — while the server completes the read, saves every section and
+   * bills for it. Uploading again then costs it all a second time, which is
+   * exactly how one visitor spent an 80k allowance on four messages.
+   *
+   * So before reporting anything, ask the server what it has. The reply text
+   * is gone with the connection that dropped, but the reply was never the
+   * valuable part — the draft is, and it is on the server.
+   *
+   * Finding the session is the fiddly half: on a first upload the client never
+   * learned its id, because the server minted it. `/sessions` is ordered
+   * newest-first and is RLS-scoped to this visitor, so its head is the one
+   * just created.
+   */
+  const recoverUpload = useCallback(async (): Promise<boolean> => {
+    let sessionId = sessionRef.current;
+    if (!sessionId) {
+      const sessions = await fetchSessions();
+      sessionId = sessions[0]?.id ?? null;
+    }
+    if (!sessionId) return false;
+
+    const draft = await fetchDraft(sessionId);
+    // A name on its own is not a read CV — the server will not render one, and
+    // claiming success on it would be the same lie in the other direction.
+    const substantive = (draft?.filled ?? []).filter(
+      (field) => field !== "full_name" && field !== "headline",
+    );
+    if (!substantive.length) return false;
+
+    sessionRef.current = sessionId;
+    storeSession(sessionId);
+    setTurns((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content:
+          "The connection dropped while I was reading that, but it did go " +
+          "through — I've got your details saved. Ask me to change anything, " +
+          "or build the CV when you're ready.",
+      },
+    ]);
+    setStatus("idle");
+    void refreshDraft(sessionId);
+    return true;
+  }, [refreshDraft]);
+
   const upload = useCallback(
     async (file: File) => {
       if (busy || status === "unavailable") return;
@@ -210,10 +264,15 @@ export function useResumeChat(initialSessionId?: string | null) {
       try {
         applyResponse(await uploadCv(file, sessionRef.current));
       } catch (caught) {
+        // Only a lost connection or a local deadline is worth checking on: a
+        // 400 or a 413 is a real answer from a server that did no work.
+        const worthChecking =
+          !(caught instanceof ResumeApiError) || caught.status === TIMED_OUT;
+        if (worthChecking && (await recoverUpload())) return;
         handleFailure(caught);
       }
     },
-    [applyResponse, busy, handleFailure, status],
+    [applyResponse, busy, handleFailure, recoverUpload, status],
   );
 
   /** Render the draft directly, bypassing the model entirely. */

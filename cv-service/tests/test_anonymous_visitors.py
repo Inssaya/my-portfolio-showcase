@@ -14,6 +14,8 @@ budget — because that is the part where getting it wrong costs real money.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -318,3 +320,39 @@ def test_the_new_conversation_guard_does_not_apply_to_members(
     for _ in range(ANON_SESSION_PER_IP.times * 2):
         response = client.post("/chat", json={"message": "new one"})
         assert response.status_code == 200, response.json()
+
+
+# ------------------------------------------------ what an upload costs to keep
+
+def test_the_same_file_twice_is_not_read_twice(monkeypatch, client: TestClient) -> None:
+    """The bug that burned an 80k guest allowance in four messages.
+
+    Uploads were failing on the visitor's phone — the connection dropped
+    before a vision call plus a full tool loop could finish — while the server
+    completed the work and billed for it. So they sent the same screenshot
+    three times, and paid three times.
+
+    Re-reading a file that has already been read cannot produce a different
+    answer, so the second arrival is answered from what is already known,
+    without a model call.
+    """
+    _as(ANON)
+    calls: list[int] = []
+    monkeypatch.setattr(
+        agent_module, "complete",
+        lambda *a, **k: (calls.append(1), Completion(content="Read it."))[1],
+    )
+
+    document = (Path(__file__).parent / "data" / "pasted_cv.md").read_bytes()
+    payload = {"file": ("cv.md", document, "text/markdown")}
+    first = client.post("/upload", files=payload)
+    assert first.status_code == 200
+    spent_after_first = len(calls)
+
+    again = client.post(
+        "/upload", files=payload, data={"session_id": first.json()["session_id"]}
+    )
+
+    assert again.status_code == 200
+    assert len(calls) == spent_after_first, "the same file was read a second time"
+    assert "same file" in again.json()["reply"].lower()
