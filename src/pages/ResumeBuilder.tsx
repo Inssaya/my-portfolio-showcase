@@ -115,8 +115,12 @@ const ResumeBuilder = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forceNew]);
 
+  // pdfVersion > 0 means a CV actually rendered — the shell turns that into
+  // the "keep your work" prompt, but only for a guest. The decision lives
+  // there rather than here because this page renders the provider and so sits
+  // outside its own context.
   return (
-    <CvAppShell>
+    <CvAppShell cvReady={pdfVersion > 0}>
       <main
         className="mx-auto flex h-[calc(100svh-3.5rem)] w-full max-w-3xl flex-col"
         onDragOver={(event) => {

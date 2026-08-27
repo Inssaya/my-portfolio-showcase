@@ -54,6 +54,14 @@ class AuthUser:
     # re-deriving it — RLS then enforces per-user isolation at the database
     # itself, and this service never needs the service_role key.
     access_token: str
+    # A visitor who has not signed up yet. Supabase's anonymous sign-in mints
+    # a real, unique account with a real JWT and no email, so everything that
+    # keys on `id` — session ownership, RLS, per-user limits — works unchanged.
+    #
+    # It matters here for one reason: an anonymous identity is free to mint, so
+    # anything rationed *per account* stops being a ration. See
+    # `ratelimit.limit_by_account` and `Settings.max_anonymous_session_tokens`.
+    is_anonymous: bool = False
 
 
 _cache: dict[str, tuple[float, AuthUser]] = {}
@@ -93,7 +101,14 @@ def _verify_with_supabase(token: str) -> AuthUser:
         # Malformed response from an endpoint that should never send one —
         # treat as unverifiable rather than trusting a partial payload.
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Your session could not be verified.")
-    return AuthUser(id=user_id, email=body.get("email"), access_token=token)
+    # Supabase marks anonymous accounts explicitly. The email fallback covers
+    # an older project that predates the flag: an account with no email cannot
+    # have gone through signup, so it is anonymous by construction.
+    email = body.get("email")
+    is_anonymous = bool(body.get("is_anonymous", not email))
+    return AuthUser(
+        id=user_id, email=email, access_token=token, is_anonymous=is_anonymous
+    )
 
 
 def get_current_user(authorization: str = Header(default="")) -> AuthUser:

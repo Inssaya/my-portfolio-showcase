@@ -4,6 +4,12 @@ Written for whoever picks this up next, human or AI. It covers what exists, the
 decisions behind it and **why**, the bugs already found (so they are not
 rediscovered or reintroduced), and what Phase 2 needs.
 
+**If you are touching anything to do with accounts, read §10 first.** Most
+visitors are now *guests* — real Supabase accounts with no email — and two of
+the rules around them are the kind that look like details and are not: a guest
+must be converted rather than signed up, and a limit keyed on their account is
+not a limit at all.
+
 Read this before changing anything in `cv-service/`. Several things that look
 like obvious simplifications are load-bearing, and the reasons are recorded here
 rather than in commit messages.
@@ -22,7 +28,10 @@ account (verified live: an unauthenticated request gets a real 401). A
 session's draft and transcript now write through to Postgres and read back on
 a miss (`app/db.py`, `NEXT.md` Step 2b/2c); the schema it needs has been run
 against the live project (`supabase/setup.sql` — one file, idempotent, and now
-the only SQL in the repo). 368 tests pass, hermetic (auth is faked at the network boundary, and a new
+the only SQL in the repo). A visitor no longer has to sign up first: with no
+session they are signed in anonymously and build a CV straight away, and the
+account becomes permanent — keeping the same id, and so all their work — only
+when they choose to save it (**§10**). 378 tests pass, hermetic (auth is faked at the network boundary, and a new
 autouse fixture keeps Postgres persistence off by default too — see
 `tests/conftest.py`, `tests/test_auth.py`, `tests/test_persistence.py`).
 
@@ -318,3 +327,104 @@ verification links, which Supabase does natively.
 * **When the model misbehaves, ask whether the interface invited it.** "Tell me what you found" produced prose instead of saved sections. `Role | Employer | Dates | Location` invited filling every slot.
 * **Test with real files.** `C:/Users/yassi/Downloads/*CV*.pdf` is a corpus of ~19; `tests/data/pasted_cv.md` is the Markdown case.
 * **Never commit `cv-service/.env`.** It holds live keys and is gitignored twice.
+
+---
+
+## 10. Guests — letting people in before they sign up
+
+The drop-off was at email verification. Visitors were being asked to leave the
+page, open their inbox and click a link for a product they had not yet seen do
+anything. Most did not come back.
+
+So `/cv-builder` no longer turns anyone away. A visitor with no session is
+signed in **anonymously** (`signInAnonymously()`, in
+`src/components/cv/CvProtectedRoute.tsx`) and starts building immediately. The
+account only becomes permanent when they have a finished CV in hand and choose
+to keep it (`CvSaveWorkPrompt`).
+
+### Why anonymous auth and not a device fingerprint
+
+A fingerprint was the other candidate and it is worse on every axis that
+matters here:
+
+* **Fingerprints collide.** Two visitors on the same phone model, browser and
+  OS can hash to the same value. Here that means opening the app and finding
+  *somebody else's* CV — with their name, phone number and address in it.
+* **They are unstable.** A browser update changes the fingerprint and the
+  visitor silently loses their account.
+* **They are identification without consent**, which puts them under
+  GDPR/ePrivacy in the same bracket as cookies — for a feature whose entire
+  purpose is to avoid a consent step.
+
+Anonymous sign-in has none of those. It mints a *real* Supabase account: a
+unique id and a valid JWT, with no email. That is why the backend needed no
+new concept of a guest to be safe — session ownership, the RLS policies and
+the per-user checks all key on the id, exactly as before.
+
+### Converting keeps the id — this is the load-bearing part
+
+`updateUser({ email, password })` attaches credentials to the account that
+already exists. **The user id does not change**, so every CV, session,
+transcript and upload built as a guest stays attached with nothing to migrate
+and no "claim your data" step.
+
+The corollary is a trap worth stating plainly: a guest must never be sent
+through `signUp()`. That mints a *second* account and swaps the session to it,
+silently abandoning everything they built. `src/pages/cv/CvSignUp.tsx`
+branches on this — guests convert, everyone else signs up — and
+`src/lib/cv/guest.ts` is the one place that knows how.
+
+Two related consequences, both handled:
+
+* A guest holds a session, so "is there a session?" stopped being the same
+  question as "do they have an account?". Both `CvSignIn` and `CvSignUp` had
+  an `alreadyIn` redirect that would otherwise bounce a returning member away
+  from the sign-in form and a guest away from the sign-up form.
+* Signing in to a *different* account from a guest session swaps sessions
+  rather than converting, so the guest CV stays behind. The sign-in page says
+  so rather than letting them find out afterwards.
+
+### What an anonymous identity costs, and what pays for it
+
+An anonymous account is **free to mint**. Every limit that rations by account
+therefore stops being a limit — a script that signs in again before each
+request never hits one, while spending real OpenAI budget every call. Two
+defences, both in this repo rather than in a prompt:
+
+1. **Rationed by IP, not by account.** `limit_by_account`
+   (`app/ratelimit.py`) keys anonymous callers on `ANON_*_PER_IP` and
+   signed-up ones on the existing per-account rules — members legitimately
+   share an IP (a school, an office, CGNAT); guests are the ones whose
+   "account" is worthless as a subject. Pinned by
+   `tests/test_anonymous_visitors.py`, which proves a fresh identity per
+   request still hits the wall.
+2. **A smaller token ceiling.** `MAX_ANONYMOUS_SESSION_TOKENS` (25k, vs 60k)
+   is applied in `run_turn` from `session.is_anonymous`. The flag is
+   **re-stamped from the verified token on every request**, never persisted —
+   which is exactly what makes signing up lift the ceiling mid-session
+   without touching the session object.
+
+`GLOBAL_PER_IP` still sits above both, but it is a flood backstop, not an
+economic control: 120 requests a minute of a model that bills per call is not
+a budget.
+
+### Housekeeping
+
+Guests accumulate one `auth.users` row per visitor who never converts, and
+Supabase clears none of it. `public.purge_stale_guest_accounts(interval)` in
+`supabase/setup.sql` deletes anonymous, never-converted accounts idle for the
+whole retention window — measured from last CV activity, not signup, so
+work in progress survives. The delete cascades to `cv_sessions`,
+`cv_messages` and `cv_uploads`, which is the point: it clears the drafts too.
+
+The admin User Management page labels these rows **Guest** rather than showing
+a blank email (`admin_list_users()` now returns `is_guest`).
+
+### One thing that is not in this repo
+
+Anonymous sign-in is a **project setting**: Supabase → Authentication →
+Providers → Anonymous. With it off, `signInAnonymously()` errors and
+`CvProtectedRoute` falls back to the sign-in page — the old behaviour, so
+nothing breaks, but nothing improves either. Turning on CAPTCHA protection
+alongside it is worth doing: it is the cheapest brake on automated guest
+creation, and it sits in front of everything above.

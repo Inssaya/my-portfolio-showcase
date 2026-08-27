@@ -5,6 +5,16 @@ import {
 } from "lucide-react";
 import { adminData, AppUser, ChatMessage, UploadFileMeta, UserCV } from "@/lib/admin-data";
 import { adminDownloadResume } from "@/lib/resume/api";
+import { guestNameFromId } from "@/lib/cv/guest";
+
+/**
+ * What to call a user in a heading. A guest has neither a name nor an email,
+ * so falling through to `user.email` alone leaves "CVs — " with nothing after
+ * it; the derived guest name is the same one the visitor sees in the builder.
+ */
+function displayName(user: AppUser) {
+  return user.fullName || user.email || guestNameFromId(user.id);
+}
 
 function fmtBytes(n: number) {
   if (n >= 1_048_576) return `${(n / 1_048_576).toFixed(1)} MB`;
@@ -61,8 +71,8 @@ const CVsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) => 
       <div className="w-full max-w-xl rounded-xl border border-border bg-card p-6 space-y-4 max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between shrink-0">
           <div>
-            <h2 className="font-sora font-semibold">CVs — {user.fullName || user.email}</h2>
-            <p className="text-xs text-muted-foreground">{user.email}</p>
+            <h2 className="font-sora font-semibold">CVs — {displayName(user)}</h2>
+            <p className="text-xs text-muted-foreground">{user.email || "Guest — no account saved"}</p>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X size={20} />
@@ -186,9 +196,9 @@ const ChatsModal = ({ user, onClose }: { user: AppUser; onClose: () => void }) =
             )}
             <div className="min-w-0">
               <h2 className="font-sora font-semibold truncate">
-                {openId ? "Transcript" : `Chats — ${user.fullName || user.email}`}
+                {openId ? "Transcript" : `Chats — ${displayName(user)}`}
               </h2>
-              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              <p className="text-xs text-muted-foreground truncate">{user.email || "Guest — no account saved"}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0">
@@ -451,7 +461,17 @@ const AdminUserManagement = () => {
               {filtered.map((u) => (
                 <tr key={u.id} className="hover:bg-secondary/20 transition-colors">
                   <td className="px-4 py-3 font-medium whitespace-nowrap">{u.fullName || "—"}</td>
-                  <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{u.email}</td>
+                  <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                    {u.email || (
+                      // A guest: signed in anonymously and has not saved their
+                      // work to an account yet. Everything else about the row
+                      // is real — the CVs, the chats and the token spend are
+                      // all theirs.
+                      <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium">
+                        Guest
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
                     {u.id.slice(0, 8)}…
                   </td>

@@ -5,6 +5,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { WavyUnderline } from "@/components/visuals/Handdrawn";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
+import { convertGuestAccount, isGuest } from "@/lib/cv/guest";
 
 /**
  * Account creation for the CV builder.
@@ -35,6 +36,7 @@ const CvSignUp = () => {
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const [alreadyIn, setAlreadyIn] = useState(false);
+  const [asGuest, setAsGuest] = useState(false);
 
   useEffect(() => {
     document.title = "CV Builder — Create account";
@@ -43,7 +45,14 @@ const CvSignUp = () => {
       return;
     }
     supabase.auth.getSession().then(({ data }) => {
-      setAlreadyIn(Boolean(data.session));
+      // A guest already holds a session, so "is there a session?" is no
+      // longer the same question as "do they already have an account?".
+      // Bouncing a guest away from here would be wrong twice over: they do
+      // not have an account yet, and this page is exactly where they came to
+      // get one.
+      const guest = Boolean(data.session) && isGuest(data.session?.user);
+      setAlreadyIn(Boolean(data.session) && !guest);
+      setAsGuest(guest);
       setCheckingSession(false);
     });
   }, []);
@@ -75,6 +84,30 @@ const CvSignUp = () => {
 
     setBusy(true);
     setError(null);
+
+    if (asGuest) {
+      // Crucial: a guest must be *converted*, never signed up afresh.
+      // `signUp` would mint a second account and swap the session to it,
+      // silently abandoning every CV, chat and draft built as a guest — all
+      // of which are keyed to the guest's user id. `updateUser` attaches the
+      // email and password to that same id instead, so nothing moves.
+      const result = await convertGuestAccount(email, password, {
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+      });
+      setBusy(false);
+
+      if (!result.ok) {
+        setError(result.error ?? "Couldn't create your account.");
+        return;
+      }
+      if (result.needsEmailConfirmation) {
+        setSentTo(email.trim());
+        return;
+      }
+      navigate("/cv-builder", { replace: true });
+      return;
+    }
 
     const { error: signUpError } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
@@ -118,14 +151,26 @@ const CvSignUp = () => {
           </div>
           <h1 className="font-playfair text-2xl font-semibold text-foreground">Check your email</h1>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            We sent a confirmation link to <span className="text-foreground">{sentTo}</span>. Open it
-            to activate your account, then come back and sign in.
+            {asGuest ? (
+              <>
+                We sent a confirmation link to{" "}
+                <span className="text-foreground">{sentTo}</span>. Open it to finish
+                setting up your account — everything you've already built is saved
+                and stays exactly where it is.
+              </>
+            ) : (
+              <>
+                We sent a confirmation link to{" "}
+                <span className="text-foreground">{sentTo}</span>. Open it to activate
+                your account, then come back and sign in.
+              </>
+            )}
           </p>
           <Link
-            to="/cv-builder/login"
+            to={asGuest ? "/cv-builder" : "/cv-builder/login"}
             className="mt-6 inline-block text-sm font-semibold text-accent hover:underline"
           >
-            Back to sign in
+            {asGuest ? "Back to my CV" : "Back to sign in"}
           </Link>
         </motion.div>
       </div>
@@ -147,11 +192,13 @@ const CvSignUp = () => {
             <UserPlus size={18} />
           </div>
           <h1 className="relative inline-block font-playfair text-3xl font-semibold text-foreground">
-            Create your account
+            {asGuest ? "Keep your work" : "Create your account"}
             <WavyUnderline delay={0.35} duration={1.2} />
           </h1>
           <p className="mt-3 text-sm text-muted-foreground">
-            Free to use while the CV builder is in beta.
+            {asGuest
+              ? "Your CV and chat history stay exactly as they are — this just gives you a way back to them."
+              : "Free to use while the CV builder is in beta."}
           </p>
         </div>
 

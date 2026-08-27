@@ -4,6 +4,7 @@ import { CheckCircle2, KeyRound, Loader2, Lock } from "lucide-react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { WavyUnderline } from "@/components/visuals/Handdrawn";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
+import { isGuest } from "@/lib/cv/guest";
 
 /**
  * Sign-in for the CV builder, plus the two states around it: requesting a
@@ -41,6 +42,7 @@ const CvSignIn = () => {
   const [busy, setBusy] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [alreadyIn, setAlreadyIn] = useState(false);
+  const [asGuest, setAsGuest] = useState(false);
 
   const from = (location.state as { from?: string } | null)?.from ?? "/cv-builder";
 
@@ -53,7 +55,13 @@ const CvSignIn = () => {
     const client = supabase;
 
     client.auth.getSession().then(({ data }) => {
-      setAlreadyIn(Boolean(data.session));
+      // A guest holds a real session too. Treating that as "already signed
+      // in" would bounce them straight back into the app and leave a
+      // returning member with no way to reach their own account from a
+      // device that had once been used as a guest.
+      const guest = Boolean(data.session) && isGuest(data.session?.user);
+      setAlreadyIn(Boolean(data.session) && !guest);
+      setAsGuest(guest);
       setCheckingSession(false);
     });
 
@@ -96,6 +104,29 @@ const CvSignIn = () => {
     if (signInError) {
       setError(messageFor(signInError.message));
       setBusy(false);
+      return;
+    }
+    navigate(from, { replace: true });
+  };
+
+  /**
+   * The way in for someone who does not want an account yet.
+   *
+   * CvProtectedRoute already does this automatically for a visitor with no
+   * session, so this button only ever matters for the two cases that reach
+   * this page deliberately: somebody who signed out and changed their mind,
+   * and somebody who followed "Sign in" from the portfolio without having
+   * decided yet. Both would otherwise be stuck at a form.
+   */
+  const onContinueAsGuest = async () => {
+    if (busy || !supabase) return;
+    setBusy(true);
+    setError(null);
+
+    const { error: guestError } = await supabase.auth.signInAnonymously();
+    setBusy(false);
+    if (guestError) {
+      setError(messageFor(guestError.message));
       return;
     }
     navigate(from, { replace: true });
@@ -266,9 +297,24 @@ const CvSignIn = () => {
             <WavyUnderline delay={0.35} duration={1.2} />
           </h1>
           <p className="mt-3 text-sm text-muted-foreground">
-            Sign in to build your CV.
+            Sign in to pick up your saved CVs.
           </p>
         </div>
+
+        {asGuest && (
+          // They are mid-session as a guest and chose to sign in to an
+          // existing account instead. Signing in swaps the session, so the
+          // guest CV stays with the guest account and is not carried over —
+          // saying so beats letting them discover it afterwards. The way to
+          // keep it is "Save work" in the builder, which converts this
+          // account rather than replacing it.
+          <p className="mb-5 rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+            You're currently building as a guest. Signing in to another account
+            switches to it — the CV you built as a guest stays with the guest
+            session. To keep it on this account, go back and use{" "}
+            <span className="text-foreground">Save work</span> instead.
+          </p>
+        )}
 
         <form onSubmit={onSignIn} className="space-y-4">
           <label className="block">
@@ -326,6 +372,27 @@ const CvSignIn = () => {
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
+
+        {!asGuest && (
+          <>
+            <div className="my-5 flex items-center gap-3">
+              <span className="h-px flex-1 bg-border/60" />
+              <span className="text-[11px] uppercase tracking-wider text-muted-foreground">or</span>
+              <span className="h-px flex-1 bg-border/60" />
+            </div>
+            <button
+              type="button"
+              onClick={onContinueAsGuest}
+              disabled={busy}
+              className="w-full rounded-full border border-border/60 px-4 py-2.5 text-sm font-semibold text-foreground/80 transition-colors hover:border-accent/50 hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Build a CV without an account
+            </button>
+            <p className="mt-2 text-center text-[11px] text-muted-foreground">
+              No email needed. You can save it to an account afterwards.
+            </p>
+          </>
+        )}
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
           New here?{" "}

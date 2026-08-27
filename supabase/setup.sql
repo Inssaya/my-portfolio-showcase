@@ -5,7 +5,8 @@
 --   1. All tables (portfolio content, messages, CV builder, uploads)
 --   2. The is_admin() gate + all hardened RLS policies
 --   3. The public "images" storage bucket + policies
---   4. Every admin function (user management, CV/chat/upload review)
+--   4. Every admin function (user management, CV/chat/upload review, and the
+--      purge for abandoned guest accounts)
 --   5. The admin login account (only if you set a password below)
 --   6. Verifies nothing is left wide open
 --
@@ -353,10 +354,16 @@ grant execute on function public.admin_get_upload(uuid) to authenticated;
 -- User Management page. Never return passwords. See this file above
 -- for the full commentary.
 
+-- The return type gained is_guest, and `create or replace` cannot change a
+-- function's signature — so drop first. Still re-run safe: the definition
+-- follows immediately, and the grants are re-applied below.
+drop function if exists public.admin_list_users();
+
 create or replace function public.admin_list_users()
 returns table (
   id uuid, email text, full_name text, created_at timestamptz,
-  last_sign_in_at timestamptz, cv_count bigint, total_tokens bigint
+  last_sign_in_at timestamptz, cv_count bigint, total_tokens bigint,
+  is_guest boolean
 )
 language plpgsql stable security definer set search_path = public
 as $$
@@ -367,7 +374,16 @@ begin
     nullif(trim(coalesce(u.raw_user_meta_data->>'first_name','') || ' ' ||
                 coalesce(u.raw_user_meta_data->>'last_name','')), '') as full_name,
     u.created_at, u.last_sign_in_at,
-    coalesce(s.cv_count, 0), coalesce(s.total_tokens, 0)
+    coalesce(s.cv_count, 0), coalesce(s.total_tokens, 0),
+    -- Guests (anonymous sign-in) are real rows in auth.users with no email,
+    -- so without this the User Management table shows them as blank-email
+    -- accounts and reads like corrupted data.
+    --
+    -- Read through to_jsonb rather than naming u.is_anonymous directly: the
+    -- column only exists on GoTrue versions that support anonymous sign-in,
+    -- and a missing key here yields NULL and falls back to the email test
+    -- instead of making this whole file fail to run on an older project.
+    coalesce((to_jsonb(u) ->> 'is_anonymous')::boolean, u.email is null)
   from auth.users u
   left join (
     select user_id, count(*) as cv_count,
@@ -416,6 +432,65 @@ end;
 $$;
 revoke all on function public.admin_get_session_messages(uuid) from public;
 grant execute on function public.admin_get_session_messages(uuid) to authenticated;
+
+
+-- ------------------------------------------------------ guest account purge --
+-- Anonymous sign-in creates one auth.users row per visitor who starts a CV
+-- without an account. Most never convert, so this table grows with every
+-- visit and nothing in Supabase clears it automatically. Left alone it is a
+-- slow leak — of rows, and of whatever those visitors typed into a draft.
+--
+-- Two deliberate constraints:
+--
+--   * Only ever *anonymous* accounts, and only ones that never converted.
+--     `is_anonymous` flips to false the moment an email is attached, so a
+--     visitor who signed up is out of scope permanently, no matter how long
+--     ago they started. The email test is the same version-safe fallback used
+--     in admin_list_users above.
+--   * Only ones that have been idle for the whole retention window, measured
+--     from their last CV activity and not just from signup — someone who has
+--     been building for two weeks still has work in progress.
+--
+-- The delete cascades: cv_sessions, cv_messages and cv_uploads all reference
+-- auth.users(id) on delete cascade, so removing the account removes the
+-- drafts, transcripts and uploaded files with it. That is the point.
+--
+-- Run it from the SQL editor, or schedule it with pg_cron if that extension
+-- is enabled on the project:
+--     select cron.schedule('purge-guests', '0 4 * * *',
+--                          $$select public.purge_stale_guest_accounts()$$);
+create or replace function public.purge_stale_guest_accounts(
+  retain interval default interval '30 days'
+)
+returns integer
+language plpgsql security definer set search_path = public
+as $$
+declare
+  removed integer;
+begin
+  if not public.is_admin() then raise exception 'Not authorized'; end if;
+
+  with stale as (
+    select u.id
+    from auth.users u
+    where coalesce((to_jsonb(u) ->> 'is_anonymous')::boolean, u.email is null)
+      and u.email is null                     -- never converted
+      and u.created_at < now() - retain
+      and coalesce(u.last_sign_in_at, u.created_at) < now() - retain
+      and not exists (
+        select 1 from public.cv_sessions s
+        where s.user_id = u.id and s.updated_at >= now() - retain
+      )
+  )
+  delete from auth.users u using stale where u.id = stale.id;
+
+  get diagnostics removed = row_count;
+  raise notice 'purged % stale guest account(s)', removed;
+  return removed;
+end;
+$$;
+revoke all on function public.purge_stale_guest_accounts(interval) from public;
+grant execute on function public.purge_stale_guest_accounts(interval) to authenticated;
 
 
 -- ---------------------------------------------------------- admin account ---

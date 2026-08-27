@@ -234,8 +234,22 @@ def run_turn(session: Session, user_message: str) -> dict:
 
     # Checked before the turn, not during: stopping mid-turn would bill for the
     # rounds already spent and still leave the visitor without an answer.
-    budget = settings.max_session_tokens
+    budget = (
+        settings.max_anonymous_session_tokens
+        if session.is_anonymous
+        else settings.max_session_tokens
+    )
     if budget and session.usage.total >= budget:
+        if session.is_anonymous:
+            # Not a dead end, and worth saying so precisely: the draft is
+            # intact, the Build button renders it without the model, and
+            # signing up raises the ceiling on this same account rather than
+            # starting them over.
+            raise SessionBudgetExceeded(
+                "This conversation has reached the limit for a guest session. "
+                "Nothing is lost — use the Build button to get your CV now, and "
+                "creating an account keeps this same CV and lets you carry on."
+            )
         raise SessionBudgetExceeded(
             "This conversation has reached its limit. Your draft is saved — use "
             "the Build button to get your CV, or start over for a fresh session."

@@ -24,7 +24,17 @@ Phase 1 is complete and tested. Phase 2 auth is done — every route requires a
 signed-in Supabase user (`app/auth.py`, verified live: unauthenticated
 requests get a real 401). Session **persistence** is done too: `app/db.py`
 writes sessions and transcripts through to Postgres and reads them back on a
-miss, so a session survives a restart (`app/session.py`). 368 tests pass.
+miss, so a session survives a restart (`app/session.py`). 378 tests pass.
+
+Signing up is no longer the first thing a visitor meets: with no session they
+are signed in **anonymously** and build a CV straight away, and the account
+becomes permanent — same id, so all their work carries over — only when they
+choose to keep it. Two rules that look like details and are not: a guest must
+be *converted* (`updateUser`) and never re-registered with `signUp`, which
+would abandon everything they built; and a rate limit keyed on a guest's
+account is not a limit, because the account is free to mint — anonymous
+callers are rationed by IP instead. `HANDOFF.md` §10 has the whole picture;
+`src/lib/cv/guest.ts` is the one place that knows how conversion works.
 
 Quick orientation:
 

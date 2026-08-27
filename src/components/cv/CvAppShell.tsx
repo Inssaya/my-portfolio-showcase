@@ -1,5 +1,6 @@
-import { ReactNode } from "react";
+import { ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import type { User } from "@supabase/supabase-js";
 import { ArrowLeft, FileText, History, LogOut, Mail, Menu, Plus, User as UserIcon } from "lucide-react";
 import {
   Sheet,
@@ -10,6 +11,8 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { supabase } from "@/lib/supabase";
+import CvSaveWorkPrompt from "@/components/cv/CvSaveWorkPrompt";
+import { guestName, isGuest } from "@/lib/cv/guest";
 
 /**
  * The CV builder's own app shell: a burger menu, not the portfolio's
@@ -27,13 +30,73 @@ const ITEMS = [
 
 interface CvAppShellProps {
   children: ReactNode;
+  /**
+   * Set by a page that has produced a finished CV. The shell — not the page —
+   * decides what to do with that, because only the shell knows whether the
+   * visitor is still a guest. Asking here also keeps it to once per visit
+   * rather than once per rebuild.
+   */
+  cvReady?: boolean;
 }
 
-const CvAppShell = ({ children }: CvAppShellProps) => {
+interface GuestAccount {
+  /** True while the visitor is building without having signed up. */
+  isGuest: boolean;
+  /** Friendly, stable display name — "Guest 511". */
+  name: string;
+  /** Open the "keep this CV" prompt. */
+  promptToSave: () => void;
+}
+
+const GuestAccountContext = createContext<GuestAccount>({
+  isGuest: false,
+  name: "",
+  promptToSave: () => {},
+});
+
+/**
+ * Guest state lives in the shell so every /cv-builder page shares one source
+ * of truth and one prompt instance. A page that reaches a natural moment to
+ * ask — ResumeBuilder, once a CV has actually rendered — calls promptToSave();
+ * the header offers the same thing permanently, so a visitor who dismissed it
+ * is never stuck as a guest with no way back.
+ */
+export const useGuestAccount = () => useContext(GuestAccountContext);
+
+const CvAppShell = ({ children, cvReady = false }: CvAppShellProps) => {
   const location = useLocation();
+  const [user, setUser] = useState<User | null>(null);
+  const [savePromptOpen, setSavePromptOpen] = useState(false);
+  const [asked, setAsked] = useState(false);
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const guest = isGuest(user);
+  const promptToSave = useCallback(() => setSavePromptOpen(true), []);
+
+  useEffect(() => {
+    // The conversion moment: they have a CV in hand and something to lose.
+    // Once only — a save prompt that reappears after every edit is a wall
+    // wearing a friendlier label.
+    if (cvReady && guest && !asked) {
+      setAsked(true);
+      setSavePromptOpen(true);
+    }
+  }, [cvReady, guest, asked]);
 
   return (
+    <GuestAccountContext.Provider
+      value={{ isGuest: guest, name: guestName(user), promptToSave }}
+    >
     <div className="min-h-[100svh] bg-background">
+      <CvSaveWorkPrompt open={savePromptOpen} onClose={() => setSavePromptOpen(false)} />
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
           <Sheet>
@@ -109,21 +172,36 @@ const CvAppShell = ({ children }: CvAppShellProps) => {
               <History size={14} />
               History
             </Link>
-            <button
-              type="button"
-              onClick={() => void supabase?.auth.signOut()}
-              title="Sign out"
-              aria-label="Sign out"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
-            >
-              <LogOut size={16} />
-            </button>
+            {guest ? (
+              // A guest needs a permanent way to convert, not just the one
+              // prompt shown after their first CV — dismissing that must not
+              // strand them. Doubles as the answer to "am I signed in?".
+              <button
+                type="button"
+                onClick={promptToSave}
+                className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+              >
+                <UserIcon size={13} />
+                Save work
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void supabase?.auth.signOut()}
+                title="Sign out"
+                aria-label="Sign out"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
+              >
+                <LogOut size={16} />
+              </button>
+            )}
           </div>
         </div>
       </header>
 
       {children}
     </div>
+    </GuestAccountContext.Provider>
   );
 };
 

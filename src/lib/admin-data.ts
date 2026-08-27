@@ -436,6 +436,12 @@ export interface AppUser {
   lastLoginAt: string | null;
   totalCvsCreated: number;
   totalTokens: number;
+  /**
+   * Signed in anonymously and never converted to a real account. They have no
+   * email, so without this flag they show up as blank-email rows and read
+   * like broken data rather than like the ordinary majority of visitors.
+   */
+  isGuest: boolean;
 }
 
 /** One CV session (each is a CV conversation the visitor built). */
@@ -491,6 +497,9 @@ const mapAppUser = (row: Row): AppUser => ({
   lastLoginAt: (row.last_sign_in_at as string | null) ?? null,
   totalCvsCreated: Number(row.cv_count ?? 0),
   totalTokens: Number(row.total_tokens ?? 0),
+  // Falls back to the email test so the page still labels guests correctly
+  // against a database where setup.sql has not been re-run yet.
+  isGuest: Boolean(row.is_guest ?? !row.email),
 });
 
 const mapUserCV = (row: Row): UserCV => ({

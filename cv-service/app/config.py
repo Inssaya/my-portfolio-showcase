@@ -83,6 +83,18 @@ class Settings(BaseSettings):
     # Set MAX_SESSION_TOKENS=0 to disable the ceiling entirely.
     max_session_tokens: int = 60_000
 
+    # A signed-up visitor is a known person who came back; an anonymous one is
+    # a free identity a script can mint per request. Both get enough budget to
+    # build a real CV end to end — that is the whole point of letting somebody
+    # in before they sign up — but the anonymous ceiling is lower, because it
+    # is the one an abuser gets to spend over and over.
+    #
+    # Reaching it is not a dead end: the draft survives, the Build button still
+    # renders it without the model (app/tools.py), and signing up lifts the
+    # ceiling on the same account (Supabase keeps the user id when an anonymous
+    # account is converted), so nothing built so far is lost.
+    max_anonymous_session_tokens: int = 25_000
+
     # --- auth ------------------------------------------------------------------
     # The same project the portfolio's admin panel already uses
     # (src/lib/supabase.ts) — this service only ever calls the public

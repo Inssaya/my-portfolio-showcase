@@ -68,6 +68,22 @@ CHAT_PER_USER = Rule(30, 300)       # 30 chat turns / 5 min
 UPLOAD_PER_USER = Rule(15, 300)     # 15 uploads / 5 min — larger payloads, same account
 GENERATE_PER_USER = Rule(20, 300)   # 20 renders / 5 min — cheap in tokens, not in CPU
 
+# --- anonymous visitors ------------------------------------------------------
+# Everything above rations by account, which works because an account costs a
+# signup and an inbox. Anonymous sign-in removes that price: a script can mint
+# a fresh identity per request, and a per-account limit it never hits twice is
+# not a limit at all. So for anonymous callers the same rules are keyed on the
+# IP instead, over a longer window.
+#
+# These are the real spend ceiling for un-signed-up traffic. Deliberately
+# enough for a genuine visitor to build a CV end to end — the whole point of
+# letting them in without signing up — and not much more. GLOBAL_PER_IP still
+# sits above as the flood backstop; it is far too loose to be an economic
+# control on its own, at 120 requests a minute of a model that bills per call.
+ANON_CHAT_PER_IP = Rule(40, 3600)      # 40 chat turns / hour / IP
+ANON_UPLOAD_PER_IP = Rule(20, 3600)    # 20 uploads / hour / IP
+ANON_GENERATE_PER_IP = Rule(30, 3600)  # 30 renders / hour / IP
+
 
 class SlidingWindow:
     """Thread-safe sliding-window counters with bounded memory.
@@ -152,6 +168,29 @@ def limit_by_user(rule: Rule, scope: str, what: str):
 
     def dependency(user: AuthUser = Depends(get_current_user)) -> None:
         _enforce(f"{scope}:user:{user.id}", rule, what)
+
+    return Depends(dependency)
+
+
+def limit_by_account(rule: Rule, anon_rule: Rule, scope: str, what: str):
+    """Ration by account for signed-up users, by IP for anonymous ones.
+
+    A per-account limit assumes an account is expensive to obtain. Anonymous
+    sign-in makes one free, so for an anonymous caller the account is not a
+    subject worth counting — a loop that mints a new identity per request
+    would sail past `limit_by_user` forever while spending real OpenAI budget
+    on every call. The IP is the closest thing to a scarce resource such a
+    caller has, so that is what gets counted.
+
+    Signed-up users keep the per-account rule unchanged: they paid the signup
+    price, and several of them can legitimately share one IP.
+    """
+
+    def dependency(request: Request, user: AuthUser = Depends(get_current_user)) -> None:
+        if user.is_anonymous:
+            _enforce(f"{scope}:anon-ip:{client_ip(request)}", anon_rule, what)
+        else:
+            _enforce(f"{scope}:user:{user.id}", rule, what)
 
     return Depends(dependency)
 

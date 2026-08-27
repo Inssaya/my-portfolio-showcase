@@ -37,11 +37,14 @@ from .cv.photo import (
 )
 from .llm import LLMBusy, LLMError, LLMNotConfigured, get_pool
 from .ratelimit import (
+    ANON_CHAT_PER_IP,
+    ANON_GENERATE_PER_IP,
+    ANON_UPLOAD_PER_IP,
     CHAT_PER_USER,
     GENERATE_PER_USER,
     UPLOAD_PER_USER,
     GlobalIpRateLimitMiddleware,
-    limit_by_user,
+    limit_by_account,
 )
 from .session import Session, store
 from .tools import ToolError, run_tool
@@ -250,10 +253,13 @@ def _as_pasted_document(text: str) -> dict | None:
 @app.post(
     "/chat",
     response_model=ChatResponse,
-    dependencies=[limit_by_user(CHAT_PER_USER, "chat", "chat messages")],
+    dependencies=[limit_by_account(CHAT_PER_USER, ANON_CHAT_PER_IP, "chat", "chat messages")],
 )
 def chat(payload: ChatRequest = Body(...), user: AuthUser = Depends(get_current_user)) -> ChatResponse:
     session = store.get_or_create(payload.session_id, user.id, user.access_token)
+    # Re-stamped from the verified token every request, so a session started
+    # anonymously gets the full budget the moment its owner signs up.
+    session.is_anonymous = user.is_anonymous
     message = payload.message.strip()
 
     pasted = _as_pasted_document(message)
@@ -283,7 +289,7 @@ def chat(payload: ChatRequest = Body(...), user: AuthUser = Depends(get_current_
 @app.post(
     "/upload",
     response_model=ChatResponse,
-    dependencies=[limit_by_user(UPLOAD_PER_USER, "upload", "uploads")],
+    dependencies=[limit_by_account(UPLOAD_PER_USER, ANON_UPLOAD_PER_IP, "upload", "uploads")],
 )
 async def upload(
     file: UploadFile = File(...),
@@ -311,6 +317,7 @@ async def upload(
     # it would be pure cost. The reply is written here.
     if looks_like_an_image(filename):
         session = store.get_or_create(session_id, user.id, user.access_token)
+        session.is_anonymous = user.is_anonymous
 
         # Keep the original for admin review, exactly as the document branch
         # does — a photographed CV is a CV upload and belongs in that record.
@@ -394,6 +401,7 @@ async def upload(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
     session = store.get_or_create(session_id, user.id, user.access_token)
+    session.is_anonymous = user.is_anonymous
 
     # Keep the original file so the admin can later download exactly what the
     # visitor uploaded, to review chatbot quality. Best-effort — the session
@@ -472,7 +480,7 @@ async def upload(
 @app.post(
     "/generate/{session_id}",
     response_model=ChatResponse,
-    dependencies=[limit_by_user(GENERATE_PER_USER, "generate", "renders")],
+    dependencies=[limit_by_account(GENERATE_PER_USER, ANON_GENERATE_PER_IP, "generate", "renders")],
 )
 def generate(session_id: str, user: AuthUser = Depends(get_current_user)) -> ChatResponse:
     """Render the draft directly, with no model involved.

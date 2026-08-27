@@ -11,16 +11,27 @@ interface CvProtectedRouteProps {
 /**
  * Route gate for /cv-builder.
  *
- * Same shape as the admin panel's ProtectedRoute (components/admin), but
- * deliberately not the same component: that one has a hardcoded static
- * fallback for a single pre-created admin account, which makes no sense for a
- * public sign-up flow — anyone reaching this gate is meant to be able to
- * create an account, not be told to "kindly turn back".
+ * Visitors used to be stopped here and sent to sign up, and most of them left:
+ * the drop-off was at email verification, which asks somebody to go to their
+ * inbox for a product they have not seen work yet. So this no longer turns
+ * anyone away. A visitor with no session is signed in *anonymously* and goes
+ * straight to building a CV; the account only becomes a real one when they
+ * choose to keep their work (see CvSaveWorkPrompt).
  *
- * Backed by Supabase Auth. On mount this asks supabase-js for the current
- * session and subscribes to auth state changes, so a sign-out in another tab
- * (or the sign-out button in ResumeBuilder itself) kicks the page back to
- * /cv-builder/login live.
+ * Anonymous sign-in is a real Supabase account — a unique id and a valid JWT,
+ * just no email — which is why it needed no backend change: session ownership,
+ * the RLS policies and the per-user checks all key on the id, and `is_admin()`
+ * keys on the email an anonymous user does not have, so one can never be an
+ * admin. Converting later with `updateUser({ email, password })` keeps the same
+ * id, so every CV built as a guest carries over with nothing to migrate.
+ *
+ * Deliberately NOT device fingerprinting, which was the other way to do this.
+ * Fingerprints collide — two visitors on the same phone model and browser can
+ * produce the same one, which here would mean opening the app and finding
+ * somebody else's CV, with their name and phone number in it. They are also
+ * unstable (a browser update loses the account) and, being identification
+ * without consent, are treated like cookies under GDPR/ePrivacy. Anonymous
+ * auth has none of those properties.
  */
 const CvProtectedRoute = ({ children }: CvProtectedRouteProps) => {
   const [status, setStatus] = useState<Status>("checking");
@@ -37,13 +48,38 @@ const CvProtectedRoute = ({ children }: CvProtectedRouteProps) => {
     const client = supabase;
     let cancelled = false;
 
-    client.auth.getSession().then(({ data }) => {
+    const admit = async (hasSession: boolean) => {
       if (cancelled) return;
-      setStatus(data.session ? "authorized" : "denied");
-    });
+      if (hasSession) {
+        setStatus("authorized");
+        return;
+      }
+      // No session: make them a guest rather than sending them away.
+      const { error } = await client.auth.signInAnonymously();
+      if (cancelled) return;
+      if (error) {
+        // Anonymous sign-in is a project setting (Supabase → Authentication →
+        // Providers → Anonymous). If it is off, or rate-limited, fall back to
+        // the sign-in page rather than leaving the visitor on a blank screen —
+        // the old behaviour, which still works.
+        console.warn("anonymous sign-in unavailable, falling back to login", error);
+        setStatus("denied");
+        return;
+      }
+      setStatus("authorized");
+    };
 
-    const { data: sub } = client.auth.onAuthStateChange((_event, session) => {
+    client.auth.getSession().then(({ data }) => void admit(Boolean(data.session)));
+
+    const { data: sub } = client.auth.onAuthStateChange((event, session) => {
       if (cancelled) return;
+      // A real sign-out should return them to the sign-in page rather than
+      // silently minting a new guest, which would look like the sign-out
+      // failed. Every other transition just reflects the new session.
+      if (event === "SIGNED_OUT") {
+        setStatus("denied");
+        return;
+      }
       setStatus(session ? "authorized" : "denied");
     });
 

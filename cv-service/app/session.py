@@ -94,6 +94,13 @@ class Session:
     # would outlive it on any crash.
     photo: bytes | None = None
 
+    # Whether the visitor holding this session has signed up yet. Set from the
+    # verified token on every request rather than stored, so it follows the
+    # account: the moment an anonymous visitor converts, the same session is a
+    # signed-up one and gets the full budget, with nothing to migrate.
+    # Not persisted — it is a property of the caller, not of the draft.
+    is_anonymous: bool = False
+
     # The most recent render, held so the browser can download it by session
     # without us needing a blob store yet.
     pdf: bytes | None = None
