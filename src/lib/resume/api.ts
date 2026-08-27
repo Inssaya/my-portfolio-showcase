@@ -115,6 +115,9 @@ const UPLOAD_TIMEOUT_MS = 180_000;
  *  looking for work the server may have finished anyway. */
 export const TIMED_OUT = 408;
 
+/** The service's answer to a guest asking for the finished PDF. */
+export const NEEDS_ACCOUNT = 402;
+
 const TIMED_OUT_MESSAGE =
   "That took longer than expected. Checking whether it went through…";
 
@@ -173,6 +176,16 @@ async function parse(response: Response): Promise<ChatResponse> {
 
   if (response.status === 401) {
     throw new ResumeApiError(NOT_SIGNED_IN, response.status);
+  }
+  // 402 is this service's "an account is required" — a guest asking for the
+  // PDF. The detail is already written for the visitor, so it passes straight
+  // through; the UI catches the status to offer the account form rather than
+  // just printing it.
+  if (response.status === NEEDS_ACCOUNT) {
+    throw new ResumeApiError(
+      detail || "Create an account or log in to download your CV.",
+      response.status,
+    );
   }
   if (response.status === 503 || detail === "not_configured") {
     throw new ResumeApiError(NOT_CONFIGURED, response.status);
@@ -244,11 +257,18 @@ async function downloadFromPath(path: string, fallbackName: string): Promise<voi
   const response = await fetch(`${BASE_URL}${path}`, { headers: await authHeader() });
   if (!response.ok) {
     const detail =
-      response.status === 403
-        ? "You're not authorised to download this."
-        : response.status === 409
-          ? "This CV has no content to render yet."
-          : "Could not download the CV. Try again.";
+      // A guest asking for the file. The server is the authority on this, not
+      // the button: the UI hides the download behind an account form, but a
+      // session that converted a moment ago — or one restored from an old tab
+      // — can still arrive here, and "could not download, try again" would be
+      // both wrong and unactionable.
+      response.status === NEEDS_ACCOUNT
+        ? "Create an account or log in to download your CV."
+        : response.status === 403
+          ? "You're not authorised to download this."
+          : response.status === 409
+            ? "This CV has no content to render yet."
+            : "Could not download the CV. Try again.";
     throw new ResumeApiError(detail, response.status);
   }
 

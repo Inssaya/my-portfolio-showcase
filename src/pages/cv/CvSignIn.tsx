@@ -401,10 +401,14 @@ const CvSignIn = () => {
               disabled={busy}
               className="w-full rounded-full border border-border/60 px-4 py-2.5 text-sm font-semibold text-foreground/80 transition-colors hover:border-accent/50 hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Build a CV without an account
+              Continue as a guest
             </button>
-            <p className="mt-2 text-center text-[11px] text-muted-foreground">
-              No email needed. You can save it to an account afterwards.
+            {/* Stated up front rather than discovered at the download button.
+                A visitor who chose this knowing the limit is making a choice;
+                one who finds out at the end has been led somewhere. */}
+            <p className="mt-2 text-center text-[11px] leading-relaxed text-muted-foreground">
+              Build and preview your CV with no email. Downloading the file needs
+              an account — you can create one at any point and keep everything.
             </p>
           </>
         )}

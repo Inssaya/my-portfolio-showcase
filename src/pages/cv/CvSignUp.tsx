@@ -5,7 +5,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { WavyUnderline } from "@/components/visuals/Handdrawn";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
-import { convertGuestAccount, isGuest } from "@/lib/cv/guest";
+import { convertGuestAccount, isGuest, verifyEmailCode } from "@/lib/cv/guest";
 
 /**
  * Account creation for the CV builder.
@@ -23,6 +23,15 @@ import { convertGuestAccount, isGuest } from "@/lib/cv/guest";
  * adding one before it is needed would be exactly the kind of premature
  * structure this codebase avoids elsewhere.
  */
+const ErrorBanner = ({ message }: { message: string }) => (
+  <p
+    role="alert"
+    className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+  >
+    {message}
+  </p>
+);
+
 const CvSignUp = () => {
   const navigate = useNavigate();
   const [firstName, setFirstName] = useState("");
@@ -34,6 +43,12 @@ const CvSignUp = () => {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  // Which verification a code will belong to. A brand-new account is a
+  // `signup`; a guest attaching an address to the account they already have
+  // is an `email_change`, and using the wrong one fails as "token expired".
+  const [codeKind, setCodeKind] = useState<"signup" | "email_change">("signup");
+  const [code, setCode] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [alreadyIn, setAlreadyIn] = useState(false);
   const [asGuest, setAsGuest] = useState(false);
@@ -102,6 +117,7 @@ const CvSignUp = () => {
         return;
       }
       if (result.needsEmailConfirmation) {
+        setCodeKind("email_change");
         setSentTo(email.trim());
         return;
       }
@@ -132,8 +148,33 @@ const CvSignUp = () => {
       return;
     }
 
+    setCodeKind("signup");
     setSentTo(email.trim());
     setBusy(false);
+  };
+
+  /**
+   * Confirm the emailed code.
+   *
+   * A code and not a link, deliberately. A link opens a new browser context —
+   * on a phone, very often a different app's in-app browser — so the visitor
+   * lands signed in somewhere that has none of the work they just did, in a
+   * tab they cannot navigate back to. Typing six digits keeps them where they
+   * already are, which is also where their CV is.
+   */
+  const onConfirmCode = async (event: FormEvent) => {
+    event.preventDefault();
+    if (confirming || !sentTo) return;
+    setConfirming(true);
+    setError(null);
+
+    const result = await verifyEmailCode(sentTo, code, codeKind);
+    setConfirming(false);
+    if (!result.ok) {
+      setError(result.error ?? "Couldn't confirm that code.");
+      return;
+    }
+    navigate("/cv-builder", { replace: true });
   };
 
   if (sentTo) {
@@ -149,29 +190,50 @@ const CvSignUp = () => {
           <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-accent/15 text-accent">
             <CheckCircle2 size={20} />
           </div>
-          <h1 className="font-playfair text-2xl font-semibold text-foreground">Check your email</h1>
+          <h1 className="font-playfair text-2xl font-semibold text-foreground">Enter your code</h1>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            {asGuest ? (
-              <>
-                We sent a confirmation link to{" "}
-                <span className="text-foreground">{sentTo}</span>. Open it to finish
-                setting up your account — everything you've already built is saved
-                and stays exactly where it is.
-              </>
-            ) : (
-              <>
-                We sent a confirmation link to{" "}
-                <span className="text-foreground">{sentTo}</span>. Open it to activate
-                your account, then come back and sign in.
-              </>
-            )}
+            We sent a code to <span className="text-foreground">{sentTo}</span>.
+            {asGuest
+              ? " Type it below — stay on this page, everything you've built is right behind it."
+              : " Type it below to finish setting up your account."}
           </p>
-          <Link
-            to={asGuest ? "/cv-builder" : "/cv-builder/login"}
-            className="mt-6 inline-block text-sm font-semibold text-accent hover:underline"
+
+          <form onSubmit={onConfirmCode} className="mt-6 space-y-3">
+            <input
+              // Numeric keypad on a phone, and the OS offers to fill the code
+              // straight from the message.
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              required
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              placeholder="123456"
+              disabled={confirming}
+              className="w-full rounded-lg border border-border/60 bg-secondary/50 px-3 py-2.5 text-center font-mono text-lg tracking-[0.4em] outline-none transition-colors focus:border-accent/50 disabled:opacity-60"
+            />
+            {error && <ErrorBanner message={error} />}
+            <button
+              type="submit"
+              disabled={confirming || code.trim().length < 4}
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {confirming && <Loader2 size={14} className="animate-spin" />}
+              {confirming ? "Checking…" : "Confirm"}
+            </button>
+          </form>
+
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setCode("");
+              setSentTo(null);
+            }}
+            className="mt-4 text-xs text-muted-foreground hover:text-accent"
           >
-            {asGuest ? "Back to my CV" : "Back to sign in"}
-          </Link>
+            Use a different email
+          </button>
         </motion.div>
       </div>
     );
@@ -248,6 +310,12 @@ const CvSignUp = () => {
               disabled={busy}
               className="w-full rounded-lg border border-border/60 bg-secondary/50 px-3 py-2.5 text-sm outline-none transition-colors focus:border-accent/50 disabled:opacity-60"
             />
+            {/* Before they type, not after. A made-up address only fails at
+                the code step, by which point they have filled in a whole form
+                and believe they have an account. */}
+            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+              Use a real email you can open now — we send a code there to confirm it.
+            </p>
           </label>
 
           <label className="block">

@@ -93,17 +93,18 @@ class Settings(BaseSettings):
 
     # Rolling, not calendar, so nobody is locked out until an arbitrary Monday.
     #
-    # 1M is roughly a dozen full interviews with revisions. It was 300k, which
-    # was wrong for a reason worth writing down: 300k a week is under four
-    # guest conversations, while a guest could open several an hour. Signing
-    # up therefore *reduced* what a visitor was allowed, which is the exact
-    # opposite of the intended incentive and the kind of mistake that only
-    # shows up when the two numbers are put next to each other.
+    # 300k is roughly eight full interviews a week.
+    #
+    # This briefly went to 1M to fix an ordering problem — a guest could spend
+    # more than an account — and that was the wrong lever: it fixed the
+    # ordering by spending more money, on traffic that has not signed up. What
+    # actually separates the two is not the token count at all, it is that the
+    # PDF only downloads for an account. The numbers move down, not up.
     #
     # Enforced from the `cv_usage` ledger in Postgres, not from in-process
     # state: a weekly window has to survive the restarts a single Render
     # instance does routinely. See app/quota.py.
-    account_weekly_tokens: int = 1_000_000
+    account_weekly_tokens: int = 300_000
 
     # What a guest may spend in a day from one address, across every
     # conversation they open.
@@ -119,9 +120,11 @@ class Settings(BaseSettings):
     # subject. Not a contradiction of "no weekly limit for guests" — that rule
     # is about account quotas, and a guest has no account worth quota-ing.
     #
-    # 200k is two or three complete CVs in a day, which is past what a genuine
-    # visitor does and well short of what makes farming worth the trouble.
-    guest_daily_ip_tokens: int = 200_000
+    # 80k — one full conversation's worth a day from one address. A guest can
+    # build a complete CV and read it; they cannot sit and farm the model.
+    # There is little reason to try: the file itself does not download without
+    # an account, so there is nothing at the end of it to take.
+    guest_daily_ip_tokens: int = 80_000
 
     # All three accept 0 to disable that ceiling entirely, which is the escape
     # hatch if the accounting itself ever misbehaves.

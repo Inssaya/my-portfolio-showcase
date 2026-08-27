@@ -4,6 +4,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp, Check, Download, FileText, FileUp, Sparkles, X } from "lucide-react";
 import ChatMarkdown from "@/components/ChatMarkdown";
 import CvAppShell from "@/components/cv/CvAppShell";
+import CvSaveWorkPrompt from "@/components/cv/CvSaveWorkPrompt";
+import { useIsGuest } from "@/lib/cv/guest";
 import { useResumeChat } from "@/lib/resume/useResumeChat";
 
 /**
@@ -27,6 +29,12 @@ const OPENERS = [
 const ACCEPTED = ".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp";
 
 const ResumeBuilder = () => {
+  // A guest builds the whole CV and reads it on screen; the file is what an
+  // account is for. Checked here as well as on the server — the server is
+  // what actually enforces it (see /resume/{id}.pdf), this is so the visitor
+  // meets an explanation instead of a failed download.
+  const guest = useIsGuest();
+  const [wantsToDownload, setWantsToDownload] = useState(false);
   // "Continue" from the My Data page links here with ?session=<id>, which
   // must win over whatever session localStorage already had — see
   // useResumeChat's initialSessionId doc comment.
@@ -121,6 +129,19 @@ const ResumeBuilder = () => {
   // outside its own context.
   return (
     <CvAppShell cvReady={pdfVersion > 0}>
+      {/* Opened by the download button when the visitor is still a guest.
+          Deliberately the same conversion form used elsewhere — a guest who
+          creates the account here keeps this exact CV, because converting
+          keeps the account id. */}
+      <CvSaveWorkPrompt
+        open={wantsToDownload}
+        reason="download"
+        onClose={() => setWantsToDownload(false)}
+        onSaved={() => {
+          setWantsToDownload(false);
+          void download();
+        }}
+      />
       <main
         className="mx-auto flex h-[calc(100svh-3.5rem)] w-full max-w-3xl flex-col"
         onDragOver={(event) => {
@@ -216,7 +237,9 @@ const ResumeBuilder = () => {
                   {turn.pdfVersion !== undefined && (
                     <button
                       type="button"
-                      onClick={() => void download()}
+                      onClick={() =>
+                        guest ? setWantsToDownload(true) : void download()
+                      }
                       className="mt-3 inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-xs font-semibold text-accent-foreground transition-opacity hover:opacity-90"
                     >
                       <Download size={13} />

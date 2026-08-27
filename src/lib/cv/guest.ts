@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
@@ -75,12 +76,55 @@ export async function convertGuestAccount(
 
   if (error) return { ok: false, error: messageFor(error.message) };
 
-  // With "Confirm email" on, the address is pending until the link is opened:
-  // Supabase reports it under new_email and leaves the account usable
-  // meanwhile. Saying so is the difference between "check your inbox" and the
-  // visitor assuming it silently failed.
+  // The address is pending until the code is entered: Supabase reports it
+  // under new_email and leaves the account usable meanwhile. Saying so is the
+  // difference between "here is where to type the code" and the visitor
+  // assuming it silently failed.
   const pending = Boolean((data.user as { new_email?: string } | null)?.new_email);
   return { ok: true, needsEmailConfirmation: pending };
+}
+
+/**
+ * Finish verification with the code from the email.
+ *
+ * A code rather than a link, and the difference is not cosmetic. A link opens
+ * a *new browser context* — often a different app's in-app browser on a phone
+ * — which is where the old flow lost people: the session and the CV they had
+ * just built lived in the tab they had left behind. A code is typed into the
+ * tab they are already in, so nothing is left behind and nothing has to be
+ * carried across.
+ *
+ * `type` differs by how the address was attached, and getting it wrong fails
+ * with an unhelpful "token expired": a brand-new account is a `signup`, while
+ * a guest who attached an email to the account they already had is an
+ * `email_change` — Supabase treats conversion as changing an address from
+ * none to one.
+ */
+export async function verifyEmailCode(
+  email: string,
+  code: string,
+  type: "signup" | "email_change",
+): Promise<{ ok: boolean; error?: string }> {
+  if (!supabase) return { ok: false, error: "Accounts aren't available on this deployment." };
+
+  const { error } = await supabase.auth.verifyOtp({
+    email: email.trim().toLowerCase(),
+    token: code.trim(),
+    type,
+  });
+  if (!error) return { ok: true };
+
+  const lower = error.message.toLowerCase();
+  if (lower.includes("expired")) {
+    return { ok: false, error: "That code has expired — send yourself a new one." };
+  }
+  if (lower.includes("invalid") || lower.includes("token")) {
+    return { ok: false, error: "That code isn't right. Check the email and try again." };
+  }
+  if (lower.includes("rate") || lower.includes("limit")) {
+    return { ok: false, error: "Too many tries — wait a minute and try again." };
+  }
+  return { ok: false, error: "Couldn't confirm that code. Try again." };
 }
 
 function messageFor(raw: string): string {
@@ -158,4 +202,42 @@ export function guestSignInMessage(
  */
 export function wantsDiagnostics(search: string): boolean {
   return new URLSearchParams(search).get("debug") === "1";
+}
+
+
+/**
+ * Whether the visitor is currently a guest, as live state.
+ *
+ * A hook and not a prop, because the pages that need this are on both sides
+ * of the shell that holds the guest context — ResumeBuilder *renders*
+ * CvAppShell, so it sits outside the provider it supplies. Reading the
+ * session directly avoids threading a boolean through a component that is
+ * above the thing that knows it.
+ *
+ * Subscribes rather than reading once: converting an account fires an auth
+ * event, and the download button has to unlock at that moment without a
+ * reload.
+ */
+export function useIsGuest(): boolean {
+  const [guest, setGuest] = useState(false);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const client = supabase;
+    let cancelled = false;
+
+    client.auth.getUser().then(({ data }) => {
+      if (!cancelled) setGuest(isGuest(data.user));
+    });
+    const { data: sub } = client.auth.onAuthStateChange((_event, session) => {
+      if (!cancelled) setGuest(isGuest(session?.user));
+    });
+
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  return guest;
 }

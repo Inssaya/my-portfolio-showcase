@@ -618,6 +618,20 @@ def download(session_id: str, user: AuthUser = Depends(get_current_user)) -> Res
     frontend fetches this with the bearer token and saves the response as a
     blob instead (see `src/lib/resume/api.ts`, `downloadResume`).
     """
+    # The file itself is what an account is for. A guest builds the CV, sees
+    # it, and keeps everything they wrote — the draft is theirs and survives
+    # the conversion untouched — but the PDF leaves the building only for
+    # somebody who has an account to come back to.
+    #
+    # Enforced here and not only in the UI, because a hidden button is not a
+    # rule: this endpoint is one fetch away for anyone who opens the network
+    # tab. 402 rather than 403 — nothing is forbidden, something is required.
+    if user.is_anonymous:
+        raise HTTPException(
+            status.HTTP_402_PAYMENT_REQUIRED,
+            "Create an account or log in to download your CV.",
+        )
+
     session = store.get(session_id, user.id, user.access_token)
     if session is None or session.pdf is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No CV has been generated yet.")

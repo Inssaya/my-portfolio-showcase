@@ -356,3 +356,51 @@ def test_the_same_file_twice_is_not_read_twice(monkeypatch, client: TestClient) 
     assert again.status_code == 200
     assert len(calls) == spent_after_first, "the same file was read a second time"
     assert "same file" in again.json()["reply"].lower()
+
+
+# ------------------------------------------------------- the file needs an account
+
+def test_a_guest_cannot_download_the_pdf(monkeypatch, client: TestClient) -> None:
+    """A guest builds the CV, sees it, and keeps every word they wrote — the
+    draft is theirs and survives conversion untouched. The *file* is what an
+    account is for.
+
+    Enforced on the endpoint and not only by hiding a button, because a hidden
+    button is not a rule: this is one fetch away for anyone who opens the
+    network tab, and the CV is somebody's name, phone number and address.
+    """
+    _as(ANON)
+    session = store.create(user_id=ANON.id)
+    session.is_anonymous = True
+    session.pdf = b"%PDF-1.4 pretend"
+
+    response = client.get(f"/resume/{session.id}.pdf")
+
+    assert response.status_code == 402
+    assert "account" in response.json()["detail"].lower()
+
+
+def test_a_signed_up_visitor_downloads_normally(client: TestClient) -> None:
+    """The other half — the gate must be about the account, not about the CV."""
+    _as(MEMBER)
+    session = store.create(user_id=MEMBER.id)
+    session.pdf = b"%PDF-1.4 pretend"
+
+    response = client.get(f"/resume/{session.id}.pdf")
+
+    assert response.status_code == 200
+    assert response.content == b"%PDF-1.4 pretend"
+
+
+def test_converting_unlocks_the_download_on_the_same_session(client: TestClient) -> None:
+    """Converting keeps the account id, so the CV built as a guest is the one
+    that downloads a moment later. Nothing is migrated, re-rendered or
+    re-uploaded — the only thing that changed is who is asking."""
+    session = store.create(user_id="same-id")
+    session.pdf = b"%PDF-1.4 pretend"
+
+    _as(AuthUser(id="same-id", email=None, access_token="t", is_anonymous=True))
+    assert client.get(f"/resume/{session.id}.pdf").status_code == 402
+
+    _as(AuthUser(id="same-id", email="now@real.com", access_token="t", is_anonymous=False))
+    assert client.get(f"/resume/{session.id}.pdf").status_code == 200
