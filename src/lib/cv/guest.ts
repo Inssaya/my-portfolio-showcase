@@ -99,54 +99,63 @@ function messageFor(raw: string): string {
 }
 
 /**
- * Why guest sign-in failed, in words that point at the fix.
+ * Why guest sign-in failed, in words a *visitor* should read.
  *
- * Worth its own function because the generic "something went wrong" that
- * covers password sign-in is actively unhelpful here: every likely cause is a
- * project *setting*, not something the visitor did, and a catch-all message
- * sends the owner hunting through code that is working fine.
+ * Nothing here names a dashboard, a provider or a setting. Whoever hits this
+ * is trying to write a CV; telling them to go and configure somebody else's
+ * Supabase project is noise at best, and at worst it advertises how the site
+ * is built. The fix for a misconfiguration belongs to the owner, and the
+ * owner has `?debug=1` (below) and the browser console.
  *
- * Supabase's own strings are matched loosely — they have been reworded before
- * — and the raw text is carried through for anything unrecognised, because a
- * message nobody can act on is how this went unexplained the first time.
+ * Order matters here and is not alphabetical. Supabase's rate-limit error for
+ * anonymous sign-in has the word "anonymous" in it, so checking "is the
+ * provider off" first reports a temporary block as a permanent one — which
+ * sends the owner to a setting that is already correct.
  */
 export function guestSignInMessage(
   error: string | { message: string; status?: number; code?: string },
+  options: { verbose?: boolean } = {},
 ): string {
   const raw = typeof error === "string" ? error : error.message;
   const code = typeof error === "string" ? undefined : error.code;
   const status = typeof error === "string" ? undefined : error.status;
-  // Supabase's machine-readable code is the reliable half — the prose gets
-  // reworded between releases, `code` does not.
+  // The machine-readable code is the reliable half — the prose gets reworded
+  // between releases, `code` does not.
   const lower = `${raw} ${code ?? ""}`.toLowerCase();
 
-  // The big one, and almost always the answer: anonymous sign-in is a project
-  // setting that no amount of SQL turns on. Running setup.sql does not touch
-  // it — it lives in Authentication → Providers, not in the database.
-  if (lower.includes("anonymous") || lower.includes("signups not allowed")) {
-    return (
-      "Building without an account is switched off for this site. " +
-      "Turn on Supabase → Authentication → Providers → Anonymous sign-ins."
-    );
+  const detail = options.verbose
+    ? ` [${[raw, code && `code: ${code}`, status && `status: ${status}`]
+        .filter(Boolean)
+        .join(" · ")}]`
+    : "";
+
+  // First, because it is the one that resolves itself and the one whose
+  // message overlaps with every other case.
+  if (status === 429 || lower.includes("rate limit") || lower.includes("too many")) {
+    return `Too many people started here just now. Wait a minute and try again.${detail}`;
   }
-  if (lower.includes("captcha")) {
-    return (
-      "A CAPTCHA check is configured but this page isn't sending one. " +
-      "Either disable CAPTCHA in Supabase → Authentication → Settings, or " +
-      "wire a CAPTCHA widget into this page."
-    );
+  if (lower.includes("network") || lower.includes("fetch")) {
+    return `Couldn't reach the server. Check your connection and try again.${detail}`;
   }
-  if (lower.includes("rate") || lower.includes("limit") || lower.includes("429")) {
-    return "Too many guest sessions from this connection right now — wait a minute and try again.";
+  // Both of these are the owner's to fix and neither is worth explaining to a
+  // visitor, so they get the same honest, actionable-for-them sentence.
+  if (
+    lower.includes("anonymous") ||
+    lower.includes("captcha") ||
+    lower.includes("signups not allowed")
+  ) {
+    return `Building without an account isn't available right now — you can create one instead, it takes a moment.${detail}`;
   }
-  if (lower.includes("network") || lower.includes("fetch") || lower.includes("failed to fetch")) {
-    return "Couldn't reach the server. Check your connection and try again.";
-  }
-  // Everything unrecognised carries its own identifiers. This is read on a
-  // phone, where there is no console to open, so the message on screen has to
-  // be the whole diagnostic.
-  const detail = [raw, code && `code: ${code}`, status && `status: ${status}`]
-    .filter(Boolean)
-    .join(" · ");
-  return `Couldn't start a guest session. Supabase said — ${detail}`;
+  return `Couldn't start without an account. Please try again, or create one.${detail}`;
+}
+
+/**
+ * True when the page was opened as /cv-builder/login?debug=1.
+ *
+ * The escape hatch for diagnosing this from a phone, where there is no
+ * console to open. Off for everybody else, so the diagnostic detail never
+ * reaches an ordinary visitor.
+ */
+export function wantsDiagnostics(search: string): boolean {
+  return new URLSearchParams(search).get("debug") === "1";
 }

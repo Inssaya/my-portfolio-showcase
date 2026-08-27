@@ -5,6 +5,7 @@ import {
   guestNameFromId,
   guestSignInMessage,
   isGuest,
+  wantsDiagnostics,
 } from "@/lib/cv/guest";
 
 /**
@@ -76,55 +77,70 @@ describe("guestName", () => {
 
 describe("guestSignInMessage", () => {
   /**
-   * These map Supabase's own error text onto something actionable. The whole
-   * reason they exist: the generic "Something went wrong. Please try again."
-   * was shown for a disabled project setting, which points at nothing and
-   * cost a round trip to diagnose.
+   * The rule this file exists to hold: whatever went wrong, a visitor is
+   * never told to go and change a setting on somebody else's dashboard.
    */
-  it("names the setting when anonymous sign-in is disabled", () => {
-    const message = guestSignInMessage("Anonymous sign-ins are disabled");
+  const OWNER_WORDS = ["supabase", "provider", "dashboard", "captcha", "setting"];
 
-    expect(message).toContain("Anonymous");
-    expect(message.toLowerCase()).toContain("supabase");
+  const cases = [
+    { message: "Anonymous sign-ins are disabled", code: "anonymous_provider_disabled" },
+    { message: "captcha protection: request disallowed", code: "captcha_failed" },
+    { message: "Request rate limit reached", status: 429 },
+    { message: "Failed to fetch" },
+    { message: "teapot refused to brew", code: "unknown", status: 418 },
+  ];
+
+  it.each(cases)("says nothing about configuration for %o", (error) => {
+    const message = guestSignInMessage(error).toLowerCase();
+
+    for (const word of OWNER_WORDS) {
+      expect(message).not.toContain(word);
+    }
   });
 
-  it("recognises a CAPTCHA requirement", () => {
-    expect(guestSignInMessage("captcha protection: request disallowed"))
-      .toContain("CAPTCHA");
+  it("offers the visitor the thing they can actually do", () => {
+    expect(guestSignInMessage({ message: "Anonymous sign-ins are disabled" }))
+      .toContain("account");
   });
 
-  it("keeps the raw reason for anything it does not recognise", () => {
-    // A message nobody can act on is exactly the failure being fixed here, so
-    // an unknown error must carry its own text rather than be swallowed.
-    expect(guestSignInMessage("teapot refused to brew")).toContain(
-      "teapot refused to brew",
+  it("reports a rate limit as temporary even though it mentions anonymous", () => {
+    // The bug this pins: Supabase's rate-limit message contains the word
+    // "anonymous", so matching that first reported a block that clears on its
+    // own as a permanent misconfiguration — sending the owner to a setting
+    // that was already correct.
+    const message = guestSignInMessage({
+      message: "Anonymous sign-ins are rate limited",
+      status: 429,
+    });
+
+    expect(message.toLowerCase()).toContain("wait");
+  });
+
+  it("keeps the diagnostic out of the message by default", () => {
+    expect(guestSignInMessage({ message: "teapot", code: "brew_failed" }))
+      .not.toContain("brew_failed");
+  });
+
+  it("includes it when the owner asks for it explicitly", () => {
+    // ?debug=1 — the escape hatch for diagnosing this from a phone, where
+    // there is no console to open.
+    const message = guestSignInMessage(
+      { message: "teapot", code: "brew_failed", status: 418 },
+      { verbose: true },
     );
+
+    expect(message).toContain("brew_failed");
+    expect(message).toContain("418");
   });
 });
 
-describe("guestSignInMessage with a real AuthError shape", () => {
-  it("uses the machine-readable code, not just the prose", () => {
-    // Supabase rewords its messages between releases; `code` is the stable
-    // half, so recognising the cause must not depend on the wording.
-    const message = guestSignInMessage({
-      message: "Signups not allowed for this instance",
-      code: "anonymous_provider_disabled",
-      status: 422,
-    });
-
-    expect(message).toContain("Anonymous");
+describe("wantsDiagnostics", () => {
+  it("is off unless asked for", () => {
+    expect(wantsDiagnostics("")).toBe(false);
+    expect(wantsDiagnostics("?from=/cv-builder")).toBe(false);
   });
 
-  it("puts the code and status on screen for anything unrecognised", () => {
-    // Read on a phone, where there is no console to open — the message has to
-    // be the whole diagnostic or it is another dead end.
-    const message = guestSignInMessage({
-      message: "unexpected failure",
-      code: "some_new_code",
-      status: 500,
-    });
-
-    expect(message).toContain("some_new_code");
-    expect(message).toContain("500");
+  it("is on for ?debug=1", () => {
+    expect(wantsDiagnostics("?debug=1")).toBe(true);
   });
 });

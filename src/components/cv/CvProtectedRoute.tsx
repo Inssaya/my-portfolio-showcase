@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
-import { guestSignInMessage } from "@/lib/cv/guest";
+import { guestSignInMessage, wantsDiagnostics } from "@/lib/cv/guest";
 
 type Status = "checking" | "authorized" | "denied";
 
@@ -73,7 +73,9 @@ const CvProtectedRoute = ({ children }: CvProtectedRouteProps) => {
         // Carry the *reason* to the sign-in page, not just the fact. Every
         // likely cause is a project setting, and a banner that guesses at
         // which one is how this took two rounds to diagnose the first time.
-        setGuestError(guestSignInMessage(error));
+        setGuestError(
+          guestSignInMessage(error, { verbose: wantsDiagnostics(window.location.search) }),
+        );
         setStatus("denied");
         return;
       }

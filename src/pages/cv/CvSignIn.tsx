@@ -4,7 +4,7 @@ import { CheckCircle2, KeyRound, Loader2, Lock } from "lucide-react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { WavyUnderline } from "@/components/visuals/Handdrawn";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
-import { guestSignInMessage, isGuest } from "@/lib/cv/guest";
+import { guestSignInMessage, isGuest, wantsDiagnostics } from "@/lib/cv/guest";
 
 /**
  * Sign-in for the CV builder, plus the two states around it: requesting a
@@ -135,7 +135,7 @@ const CvSignIn = () => {
       // than anything the visitor did, and the generic "something went wrong"
       // points at nothing. See guestSignInMessage.
       console.warn("anonymous sign-in failed", guestError);
-      setError(guestSignInMessage(guestError));
+      setError(guestSignInMessage(guestError, { verbose: wantsDiagnostics(location.search) }));
       return;
     }
     navigate(from, { replace: true });
