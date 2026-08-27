@@ -229,6 +229,7 @@ def run_tool(session: Session, name: str, arguments: dict | None = None) -> str:
                 "experience, education and skills first, then generate."
             )
 
+
         style = str(arguments.get("style") or session.style).strip()
         if style not in STYLES:
             style = "modern"
@@ -258,9 +259,30 @@ def run_tool(session: Session, name: str, arguments: dict | None = None) -> str:
         session.pdf_name = safe_filename(session.draft.get("full_name", ""))
         session.pdf_pages = pages
         session.pdf_version += 1
-        return (
+        note = (
             f"Rendered a {pages}-page {style} CV. The visitor now has a download "
             f"button for it — tell them it is ready, and offer to change anything."
         )
+
+        # A CV nobody can reply to cannot do the one thing a CV is for. This
+        # became reachable the moment placeholder scrubbing started working: a
+        # visitor uploaded a template whose every contact detail was fake
+        # ("hello@reallygreatsite.com", "+123-456-7890", "123 Anywhere St."),
+        # all of it was correctly discarded, and the CV rendered with an empty
+        # contact block.
+        #
+        # Reported rather than refused, deliberately. Rendering is the one path
+        # that must always work — the Build button exists precisely so a
+        # visitor is never left with a finished draft and no file, whatever the
+        # model does — so this hands the model the fact and lets it ask, rather
+        # than withholding a document somebody may have wanted anyway.
+        if not session.draft.get("contact", "").strip():
+            note += (
+                " IMPORTANT: the CV has no contact details, so a recruiter reading "
+                "it would have no way to reply. If an uploaded template's example "
+                "details were discarded, that is why. Ask the visitor for a real "
+                "email and phone number, save them, and generate again."
+            )
+        return note
 
     return f"Unknown tool: {name}"

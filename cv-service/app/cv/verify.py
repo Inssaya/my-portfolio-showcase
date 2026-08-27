@@ -98,10 +98,22 @@ _PLACEHOLDER_EMAIL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# The same fictional domains as bare links. A CV template carries its
+# placeholder site next to its placeholder inbox, and catching only the inbox
+# left "www.reallygreatsite.com" printed on the finished CV as if it were the
+# visitor's own site.
+_PLACEHOLDER_URL_RE = re.compile(
+    r"\b(?:https?://)?(?:www\.)?(?:reallygreatsite\.com|example\.(?:com|org|net))"
+    r"(?:/\S*)?",
+    re.IGNORECASE,
+)
+
 # Keyboard-walk and reserved-fictional phone numbers. 555-01xx is the range
 # Hollywood/US docs use precisely because it can never be a real line.
 _PLACEHOLDER_PHONE_RE = re.compile(
-    r"(?:\+?\d{1,3}[\s.-]?)?"
+    # The "+" and any country code are consumed with the number. Leaving them
+    # behind printed a contact line reading just "+".
+    r"\+?\s?(?:\d{1,3}[\s.-]?)??"
     r"(?:123[\s.-]?456[\s.-]?7890|\(?555\)?[\s.-]?01\d\d|1234567890|0{7,})"
 )
 
@@ -136,7 +148,13 @@ _LABEL_ONLY_RE = re.compile(r"^[A-Za-z /]{1,24}[:\-–—]$")
 # A line (or line remnant) with nothing but leftover punctuation — e.g. a
 # trailing ", ." after "123 Anywhere St., Any City" loses both phrases and
 # leaves only the comma and full stop that used to separate them.
-_PUNCT_ONLY_RE = re.compile(r"^[\s,.\-–—·|]*$")
+_PUNCT_ONLY_RE = re.compile(r"^[\s,.\-–—·|+()/:;]*$")
+
+# How much of a line has to be template filler before the rest of it is
+# assumed to be filler as well. Half is deliberately not lower: an entry like
+# "Bachelor's Degree | University of Example | 2023" loses under half and must
+# keep its real qualification and year, with only the empty column blanked.
+_MOSTLY_FAKE_LINE = 0.5
 
 # The pseudo-Latin vocabulary "Lorem Ipsum" filler draws from (garbled
 # Cicero). A real upload's "About Me" and every "Experience" bullet came
@@ -187,25 +205,59 @@ def strip_placeholder_values(content: str) -> tuple[str, list[str]]:
     """
     removed: list[str] = []
 
-    def _capture(pattern: re.Pattern[str], text: str) -> str:
-        def repl(match: re.Match[str]) -> str:
-            removed.append(match.group(0).strip())
-            return ""
-        return pattern.sub(repl, text)
+    # Scrubbed line by line, because whether a *line* survives depends on how
+    # much of it was fake — see _MOSTLY_FAKE_LINE below.
+    surviving_lines: list[str] = []
+    for original_line in content.split("\n"):
+        before = len(original_line.strip())
+        line = original_line
+        # Held per line rather than appended straight to `removed`: if the
+        # whole line turns out to go, the line is what gets reported and these
+        # individual matches would only repeat a part of it back.
+        line_removals: list[str] = []
 
-    cleaned = content
-    for pattern in (_PLACEHOLDER_EMAIL_RE, _PLACEHOLDER_PHONE_RE, _PLACEHOLDER_TEXT_RE):
-        cleaned = _capture(pattern, cleaned)
+        def _capture(pattern: re.Pattern[str], text: str) -> str:
+            def repl(match: re.Match[str]) -> str:
+                line_removals.append(match.group(0).strip())
+                return ""
+            return pattern.sub(repl, text)
 
-    # Whole-line check, run even when nothing above matched: a Lorem Ipsum
-    # sentence with no literal "lorem ipsum" bigram in it (the opener was on
-    # an earlier line, or got edited away) would otherwise sail through.
-    surviving_lines = []
-    for line in cleaned.split("\n"):
+        for pattern in (
+            _PLACEHOLDER_EMAIL_RE,
+            _PLACEHOLDER_URL_RE,
+            _PLACEHOLDER_PHONE_RE,
+            _PLACEHOLDER_TEXT_RE,
+        ):
+            line = _capture(pattern, line)
+
+        # Whole-line check, run even when nothing above matched: a Lorem Ipsum
+        # sentence with no literal "lorem ipsum" bigram in it (the opener was
+        # on an earlier line, or got edited away) would otherwise sail through.
         if _is_lorem_ipsum_line(line):
             removed.append(line.strip())
-        else:
-            surviving_lines.append(line)
+            continue
+
+        # When most of a line was template filler, the remainder is filler too.
+        # "123 Anywhere St., Any City, ST 12345" loses its two known phrases and
+        # leaves ". , , ST 12345" — a fragment of a fake address, printed on the
+        # CV as though it were the visitor's. Keeping a majority-fake line is
+        # worse than dropping it: the visitor is asked for the real value either
+        # way, and only one of those outcomes puts nonsense on the page.
+        #
+        # A line that had a real label ("Email: …") is reported by its matches,
+        # not by the whole line, so the note names the fake value rather than
+        # the visitor's own wording around it.
+        taken = before - len(line.strip())
+        if before and taken >= before * _MOSTLY_FAKE_LINE:
+            remainder = _PUNCT_ONLY_RE.sub("", line.strip())
+            if line_removals and (not remainder or _LABEL_ONLY_RE.match(line.strip())):
+                removed.extend(line_removals)
+            else:
+                removed.append(original_line.strip())
+            continue
+
+        removed.extend(line_removals)
+        surviving_lines.append(line)
     cleaned = "\n".join(surviving_lines)
 
     if not removed:
