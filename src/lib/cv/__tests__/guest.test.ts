@@ -101,3 +101,30 @@ describe("guestSignInMessage", () => {
     );
   });
 });
+
+describe("guestSignInMessage with a real AuthError shape", () => {
+  it("uses the machine-readable code, not just the prose", () => {
+    // Supabase rewords its messages between releases; `code` is the stable
+    // half, so recognising the cause must not depend on the wording.
+    const message = guestSignInMessage({
+      message: "Signups not allowed for this instance",
+      code: "anonymous_provider_disabled",
+      status: 422,
+    });
+
+    expect(message).toContain("Anonymous");
+  });
+
+  it("puts the code and status on screen for anything unrecognised", () => {
+    // Read on a phone, where there is no console to open — the message has to
+    // be the whole diagnostic or it is another dead end.
+    const message = guestSignInMessage({
+      message: "unexpected failure",
+      code: "some_new_code",
+      status: 500,
+    });
+
+    expect(message).toContain("some_new_code");
+    expect(message).toContain("500");
+  });
+});

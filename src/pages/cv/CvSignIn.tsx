@@ -135,7 +135,7 @@ const CvSignIn = () => {
       // than anything the visitor did, and the generic "something went wrong"
       // points at nothing. See guestSignInMessage.
       console.warn("anonymous sign-in failed", guestError);
-      setError(guestSignInMessage(guestError.message));
+      setError(guestSignInMessage(guestError));
       return;
     }
     navigate(from, { replace: true });

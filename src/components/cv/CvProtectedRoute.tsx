@@ -73,7 +73,7 @@ const CvProtectedRoute = ({ children }: CvProtectedRouteProps) => {
         // Carry the *reason* to the sign-in page, not just the fact. Every
         // likely cause is a project setting, and a banner that guesses at
         // which one is how this took two rounds to diagnose the first time.
-        setGuestError(guestSignInMessage(error.message));
+        setGuestError(guestSignInMessage(error));
         setStatus("denied");
         return;
       }

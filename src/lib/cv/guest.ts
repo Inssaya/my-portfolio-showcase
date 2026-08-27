@@ -110,8 +110,15 @@ function messageFor(raw: string): string {
  * — and the raw text is carried through for anything unrecognised, because a
  * message nobody can act on is how this went unexplained the first time.
  */
-export function guestSignInMessage(raw: string): string {
-  const lower = raw.toLowerCase();
+export function guestSignInMessage(
+  error: string | { message: string; status?: number; code?: string },
+): string {
+  const raw = typeof error === "string" ? error : error.message;
+  const code = typeof error === "string" ? undefined : error.code;
+  const status = typeof error === "string" ? undefined : error.status;
+  // Supabase's machine-readable code is the reliable half — the prose gets
+  // reworded between releases, `code` does not.
+  const lower = `${raw} ${code ?? ""}`.toLowerCase();
 
   // The big one, and almost always the answer: anonymous sign-in is a project
   // setting that no amount of SQL turns on. Running setup.sql does not touch
@@ -135,5 +142,11 @@ export function guestSignInMessage(raw: string): string {
   if (lower.includes("network") || lower.includes("fetch") || lower.includes("failed to fetch")) {
     return "Couldn't reach the server. Check your connection and try again.";
   }
-  return `Couldn't start a guest session. Supabase said: ${raw}`;
+  // Everything unrecognised carries its own identifiers. This is read on a
+  // phone, where there is no console to open, so the message on screen has to
+  // be the whole diagnostic.
+  const detail = [raw, code && `code: ${code}`, status && `status: ${status}`]
+    .filter(Boolean)
+    .join(" · ");
+  return `Couldn't start a guest session. Supabase said — ${detail}`;
 }
