@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
+import { guestSignInMessage } from "@/lib/cv/guest";
 
 type Status = "checking" | "authorized" | "denied";
 
@@ -35,7 +36,7 @@ interface CvProtectedRouteProps {
  */
 const CvProtectedRoute = ({ children }: CvProtectedRouteProps) => {
   const [status, setStatus] = useState<Status>("checking");
-  const [guestUnavailable, setGuestUnavailable] = useState(false);
+  const [guestError, setGuestError] = useState<string | null>(null);
   const location = useLocation();
 
   useEffect(() => {
@@ -69,7 +70,10 @@ const CvProtectedRoute = ({ children }: CvProtectedRouteProps) => {
         // changed. The sign-in page says what happened, so the cause is
         // visible from the outside instead of only in this console line.
         console.warn("anonymous sign-in unavailable, falling back to login", error);
-        setGuestUnavailable(true);
+        // Carry the *reason* to the sign-in page, not just the fact. Every
+        // likely cause is a project setting, and a banner that guesses at
+        // which one is how this took two rounds to diagnose the first time.
+        setGuestError(guestSignInMessage(error.message));
         setStatus("denied");
         return;
       }
@@ -105,7 +109,7 @@ const CvProtectedRoute = ({ children }: CvProtectedRouteProps) => {
       <Navigate
         to="/cv-builder/login"
         replace
-        state={{ from: location.pathname, guestUnavailable }}
+        state={{ from: location.pathname, guestError }}
       />
     );
   }

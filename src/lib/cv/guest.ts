@@ -97,3 +97,43 @@ function messageFor(raw: string): string {
   }
   return "Couldn't save your account. Please try again.";
 }
+
+/**
+ * Why guest sign-in failed, in words that point at the fix.
+ *
+ * Worth its own function because the generic "something went wrong" that
+ * covers password sign-in is actively unhelpful here: every likely cause is a
+ * project *setting*, not something the visitor did, and a catch-all message
+ * sends the owner hunting through code that is working fine.
+ *
+ * Supabase's own strings are matched loosely — they have been reworded before
+ * — and the raw text is carried through for anything unrecognised, because a
+ * message nobody can act on is how this went unexplained the first time.
+ */
+export function guestSignInMessage(raw: string): string {
+  const lower = raw.toLowerCase();
+
+  // The big one, and almost always the answer: anonymous sign-in is a project
+  // setting that no amount of SQL turns on. Running setup.sql does not touch
+  // it — it lives in Authentication → Providers, not in the database.
+  if (lower.includes("anonymous") || lower.includes("signups not allowed")) {
+    return (
+      "Building without an account is switched off for this site. " +
+      "Turn on Supabase → Authentication → Providers → Anonymous sign-ins."
+    );
+  }
+  if (lower.includes("captcha")) {
+    return (
+      "A CAPTCHA check is configured but this page isn't sending one. " +
+      "Either disable CAPTCHA in Supabase → Authentication → Settings, or " +
+      "wire a CAPTCHA widget into this page."
+    );
+  }
+  if (lower.includes("rate") || lower.includes("limit") || lower.includes("429")) {
+    return "Too many guest sessions from this connection right now — wait a minute and try again.";
+  }
+  if (lower.includes("network") || lower.includes("fetch") || lower.includes("failed to fetch")) {
+    return "Couldn't reach the server. Check your connection and try again.";
+  }
+  return `Couldn't start a guest session. Supabase said: ${raw}`;
+}

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { User } from "@supabase/supabase-js";
-import { guestName, guestNameFromId, isGuest } from "@/lib/cv/guest";
+import {
+  guestName,
+  guestNameFromId,
+  guestSignInMessage,
+  isGuest,
+} from "@/lib/cv/guest";
 
 /**
  * Guests are the majority of visitors now — everyone who starts a CV without
@@ -66,5 +71,33 @@ describe("guestName", () => {
 
   it("does not leak the account id", () => {
     expect(guestNameFromId("11112222-3333-4444-5555-666677778888")).not.toContain("1111");
+  });
+});
+
+describe("guestSignInMessage", () => {
+  /**
+   * These map Supabase's own error text onto something actionable. The whole
+   * reason they exist: the generic "Something went wrong. Please try again."
+   * was shown for a disabled project setting, which points at nothing and
+   * cost a round trip to diagnose.
+   */
+  it("names the setting when anonymous sign-in is disabled", () => {
+    const message = guestSignInMessage("Anonymous sign-ins are disabled");
+
+    expect(message).toContain("Anonymous");
+    expect(message.toLowerCase()).toContain("supabase");
+  });
+
+  it("recognises a CAPTCHA requirement", () => {
+    expect(guestSignInMessage("captcha protection: request disallowed"))
+      .toContain("CAPTCHA");
+  });
+
+  it("keeps the raw reason for anything it does not recognise", () => {
+    // A message nobody can act on is exactly the failure being fixed here, so
+    // an unknown error must carry its own text rather than be swallowed.
+    expect(guestSignInMessage("teapot refused to brew")).toContain(
+      "teapot refused to brew",
+    );
   });
 });

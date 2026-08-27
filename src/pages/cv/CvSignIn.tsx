@@ -4,7 +4,7 @@ import { CheckCircle2, KeyRound, Loader2, Lock } from "lucide-react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { WavyUnderline } from "@/components/visuals/Handdrawn";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
-import { isGuest } from "@/lib/cv/guest";
+import { guestSignInMessage, isGuest } from "@/lib/cv/guest";
 
 /**
  * Sign-in for the CV builder, plus the two states around it: requesting a
@@ -44,12 +44,12 @@ const CvSignIn = () => {
   const [alreadyIn, setAlreadyIn] = useState(false);
   const [asGuest, setAsGuest] = useState(false);
 
-  const routed = location.state as { from?: string; guestUnavailable?: boolean } | null;
+  const routed = location.state as { from?: string; guestError?: string | null } | null;
   const from = routed?.from ?? "/cv-builder";
-  // Set by CvProtectedRoute when signInAnonymously() failed. Landing here at
-  // all means guest mode did not work — without saying so, the product just
-  // looks like it still demands an account.
-  const guestBlocked = Boolean(routed?.guestUnavailable);
+  // Set by CvProtectedRoute when signInAnonymously() failed, and carrying the
+  // reason. Landing here at all means guest mode did not work — without
+  // saying why, the product just looks like it still demands an account.
+  const guestBlocked = routed?.guestError ?? null;
 
   useEffect(() => {
     document.title = "CV Builder — Sign in";
@@ -131,7 +131,11 @@ const CvSignIn = () => {
     const { error: guestError } = await supabase.auth.signInAnonymously();
     setBusy(false);
     if (guestError) {
-      setError(messageFor(guestError.message));
+      // Not messageFor(): every likely cause here is a project setting rather
+      // than anything the visitor did, and the generic "something went wrong"
+      // points at nothing. See guestSignInMessage.
+      console.warn("anonymous sign-in failed", guestError);
+      setError(guestSignInMessage(guestError.message));
       return;
     }
     navigate(from, { replace: true });
@@ -308,9 +312,7 @@ const CvSignIn = () => {
 
         {guestBlocked && (
           <p className="mb-5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs leading-relaxed text-amber-200">
-            Building without an account isn't available right now, so this page
-            is asking you to sign in. If this is your site: turn on Supabase →
-            Authentication → Providers → Anonymous.
+            {guestBlocked}
           </p>
         )}
 
