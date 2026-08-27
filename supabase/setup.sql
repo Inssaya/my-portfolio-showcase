@@ -10,7 +10,11 @@
 --   5. The admin login account (only if you set a password below)
 --   6. Verifies nothing is left wide open
 --
--- HOW: Supabase Dashboard → SQL Editor → New query → paste ALL of this → Run.
+-- HOW: nothing, normally. `.github/workflows/supabase-schema.yml` applies this
+-- file automatically whenever it changes on main — set the SUPABASE_DB_URL
+-- secret once (instructions at the top of that file) and it stays applied.
+-- By hand, if you need to: Supabase Dashboard → SQL Editor → New query →
+-- paste ALL of this → Run.
 -- Idempotent: safe to re-run any time (nothing is duplicated or overwritten).
 --
 -- ADMIN PASSWORD: to create the login the first time, set admin_password in

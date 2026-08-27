@@ -75,6 +75,20 @@ Point the frontend at the service with `VITE_RESUME_API_URL` in `.env.local`
 (`http://localhost:8000` locally). Vite inlines env vars at build time, so
 changing one needs a rebuild.
 
+## Database schema
+
+`supabase/setup.sql` is the whole schema — one idempotent file. Do not run it
+by hand: `.github/workflows/supabase-schema.yml` applies it on every push to
+`main` that touches it, and fails the build if the RLS verify finds an ungated
+write policy. It needs one repository secret, `SUPABASE_DB_URL` (the Supabase
+**session pooler** URI — the direct `db.<ref>.supabase.co` one is IPv6-only
+and unreachable from GitHub's runners).
+
+Anything the frontend reads from a new column or function should degrade
+gracefully until that workflow has run — see `mapAppUser` in
+`src/lib/admin-data.ts`, which falls back to the email test when
+`is_guest` is absent.
+
 ## Secrets
 
 `.env.local` and `cv-service/.env` hold live keys and are gitignored. Never

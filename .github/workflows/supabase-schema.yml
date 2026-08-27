@@ -1,0 +1,87 @@
+# Applies supabase/setup.sql to the live project automatically.
+#
+# The point of this file: setup.sql is idempotent by design — it exists to be
+# re-run — but re-running it meant opening the dashboard, finding the SQL
+# editor and pasting 500 lines by hand every time the schema changed. That is
+# the kind of step that gets skipped, and a skipped one shows up later as the
+# frontend calling a function the database does not have.
+#
+# So the push does it. The workflow only fires when setup.sql actually
+# changes, plus manually from the Actions tab.
+#
+# ONE-TIME SETUP — Settings → Secrets and variables → Actions → New secret:
+#
+#   Name:  SUPABASE_DB_URL
+#   Value: Supabase dashboard → Connect → "Session pooler" URI, with
+#          [YOUR-PASSWORD] replaced by the database password.
+#
+# It must be the *session pooler* URI (`...pooler.supabase.com:5432`), not the
+# direct `db.<ref>.supabase.co` one. Direct connections are IPv6-only now and
+# GitHub's runners have no IPv6, so the direct URI fails here with a bare
+# "network is unreachable" that looks like a wrong password.
+#
+# The secret is write-only once saved: GitHub will not show it again, it is
+# masked in logs, and it never enters the repository.
+name: Apply Supabase schema
+
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/setup.sql']
+  workflow_dispatch:
+
+concurrency:
+  # Two runs applying DDL to one database at the same time is the one way an
+  # idempotent script can still hurt. Queue them instead.
+  group: supabase-schema
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the secret is set
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$DB_URL" ]; then
+            echo "::error::SUPABASE_DB_URL is not set. See the comment at the"
+            echo "::error::top of .github/workflows/supabase-schema.yml."
+            exit 1
+          fi
+
+      - name: Apply setup.sql
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        # ON_ERROR_STOP makes psql exit non-zero on the first failure instead
+        # of ploughing through the rest of the file and reporting success.
+        run: psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/setup.sql
+
+      - name: Verify nothing is left wide open
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        # The same check that closes setup.sql, but as a build failure rather
+        # than rows a human has to notice. Any row here means a table still
+        # grants write or inbox access to every authenticated user with no
+        # admin gate — and "authenticated" now includes guests.
+        run: |
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+          do $$
+          declare open_count integer;
+          begin
+            select count(*) into open_count
+            from pg_policies
+            where schemaname in ('public', 'storage')
+              and roles::text[] @> array['authenticated']
+              and cmd <> 'SELECT'
+              and coalesce(qual, 'true') = 'true'
+              and coalesce(with_check, 'true') = 'true'
+              and policyname not in ('anyone can send');
+            if open_count > 0 then
+              raise exception '% ungated authenticated write policy/policies', open_count;
+            end if;
+            raise notice 'RLS verify passed.';
+          end $$;
+          SQL
