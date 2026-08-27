@@ -209,6 +209,71 @@ def limit_by_account(rule: Rule, anon_rule: Rule, scope: str, what: str):
     return Depends(dependency)
 
 
+class TokenWindow:
+    """A sliding window over *amounts* rather than over request counts.
+
+    The rate limiter above answers "how often"; this answers "how much", which
+    is the question that actually maps to a bill. Same structure, same lock,
+    same per-process caveat as SlidingWindow — see the module docstring.
+    """
+
+    SWEEP_EVERY = 600
+
+    def __init__(self) -> None:
+        self._spend: dict[str, deque[tuple[float, int]]] = defaultdict(deque)
+        self._lock = threading.Lock()
+        self._last_sweep = time.monotonic()
+
+    def total(self, key: str, window_seconds: int) -> int:
+        now = time.monotonic()
+        with self._lock:
+            self._maybe_sweep(now)
+            entries = self._spend[key]
+            cutoff = now - window_seconds
+            while entries and entries[0][0] <= cutoff:
+                entries.popleft()
+            return sum(amount for _, amount in entries)
+
+    def add(self, key: str, amount: int) -> None:
+        if amount <= 0:
+            return
+        with self._lock:
+            self._spend[key].append((time.monotonic(), amount))
+
+    def _maybe_sweep(self, now: float) -> None:
+        if now - self._last_sweep < self.SWEEP_EVERY:
+            return
+        self._last_sweep = now
+        horizon = now - 86_400
+        for key in [k for k, e in self._spend.items() if not e or e[-1][0] <= horizon]:
+            del self._spend[key]
+
+    def reset(self) -> None:
+        with self._lock:
+            self._spend.clear()
+            self._last_sweep = time.monotonic()
+
+
+guest_tokens = TokenWindow()
+
+GUEST_TOKEN_WINDOW_SECONDS = 86_400
+
+
+def guest_tokens_spent(request: Request) -> int:
+    """How much this address has spent as a guest in the last day."""
+    return guest_tokens.total(
+        f"tokens:anon-ip:{client_ip(request)}", GUEST_TOKEN_WINDOW_SECONDS
+    )
+
+
+def record_guest_tokens(request: Request, user: AuthUser, amount: int) -> None:
+    """Bill a turn to the address that made it. Guests only — an account is
+    counted in Postgres, by account, which is the durable place for it."""
+    if not user.is_anonymous:
+        return
+    guest_tokens.add(f"tokens:anon-ip:{client_ip(request)}", amount)
+
+
 def guard_new_guest_session(request: Request, user: AuthUser) -> None:
     """Called on the path that is about to open a *new* conversation.
 

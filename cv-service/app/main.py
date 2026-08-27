@@ -48,7 +48,9 @@ from .ratelimit import (
     UPLOAD_PER_USER,
     GlobalIpRateLimitMiddleware,
     guard_new_guest_session,
+    guest_tokens_spent,
     limit_by_account,
+    record_guest_tokens,
 )
 from .session import Session, store
 from .tools import ToolError, run_tool
@@ -150,7 +152,13 @@ def _session_for(request: Request, session_id: str | None, user: AuthUser) -> Se
     return session
 
 
-def _turn_or_http_error(session, message: str, access_token: str | None = None) -> dict:
+def _turn_or_http_error(
+    session,
+    message: str,
+    access_token: str | None = None,
+    request: Request | None = None,
+    user: AuthUser | None = None,
+) -> dict:
     """Run a turn, translating model-layer failures into honest HTTP.
 
     Shared by /chat and /upload so the two cannot drift: a visitor who uploads
@@ -167,7 +175,12 @@ def _turn_or_http_error(session, message: str, access_token: str | None = None) 
     spent_before = (session.usage.prompt, session.usage.completion)
     try:
         try:
-            return run_turn(session, message, access_token)
+            daily = (
+                guest_tokens_spent(request)
+                if request is not None and user is not None and user.is_anonymous
+                else None
+            )
+            return run_turn(session, message, access_token, daily)
         except SessionBudgetExceeded as exc:
             # 402-adjacent, but nothing is owed while the service is free, so
             # 429 with an explicit reason. The draft survives and /generate
@@ -220,12 +233,15 @@ def _turn_or_http_error(session, message: str, access_token: str | None = None) 
         # for the same reason the save is: a turn that ends in an error can
         # still have run paid rounds first, and tokens that were spent must be
         # counted whether or not the visitor got an answer for them.
-        quota.record(
-            session,
-            session.usage.prompt - spent_before[0],
-            session.usage.completion - spent_before[1],
-            access_token,
-        )
+        spent_prompt = session.usage.prompt - spent_before[0]
+        spent_completion = session.usage.completion - spent_before[1]
+        quota.record(session, spent_prompt, spent_completion, access_token)
+        # Guests are billed to their address, in memory, because there is no
+        # account worth billing — the same reasoning as every other guest
+        # control. Without this the per-conversation ceiling is not a ceiling:
+        # the next conversation starts at zero.
+        if request is not None and user is not None:
+            record_guest_tokens(request, user, spent_prompt + spent_completion)
 
 
 @app.get("/health")
@@ -319,7 +335,7 @@ def chat(
             "draft with update_resume, then tell me what you got."
         )
 
-    outcome = _turn_or_http_error(session, message, user.access_token)
+    outcome = _turn_or_http_error(session, message, user.access_token, request, user)
 
     return ChatResponse(
         session_id=session.id,
@@ -437,6 +453,8 @@ async def upload(
                 "I've uploaded my CV. Save every section you can into the draft with "
                 "update_resume, then tell me what you got.",
                 user.access_token,
+                request,
+                user,
             )
             return ChatResponse(
                 session_id=session.id,
@@ -539,6 +557,8 @@ async def upload(
         "I've uploaded my CV. Save every section you can into the draft with "
         "update_resume, then tell me what you got.",
         user.access_token,
+        request,
+        user,
     )
 
     return ChatResponse(

@@ -35,22 +35,44 @@ class BudgetExceeded(Exception):
     model, so this is always "you cannot say more", never "you lost the CV"."""
 
 
-def check(session: Session, access_token: str | None = None) -> None:
+def check(
+    session: Session,
+    access_token: str | None = None,
+    daily_spent: int | None = None,
+) -> None:
     """Raise BudgetExceeded if this turn must not run. Otherwise return.
 
     Called *before* any spend, never during: stopping mid-turn would bill for
     the rounds already run and still leave the visitor without an answer.
+
+    `daily_spent` is what this guest's address has already spent today, which
+    only the HTTP layer can know — see app/ratelimit.py. Without it a guest is
+    checked against the per-conversation ceiling alone, which is what the
+    direct callers (tests, scripts) should get.
     """
     settings = get_settings()
 
     if session.is_anonymous:
+        # The daily figure first, because it is the binding one. A message
+        # about this conversation, sent to somebody who has actually used up
+        # the day, would be answered by starting another conversation — which
+        # is precisely the advice the old wording gave, out loud.
+        if daily_spent is not None and settings.guest_daily_ip_tokens:
+            if daily_spent >= settings.guest_daily_ip_tokens:
+                raise BudgetExceeded(
+                    "You've reached today's limit for building without an "
+                    "account. Nothing is lost — the Build button still gives "
+                    "you your CV, and everything you've made is on the History "
+                    "page. Create an account and you can carry on right now."
+                )
+
         ceiling = settings.guest_session_tokens
         if ceiling and session.usage.total >= ceiling:
             raise BudgetExceeded(
-                "This conversation has reached the limit for a guest. Nothing "
-                "is lost — use the Build button to get your CV now. Starting a "
-                "new conversation gives you a fresh allowance, and creating an "
-                "account keeps everything you have built here."
+                "This conversation has gone on long enough to reach a guest's "
+                "limit. Nothing is lost — use the Build button to get your CV "
+                "now. Create an account to keep it and carry on without this "
+                "cap; without one, there's a daily total too."
             )
         return
 

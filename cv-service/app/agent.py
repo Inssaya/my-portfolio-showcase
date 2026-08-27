@@ -279,7 +279,10 @@ def _record_assistant_turn(session: Session, result: Completion) -> None:
 
 
 def run_turn(
-    session: Session, user_message: str, access_token: str | None = None
+    session: Session,
+    user_message: str,
+    access_token: str | None = None,
+    daily_spent: int | None = None,
 ) -> dict:
     """Run one visitor turn to completion. Returns what the API should send back.
 
@@ -297,7 +300,7 @@ def run_turn(
     # already spent and still leave the visitor without an answer. Which
     # ceiling applies — a guest's per-conversation one or an account's weekly
     # one — is app/quota.py's decision, not this module's.
-    quota.check(session, access_token)
+    quota.check(session, access_token, daily_spent)
 
     session.history.append({"role": "user", "content": user_message})
     session.transcript.append({"role": "user", "content": user_message})

@@ -31,7 +31,7 @@ against the live project (`supabase/setup.sql` — one file, idempotent, and now
 the only SQL in the repo). A visitor no longer has to sign up first: with no
 session they are signed in anonymously and build a CV straight away, and the
 account becomes permanent — keeping the same id, and so all their work — only
-when they choose to save it (**§10**). 393 tests pass, hermetic (auth is faked at the network boundary, and a new
+when they choose to save it (**§10**). 411 tests pass, hermetic (auth is faked at the network boundary, and a new
 autouse fixture keeps Postgres persistence off by default too — see
 `tests/conftest.py`, `tests/test_auth.py`, `tests/test_persistence.py`).
 
@@ -391,10 +391,23 @@ different for each, and that is the whole design (`app/quota.py`):
 
 | | Guest | Account |
 |---|---|---|
-| Rationed per | **conversation** (`GUEST_SESSION_TOKENS`, 80k) | **rolling week**, across every conversation (`ACCOUNT_WEEKLY_TOKENS`, 300k) |
+| Rationed per | **conversation** (`GUEST_SESSION_TOKENS`, 80k) **and per day per address** (`GUEST_DAILY_IP_TOKENS`, 200k) | **rolling week**, across every conversation (`ACCOUNT_WEEKLY_TOKENS`, 1M) |
 | Per-session ceiling | yes | **none** |
-| Weekly ceiling | none | yes |
-| Where the figure lives | the session in memory | the `cv_usage` ledger in Postgres |
+| Longer-term ceiling | daily, keyed on the IP | weekly, keyed on the account |
+| Where the figure lives | the session in memory; the day in `ratelimit.TokenWindow` | the `cv_usage` ledger in Postgres |
+
+**The daily guest figure is not decoration.** Without it the per-conversation
+ceiling bounds one conversation and nothing else — the next one starts at zero
+— so the honest description of a guest's limit was "none", and the refusal
+message said so out loud: *"Starting a new conversation gives you a fresh
+allowance."* An instruction for bypassing the limit, printed on the limit.
+
+The numbers were also incoherent against each other, which is the failure mode
+worth remembering: each was defensible alone. 80k per conversation with several
+conversations an hour, against 300k for a whole *week*, meant signing up cut a
+visitor's allowance by roughly ninety times — the exact opposite of the
+incentive. Nothing caught it because nothing compared them;
+`tests/test_limits_are_coherent.py` now does.
 
 A guest has no account worth attaching a longer-term total to — the identity
 is one request old and free to mint — so a weekly figure keyed on it would

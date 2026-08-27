@@ -24,7 +24,7 @@ Phase 1 is complete and tested. Phase 2 auth is done — every route requires a
 signed-in Supabase user (`app/auth.py`, verified live: unauthenticated
 requests get a real 401). Session **persistence** is done too: `app/db.py`
 writes sessions and transcripts through to Postgres and reads them back on a
-miss, so a session survives a restart (`app/session.py`). 393 tests pass.
+miss, so a session survives a restart (`app/session.py`). 411 tests pass.
 
 Signing up is no longer the first thing a visitor meets: with no session they
 are signed in **anonymously** and build a CV straight away, and the account
@@ -36,10 +36,16 @@ account is not a limit, because the account is free to mint — anonymous
 callers are rationed by IP instead — and by how fast they may *open*
 conversations, without which a per-conversation token ceiling bounds nothing.
 
-The two ceilings have different shapes on purpose: a guest is rationed per
-conversation (80k), an account per rolling week across all of them (300k) with
-no per-session cap at all. The weekly figure comes from the `cv_usage` ledger
-in Postgres, because a week has to survive the restarts Render does routinely.
+The ceilings have different shapes on purpose: a guest is rationed per
+conversation (80k) **and** per day per address (200k), an account per rolling
+week across every conversation (1M) with no per-session cap at all. The daily
+guest figure is not optional decoration — without it the per-conversation one
+bounds a single conversation and nothing else, since the next starts at zero.
+The two were also 80k-per-conversation against 300k-per-*week*, which meant
+signing up reduced what a visitor could spend; `tests/test_limits_are_coherent.py`
+now compares them so that cannot silently return. The weekly figure comes from
+the `cv_usage` ledger in Postgres, because a week has to survive the restarts
+Render does routinely.
 
 One more thing that changed under the surface: `authenticated` in RLS no longer
 means "signed up", it means *anyone who opened the site*. Every policy must key

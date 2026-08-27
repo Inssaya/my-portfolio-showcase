@@ -91,15 +91,39 @@ class Settings(BaseSettings):
     # 80k lets a guest do a full interview and then revise it substantially.
     guest_session_tokens: int = 80_000
 
-    # 300k is roughly eight full interviews a week, rolling — not a calendar
-    # week, so nobody is locked out until an arbitrary Monday.
+    # Rolling, not calendar, so nobody is locked out until an arbitrary Monday.
     #
-    # This is enforced from the `cv_usage` ledger in Postgres, not from
-    # in-process state: a weekly window has to survive the restarts a single
-    # Render instance does routinely. See app/quota.py.
-    account_weekly_tokens: int = 300_000
+    # 1M is roughly a dozen full interviews with revisions. It was 300k, which
+    # was wrong for a reason worth writing down: 300k a week is under four
+    # guest conversations, while a guest could open several an hour. Signing
+    # up therefore *reduced* what a visitor was allowed, which is the exact
+    # opposite of the intended incentive and the kind of mistake that only
+    # shows up when the two numbers are put next to each other.
+    #
+    # Enforced from the `cv_usage` ledger in Postgres, not from in-process
+    # state: a weekly window has to survive the restarts a single Render
+    # instance does routinely. See app/quota.py.
+    account_weekly_tokens: int = 1_000_000
 
-    # Both accept 0 to disable that ceiling entirely, which is the escape
+    # What a guest may spend in a day from one address, across every
+    # conversation they open.
+    #
+    # This is the number that makes the per-conversation ceiling mean
+    # anything. On its own, 80k per conversation bounds one conversation and
+    # nothing else — opening the next costs nothing, so the honest description
+    # of a guest's limit was "none", and the refusal message was cheerfully
+    # explaining how to reset it.
+    #
+    # Keyed on the IP and not the account, for the same reason every other
+    # guest control is: the account is free to mint and worthless as a
+    # subject. Not a contradiction of "no weekly limit for guests" — that rule
+    # is about account quotas, and a guest has no account worth quota-ing.
+    #
+    # 200k is two or three complete CVs in a day, which is past what a genuine
+    # visitor does and well short of what makes farming worth the trouble.
+    guest_daily_ip_tokens: int = 200_000
+
+    # All three accept 0 to disable that ceiling entirely, which is the escape
     # hatch if the accounting itself ever misbehaves.
 
     # --- auth ------------------------------------------------------------------
