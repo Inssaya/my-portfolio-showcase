@@ -3,7 +3,9 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { FileText, Loader2, Plus } from "lucide-react";
 import CvAppShell from "@/components/cv/CvAppShell";
+import CvGuestGate from "@/components/cv/CvGuestGate";
 import { fetchSessions, type SessionSummary } from "@/lib/resume/api";
+import { useIsGuest } from "@/lib/cv/guest";
 
 /**
  * Every CV the visitor has started. Backed by GET /sessions, which reads
@@ -19,16 +21,22 @@ import { fetchSessions, type SessionSummary } from "@/lib/resume/api";
  * themselves.
  */
 const CvMyData = () => {
+  const guest = useIsGuest();
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
 
   useEffect(() => {
     document.title = "CV Builder — History";
+    // Don't spend an API round-trip when the page will be behind the gate
+    // anyway — a guest has no signed-up history to load.
+    if (guest) {
+      setSessions([]);
+      return;
+    }
     void fetchSessions().then(setSessions);
-  }, []);
+  }, [guest]);
 
-  return (
-    <CvAppShell>
-      <main className="mx-auto flex min-h-[calc(100svh-3.5rem)] w-full max-w-2xl flex-col px-4 pb-4 pt-6">
+  const page = (
+    <main className="mx-auto flex min-h-[calc(100svh-3.5rem)] w-full max-w-2xl flex-col px-4 pb-4 pt-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="font-sora text-2xl font-bold">History</h1>
@@ -97,6 +105,11 @@ const CvMyData = () => {
           ))}
         </div>
       </main>
+  );
+
+  return (
+    <CvAppShell>
+      <CvGuestGate what="your saved CVs">{page}</CvGuestGate>
     </CvAppShell>
   );
 };

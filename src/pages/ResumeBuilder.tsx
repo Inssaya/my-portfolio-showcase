@@ -266,13 +266,18 @@ const ResumeBuilder = () => {
                     />
                   ))}
                 </div>
-                {longWait ? (
-                  <span className="text-xs text-muted-foreground">
-                    Waking up the server — this can take up to a minute the first time.
-                  </span>
-                ) : status === "uploading" ? (
+                {status === "uploading" ? (
                   <span className="text-xs text-muted-foreground">
                     Reading your CV…
+                  </span>
+                ) : longWait ? (
+                  // A backend that has been idle can take up to a minute to
+                  // wake, and 50 seconds of silent dots reads as broken. The
+                  // technical explanation ("waking up the server") is not
+                  // what a visitor came here to learn, so this just says the
+                  // one thing that reassures — the app is on it.
+                  <span className="text-xs text-muted-foreground">
+                    Thinking…
                   </span>
                 ) : null}
               </div>

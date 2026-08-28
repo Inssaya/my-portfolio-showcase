@@ -4,10 +4,13 @@ import { motion } from "framer-motion";
 import { Sparkles, User as UserIcon, Mail, Calendar, Pencil, Check, X } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import CvAppShell from "@/components/cv/CvAppShell";
+import CvGuestGate from "@/components/cv/CvGuestGate";
 import { supabase } from "@/lib/supabase";
+import { useIsGuest } from "@/lib/cv/guest";
 
 const CvProfile = () => {
   const navigate = useNavigate();
+  const guest = useIsGuest();
 
   // --- State ---
   const [user, setUser] = useState<User | null>(null);
@@ -142,6 +145,28 @@ const CvProfile = () => {
       setIsSaving(false);
     }
   }, [editFirstName, editLastName]);
+
+  // A guest has no profile to show — Supabase gave them a real account but
+  // no name and no email address, so every field is empty. Gate first, so
+  // the blurred content below doesn't flash into view for a frame while the
+  // real user load completes.
+  if (guest) {
+    return (
+      <CvAppShell>
+        <CvGuestGate what="your profile">
+          <main className="mx-auto w-full max-w-md px-5 pb-12 pt-10">
+            <div className="flex flex-col items-center text-center">
+              <div className="h-20 w-20 rounded-full bg-gradient-to-br from-accent/25 to-accent/5 ring-1 ring-accent/20" />
+              <div className="mt-4 h-6 w-40 rounded bg-secondary/60" />
+              <div className="mt-2 h-4 w-56 rounded bg-secondary/40" />
+              <div className="mt-4 h-6 w-48 rounded-full bg-accent/10" />
+            </div>
+            <div className="mt-8 h-40 rounded-2xl border border-border/60 bg-card/50" />
+          </main>
+        </CvGuestGate>
+      </CvAppShell>
+    );
+  }
 
   // --- Loading ---
   if (isLoading) {

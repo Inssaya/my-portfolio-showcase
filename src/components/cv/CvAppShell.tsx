@@ -1,7 +1,7 @@
 import { ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import type { User } from "@supabase/supabase-js";
-import { ArrowLeft, FileText, History, LayoutTemplate, LogOut, Mail, Menu, Plus, User as UserIcon } from "lucide-react";
+import { ArrowLeft, FileText, History, LayoutTemplate, Lock, LogOut, Mail, Menu, Plus, Sparkles, User as UserIcon } from "lucide-react";
 import {
   Sheet,
   SheetClose,
@@ -25,11 +25,15 @@ import { guestName, isGuest } from "@/lib/cv/guest";
  * product. Every authenticated /cv-builder/* page renders inside this.
  */
 
+// `guestOnly` means the page is available even without an account (the
+// builder itself, and the public contact form the portfolio already has).
+// Anything else — history, profile — is behind CvGuestGate; the entry
+// stays in the menu so a guest knows the page exists, but it wears a lock.
 const ITEMS = [
-  { to: "/cv-builder", label: "CV Builder", icon: FileText },
-  { to: "/cv-builder/mydata", label: "History", icon: History },
-  { to: "/cv-builder/profile", label: "Profile", icon: UserIcon },
-  { to: "/cv-builder/contact", label: "Contact", icon: Mail },
+  { to: "/cv-builder", label: "CV Builder", icon: FileText, guestOnly: true },
+  { to: "/cv-builder/mydata", label: "History", icon: History, guestOnly: false },
+  { to: "/cv-builder/profile", label: "Profile", icon: UserIcon, guestOnly: false },
+  { to: "/cv-builder/contact", label: "Contact", icon: Mail, guestOnly: true },
 ];
 
 interface CvAppShellProps {
@@ -136,6 +140,7 @@ const CvAppShell = ({ children, cvReady = false, sessionId = null }: CvAppShellP
               <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
                 {ITEMS.map((item) => {
                   const active = location.pathname === item.to;
+                  const locked = guest && !item.guestOnly;
                   return (
                     <SheetClose asChild key={item.to}>
                       <Link
@@ -147,7 +152,19 @@ const CvAppShell = ({ children, cvReady = false, sessionId = null }: CvAppShellP
                         }`}
                       >
                         <item.icon size={16} />
-                        {item.label}
+                        <span className="flex-1">{item.label}</span>
+                        {/* A lock on the entry, not a hidden entry — the
+                            visitor should see the page exists, and clicking
+                            still works: it lands them on the gate, which is
+                            the same account form the "Save work" button
+                            opens. */}
+                        {locked && (
+                          <Lock
+                            size={12}
+                            className="text-muted-foreground/60"
+                            aria-label="Requires an account"
+                          />
+                        )}
                       </Link>
                     </SheetClose>
                   );
@@ -164,14 +181,31 @@ const CvAppShell = ({ children, cvReady = false, sessionId = null }: CvAppShellP
                     Back to portfolio
                   </Link>
                 </SheetClose>
-                <button
-                  type="button"
-                  onClick={() => void supabase?.auth.signOut()}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-destructive/90 transition-colors hover:bg-destructive/10"
-                >
-                  <LogOut size={16} />
-                  Sign out
-                </button>
+                {/* A guest has no account to sign out of — sign-out would
+                    just destroy the anonymous session they're mid-CV in.
+                    So the same slot offers what a guest actually wants
+                    from it: turning that session into a real account. */}
+                {guest ? (
+                  <SheetClose asChild>
+                    <button
+                      type="button"
+                      onClick={promptToSave}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/10"
+                    >
+                      <Sparkles size={16} />
+                      Create your account
+                    </button>
+                  </SheetClose>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void supabase?.auth.signOut()}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-destructive/90 transition-colors hover:bg-destructive/10"
+                  >
+                    <LogOut size={16} />
+                    Sign out
+                  </button>
+                )}
               </div>
             </SheetContent>
           </Sheet>
