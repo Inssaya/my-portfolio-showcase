@@ -1,4 +1,5 @@
 import { FormEvent, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, Loader2, Lock, X } from "lucide-react";
 import { convertGuestAccount, verifyEmailCode } from "@/lib/cv/guest";
@@ -36,6 +37,7 @@ const CvSaveWorkPrompt = ({
   reason = "save",
   onSaved,
 }: CvSaveWorkPromptProps) => {
+  const navigate = useNavigate();
   const [step, setStep] = useState<"details" | "code" | "done">("details");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -87,6 +89,21 @@ const CvSaveWorkPrompt = ({
 
   const heading =
     reason === "download" ? "Your CV is ready to download" : "Keep this CV";
+
+  /**
+   * For a guest who already has an account elsewhere. This form only ever
+   * creates a new one (`convertGuestAccount` calls `updateUser`, which fails
+   * outright if the address is already registered) — without this way out, a
+   * returning visitor would have no path back to their existing account from
+   * here, only the confusing "Couldn't create your account" this form's
+   * submit would report. /cv-builder/login already knows how to handle a
+   * guest signing into a different account: it swaps the session and says so
+   * up front, so nothing further needs explaining here.
+   */
+  const goToSignIn = () => {
+    onClose();
+    navigate("/cv-builder/login");
+  };
 
   return (
     <AnimatePresence>
@@ -256,7 +273,18 @@ const CvSaveWorkPrompt = ({
                   </button>
                 </form>
 
-                <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+                <p className="mt-4 text-center text-xs text-muted-foreground">
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={goToSignIn}
+                    className="font-semibold text-accent hover:underline"
+                  >
+                    Sign in
+                  </button>
+                </p>
+
+                <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
                   <Lock size={11} />
                   Your CV stays private to your account.
                 </p>
