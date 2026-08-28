@@ -80,7 +80,14 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    # PATCH is the template picker (/session/{id}/style) — omitted here once,
+    # which does not fail loudly: the browser's preflight just declines to
+    # grant the method, so the real PATCH never leaves the browser and fetch()
+    # rejects with an opaque "Failed to fetch". Nothing server-side ever saw
+    # the request, so `session.style` silently stayed whatever it was before —
+    # a picker that spins forever and a Rebuild that keeps using the old
+    # template are the same one missing entry, not two separate bugs.
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     # "authorization" carries the Supabase bearer token on every request now
     # that routes are gated — omitting it does not error, it just makes the
     # browser silently drop the header on preflight, which reads as a random

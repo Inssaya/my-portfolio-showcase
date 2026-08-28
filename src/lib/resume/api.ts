@@ -369,14 +369,21 @@ export async function setSessionStyle(
   style: string,
 ): Promise<string | null> {
   if (!resumeApiConfigured) return null;
-  const response = await fetch(`${BASE_URL}/session/${sessionId}/style`, {
-    method: "PATCH",
-    headers: { "content-type": "application/json", ...(await authHeader()) },
-    body: JSON.stringify({ style }),
-  });
-  if (!response.ok) return null;
-  const body = (await response.json()) as { style: string };
-  return body.style ?? null;
+  try {
+    const response = await fetch(`${BASE_URL}/session/${sessionId}/style`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...(await authHeader()) },
+      body: JSON.stringify({ style }),
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { style: string };
+    return body.style ?? null;
+  } catch {
+    // A rejected fetch (offline, a dropped connection, a CORS block) must
+    // still resolve to "did not save" — the caller's UI state (the picker's
+    // saving spinner) depends on this always settling, never throwing.
+    return null;
+  }
 }
 
 export interface SessionSummary {

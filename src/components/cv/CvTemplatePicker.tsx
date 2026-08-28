@@ -86,11 +86,18 @@ const CvTemplatePicker = ({
 
     if (sessionId) {
       setSaving(style);
-      const saved = await setSessionStyle(sessionId, style);
-      setSaving(null);
-      if (!saved) {
-        setError("Couldn't save that choice. Try again.");
-        return;
+      // try/finally: a rejected call here must never leave `saving` set
+      // forever with no way to clear it short of a reload — that shipped
+      // once already (a missing CORS method turned into an infinite spinner
+      // rather than the "couldn't save" message below).
+      try {
+        const saved = await setSessionStyle(sessionId, style);
+        if (!saved) {
+          setError("Couldn't save that choice. Try again.");
+          return;
+        }
+      } finally {
+        setSaving(null);
       }
     }
 

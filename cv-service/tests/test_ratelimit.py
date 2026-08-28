@@ -156,6 +156,33 @@ def test_health_and_ping_are_not_special_cased_out_of_the_global_limit(client: T
     assert client.get("/health").status_code == 429
 
 
+def test_patch_is_allowed_by_cors(client: TestClient) -> None:
+    """A route added with a new HTTP method is invisible to this test suite —
+    TestClient talks to the app directly and never runs a browser's preflight
+    check, so a route can pass every other test and still be unreachable from
+    the actual frontend.
+
+    This shipped once for real: `/session/{id}/style` (PATCH) was added, CORS
+    was not told about the method, and nothing failed loudly. The browser's
+    preflight just declined to grant PATCH, so the real request never left the
+    browser — the visitor saw a picker that span forever, and the server never
+    even saw a request to explain why.
+    """
+    preflight = client.options(
+        "/session/some-id/style",
+        headers={
+            "Origin": "http://localhost:8080",
+            "Access-Control-Request-Method": "PATCH",
+        },
+    )
+    allowed = preflight.headers.get("access-control-allow-methods", "")
+    assert "PATCH" in allowed, (
+        f"CORS does not grant PATCH ({allowed!r}) — a route using it is "
+        "unreachable from a browser even though every other test can call it "
+        "directly."
+    )
+
+
 def test_disabling_rate_limiting_lifts_the_global_limit(monkeypatch, client: TestClient) -> None:
     from app.config import get_settings, reset_settings
 
