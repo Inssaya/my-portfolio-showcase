@@ -3,6 +3,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Check, Loader2, X } from "lucide-react";
 import { setSessionStyle } from "@/lib/resume/api";
 import modernThumb from "@/assets/cv-templates/modern.jpg";
+import modernBlueThumb from "@/assets/cv-templates/modern-blue.jpg";
+import modernPlumThumb from "@/assets/cv-templates/modern-plum.jpg";
+import modernBurgundyThumb from "@/assets/cv-templates/modern-burgundy.jpg";
 import classicThumb from "@/assets/cv-templates/classic.jpg";
 import classicBlueThumb from "@/assets/cv-templates/classic-blue.jpg";
 import classicGreenThumb from "@/assets/cv-templates/classic-green.jpg";
@@ -10,6 +13,9 @@ import classicBurgundyThumb from "@/assets/cv-templates/classic-burgundy.jpg";
 
 export type CvTemplate =
   | "modern"
+  | "modern-blue"
+  | "modern-plum"
+  | "modern-burgundy"
   | "classic"
   | "classic-blue"
   | "classic-green"
@@ -17,8 +23,14 @@ export type CvTemplate =
 
 export const DEFAULT_TEMPLATE: CvTemplate = "modern";
 
+/** Order matches the backend's PICKABLE_STYLES: each layout followed by its
+ *  own recolours, so the grid reads as two families rather than eight
+ *  unrelated cards. */
 const TEMPLATES: CvTemplate[] = [
   "modern",
+  "modern-blue",
+  "modern-plum",
+  "modern-burgundy",
   "classic",
   "classic-blue",
   "classic-green",
@@ -32,12 +44,15 @@ const TEMPLATES: CvTemplate[] = [
  * `classic` layout — light and cream where the real render is a full-height
  * dark sidebar with a taupe banner — and a visitor who picked it got back a
  * CV that looked nothing like what they chose. These are PNG screenshots of
- * `build_resume()`'s actual output (Yassine's real CV, all 5 pickable
- * styles), so what is shown here is what downloading produces — full stop,
+ * `build_resume()`'s actual output (Yassine's real CV, every pickable
+ * style), so what is shown here is what downloading produces — full stop,
  * not "an impression of it".
  */
 const THUMBNAILS: Record<CvTemplate, string> = {
   modern: modernThumb,
+  "modern-blue": modernBlueThumb,
+  "modern-plum": modernPlumThumb,
+  "modern-burgundy": modernBurgundyThumb,
   classic: classicThumb,
   "classic-blue": classicBlueThumb,
   "classic-green": classicGreenThumb,
@@ -46,6 +61,9 @@ const THUMBNAILS: Record<CvTemplate, string> = {
 
 export const TEMPLATE_LABELS: Record<CvTemplate, { label: string; caption: string }> = {
   modern: { label: "Modern", caption: "Teal sidebar, cream page. The house style." },
+  "modern-blue": { label: "Modern — Blue", caption: "Modern's layout, navy sidebar." },
+  "modern-plum": { label: "Modern — Plum", caption: "Modern's layout, deep plum sidebar." },
+  "modern-burgundy": { label: "Modern — Burgundy", caption: "Modern's layout, wine sidebar." },
   classic: { label: "Classic", caption: "Serif with a photo header. Taupe accent." },
   "classic-blue": { label: "Classic — Blue", caption: "Classic's layout, slate blue accent." },
   "classic-green": { label: "Classic — Green", caption: "Classic's layout, forest green accent." },
@@ -156,8 +174,8 @@ const CvTemplatePicker = ({
           onClick={onClose}
         >
           {/* max-h + its own overflow-y is what keeps this usable on a phone:
-              five full CV-shaped preview cards are taller than a phone
-              viewport, and without an internal scroll the dialog used to
+              a column of full CV-shaped preview cards is far taller than a
+              phone viewport, and without an internal scroll the dialog used to
               overflow a `fixed` ancestor with nothing to scroll it — the
               header and close button ended up pushed off-screen with no way
               back to them. Capped to dvh, not vh, so mobile Chrome's
@@ -191,7 +209,11 @@ const CvTemplatePicker = ({
             </div>
 
             <div className="overflow-y-auto px-6 py-4">
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {/* 4 across on desktop is not arbitrary: there are four modern
+                  variants and four classic ones, so each family lands on its
+                  own row and the two layouts read as two groups rather than
+                  eight unrelated cards. */}
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {TEMPLATES.map((style) => (
                   <TemplateCard
                     key={style}

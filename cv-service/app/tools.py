@@ -97,12 +97,14 @@ TOOL_SCHEMAS: list[dict] = [
                         "type": "string",
                         "enum": list(PICKABLE_STYLES),
                         "description": (
-                            "'modern' is the default house style: teal sidebar, cream page. "
-                            "'classic' is serif with a photo header, taupe accent. "
-                            "'classic-blue', 'classic-green' and 'classic-burgundy' are the "
-                            "same layout as 'classic' with only the accent colour changed. "
-                            "Only pass this if the visitor expressed a preference — the "
-                            "picker in the UI is where they usually make this choice."
+                            "Two layouts, each with three recolours. 'modern' is the default "
+                            "house style: teal sidebar, cream page, sans-serif — with "
+                            "'modern-blue', 'modern-plum' and 'modern-burgundy' as the same "
+                            "layout in another colour. 'classic' is serif with a photo "
+                            "banner and taupe accent — with 'classic-blue', 'classic-green' "
+                            "and 'classic-burgundy' likewise. Only pass this if the visitor "
+                            "expressed a preference — the picker in the UI is where they "
+                            "usually make this choice."
                         ),
                     },
                     "language": {

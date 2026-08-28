@@ -40,6 +40,23 @@ SIDE_HEAD = colors.HexColor("#C2C6CF")
 SIDE_BODY = colors.HexColor("#E4E6EA")
 SIDE_LINK = colors.HexColor("#CFE0DC")
 SIDE_STRONG = colors.white
+PHOTO_RING = colors.HexColor("#3D6070")   # hairline lifting the portrait off the band
+
+
+def _toward_white(hex_colour: str, amount: float):
+    """Blend a colour toward white — how the derived sidebar tints are made.
+
+    The photo ring and the link tint are both lighter relatives of the sidebar
+    band, not independent choices. Deriving them means a recolour picks two
+    colours (band + accent) instead of four, and cannot end up with a ring
+    that belongs to a different palette than the band it sits on.
+    """
+    base = colors.HexColor(hex_colour)
+    return colors.Color(
+        base.red + (1.0 - base.red) * amount,
+        base.green + (1.0 - base.green) * amount,
+        base.blue + (1.0 - base.blue) * amount,
+    )
 
 # ---- geometry --------------------------------------------------------------
 SIDEBAR_W = 202.3
@@ -198,11 +215,26 @@ class ModernCV:
     number and everything is replayed in page order at the end.
     """
 
-    def __init__(self, buffer, title: str):
+    def __init__(self, buffer, title: str, sidebar: str | None = None,
+                 accent: str | None = None):
         _register_fonts()
         self.c = pdfcanvas.Canvas(buffer, pagesize=(PAGE_W, PAGE_H))
         self.c.setTitle(title)
         self.ops: list[tuple[int, object]] = []
+
+        # Two colours carry this template: the sidebar band and the accent used
+        # for the headline, section heads, employers and bullet dots. The ring
+        # around the portrait and the link tint are lighter relatives of the
+        # band, derived rather than passed, so a variant cannot half-recolour.
+        #
+        # Passing neither reproduces the reference palette *exactly* — the
+        # measured hexes, not a re-derivation of them — because `modern` is the
+        # house style and matches a printed reference (tests/test_fidelity.py).
+        # A recolour must not be able to move it by a shade.
+        self.sidebar_bg = colors.HexColor(sidebar) if sidebar else SIDEBAR_BG
+        self.accent = colors.HexColor(accent) if accent else ACCENT
+        self.photo_ring = _toward_white(sidebar, 0.14) if sidebar else PHOTO_RING
+        self.side_link = _toward_white(sidebar, 0.80) if sidebar else SIDE_LINK
 
         self.side_page = 0
         self.side_y = SIDE_TOP
@@ -221,7 +253,7 @@ class ModernCV:
     def _furniture(self) -> None:
         self.c.setFillColor(PAGE_BG)
         self.c.rect(0, 0, PAGE_W, PAGE_H, stroke=0, fill=1)
-        self.c.setFillColor(SIDEBAR_BG)
+        self.c.setFillColor(self.sidebar_bg)
         self.c.rect(0, 0, SIDEBAR_W, PAGE_H, stroke=0, fill=1)
 
     def _emit(self, page: int, draw) -> None:
@@ -249,9 +281,9 @@ class ModernCV:
         return x + width
 
     def _dot(self, page: int, x: float, top_down: float, radius: float) -> None:
-        def draw(c, _y=self._y(top_down)):
+        def draw(c, _y=self._y(top_down), _accent=self.accent):
             c.saveState()
-            c.setFillColor(ACCENT)
+            c.setFillColor(_accent)
             c.circle(x, _y + 2.6, radius, stroke=0, fill=1)
             c.restoreState()
 
@@ -282,7 +314,7 @@ class ModernCV:
 
         cy = self._y(PHOTO_CY)
 
-        def draw(c):
+        def draw(c, _ring=self.photo_ring):
             c.saveState()
             clip = c.beginPath()
             clip.circle(PHOTO_CX, cy, PHOTO_R)
@@ -292,7 +324,7 @@ class ModernCV:
             c.restoreState()
             # A hairline ring lifts the portrait off the sidebar without framing it.
             c.saveState()
-            c.setStrokeColor(colors.HexColor("#3D6070"))
+            c.setStrokeColor(_ring)
             c.setLineWidth(1.6)
             c.circle(PHOTO_CX, cy, PHOTO_R + 0.8, stroke=1, fill=0)
             c.restoreState()
@@ -318,7 +350,7 @@ class ModernCV:
     def side_lines(self, lines: list[str], link_tint: bool = False) -> None:
         """One entry per line, on the wide sidebar pitch (contact, languages)."""
         for item in lines:
-            colour = SIDE_LINK if (link_tint and _looks_like_link(item)) else SIDE_BODY
+            colour = self.side_link if (link_tint and _looks_like_link(item)) else SIDE_BODY
             wrapped = _wrap(item, SANS, SIDE_CONTACT_SIZE, SIDE_W)
             self._side_room(len(wrapped) * TIGHT_LEAD + 6)
             for index, line in enumerate(wrapped):
@@ -377,14 +409,14 @@ class ModernCV:
         self.main_last = self.main_y
         if headline:
             self.main_y += 20.2
-            self._text(0, MAIN_X, self.main_y, headline, SANS_B, HEADLINE_SIZE, ACCENT)
+            self._text(0, MAIN_X, self.main_y, headline, SANS_B, HEADLINE_SIZE, self.accent)
             self.main_last = self.main_y
 
     def heading(self, text: str) -> None:
         self.main_y = self.main_last + SEC_GAP
         self._main_room(30)
         self._text(self.main_page, MAIN_X, self.main_y, text.upper(), SANS_B,
-                   SEC_HEAD_SIZE, ACCENT, track=SEC_HEAD_TRACK)
+                   SEC_HEAD_SIZE, self.accent, track=SEC_HEAD_TRACK)
         self.main_last = self.main_y
         self.main_y += SEC_DROP
         self.main_fresh = True
@@ -436,7 +468,7 @@ class ModernCV:
 
             if org_inline:
                 self._text(self.main_page, end + _space(SANS_B, ENTRY_TITLE_SIZE), self.main_y,
-                           f"\u2014 {entry.org}", SANS_B, ENTRY_TITLE_SIZE, ACCENT)
+                           f"\u2014 {entry.org}", SANS_B, ENTRY_TITLE_SIZE, self.accent)
             if entry.dates:
                 self._text(self.main_page, 0, self.main_y, entry.dates, SANS,
                            META_SIZE, META_INK, right=MAIN_RIGHT)

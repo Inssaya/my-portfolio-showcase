@@ -8,17 +8,22 @@ it) against a design sample. What changed is the boundary: the Hub stored an
 artifact and handed the model a handle, whereas here the caller wants the
 bytes, so `build_resume` returns them and the HTTP layer decides what to do.
 
-Templates:
+Two layouts, each with three recolours, plus `bold`:
   modern            teal sidebar, cream page, sans-serif. The house style, default.
+  modern-blue       modern's exact layout, recoloured — navy band, blue accent.
+  modern-plum       modern's exact layout, recoloured — plum band and accent.
+  modern-burgundy   modern's exact layout, recoloured — wine band and accent.
   classic           serif/taupe with a photo header and language bars.
   classic-blue      classic's exact layout, recoloured — slate blue accent.
   classic-green     classic's exact layout, recoloured — forest green accent.
   classic-burgundy  classic's exact layout, recoloured — deep wine accent.
   bold              single column, circular photo masthead, coloured section rules.
 
-The three `classic-*` variants are not separate renderers — `CVRenderer` takes
-an `accent` colour (see `_cvdesign.py`), and these are the one file recoloured
-three times, not three more vendored layouts to keep in sync by hand.
+The `-colour` variants are not separate renderers. `CVRenderer` takes an
+`accent` and `ModernCV` a `sidebar`+`accent` (see `_cvdesign.py` and
+`_cvmodern.py`); each variant is the one vendored file recoloured, not another
+measured layout to keep in sync by hand. Both base styles pass no colours at
+all, so they keep their exact measured palettes.
 """
 from __future__ import annotations
 
@@ -62,14 +67,30 @@ CLASSIC_ACCENTS: dict[str, str] = {
     "classic-burgundy": "#7A3B42",
 }
 
-STYLES = ("modern", "classic", *CLASSIC_ACCENTS, "bold")
+# Recolours of `modern`. Two colours each, not one: this template is carried by
+# the sidebar band *and* the accent (headline, section heads, employers, bullet
+# dots), and moving only one leaves a plum sidebar with teal headings. The
+# portrait ring and link tint are derived from the band inside ModernCV.
+#
+# Plain `modern` is deliberately absent — it passes neither colour and so keeps
+# the exact measured reference palette. See ModernCV.__init__.
+MODERN_PALETTES: dict[str, tuple[str, str]] = {
+    #                     sidebar band, accent
+    "modern-blue": ("#1E3A5F", "#14507A"),
+    "modern-plum": ("#3E2A47", "#6E3364"),
+    "modern-burgundy": ("#46242A", "#7A3B42"),
+}
 
-# What the visitor may pick from in the UI. The renderer still knows how to
-# draw `bold` — it remains reachable for stored sessions and tests — but the
-# picker keeps the choice to the recognisably different layouts (modern,
-# classic) plus its three recolours, so there is no near-duplicate pair for a
-# visitor to puzzle over.
-PICKABLE_STYLES = ("modern", "classic", *CLASSIC_ACCENTS)
+STYLES = ("modern", *MODERN_PALETTES, "classic", *CLASSIC_ACCENTS, "bold")
+
+# What the visitor may pick from in the UI: the two layouts, each with its
+# three recolours. `bold` stays out — the renderer still knows how to draw it
+# for stored sessions and tests, but it has no printed reference behind it and
+# offering a third layout shape is a different decision from offering colours.
+#
+# Order matters: this is the order the picker lays cards out in, so each
+# layout sits with its own variants rather than interleaved with the other's.
+PICKABLE_STYLES = ("modern", *MODERN_PALETTES, "classic", *CLASSIC_ACCENTS)
 
 # ------------------------------------------------------------- typography ---
 # The reference CV distinguishes three separators that a model — and most
@@ -322,7 +343,10 @@ def build_resume(
     labels = LABELS.get(language, LABELS["en"])
     full_name = normalise_name(full_name)
     buffer = io.BytesIO()
-    cv = ModernCV(buffer, title=f"{full_name} - CV")
+    # `modern` itself passes neither colour, so it keeps the exact reference
+    # palette rather than a re-derivation of it (tests/test_fidelity.py).
+    sidebar, accent = MODERN_PALETTES.get(style, (None, None))
+    cv = ModernCV(buffer, title=f"{full_name} - CV", sidebar=sidebar, accent=accent)
 
     if photo:
         cv.photo(photo)
