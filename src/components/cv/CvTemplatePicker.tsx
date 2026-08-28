@@ -344,95 +344,82 @@ const ModernPreview = () => (
 );
 
 /**
- * A miniature of the classic template: photo header across the top, serif
- * type, taupe accents, and a shorter sidebar on the right for skills.
+ * A miniature of the actual `classic` renderer (`_cvdesign.py`), not a
+ * loosely-inspired restyle.
+ *
+ * It shipped once as a restyle — a light cream card, a thin taupe strip, a
+ * sidebar on the *right* — and the real PDF a visitor got back looked
+ * nothing like what they picked: a full-height dark sidebar on the *left*, a
+ * taupe banner spanning the top with the photo and name on it, and taupe
+ * filled badges (not plain coloured text) for every section heading in the
+ * main column. Every colour below is the same hex `_cvdesign.py` paints with
+ * (DARK/TAUPE/SIDE_TEXT/BODY/SUBTLE), and every position is that file's own
+ * point coordinates converted to a percentage of the A4 page (595×842pt) —
+ * not eyeballed, so it cannot drift from the renderer the way a loosely-
+ * inspired restyle already did once.
  */
 const ClassicPreview = () => (
-  <div
-    className="absolute inset-0 flex flex-col text-[6px] leading-snug"
-    style={{ background: "#F6F3ED", color: "#3A3734" }}
-  >
+  <div className="absolute inset-0" style={{ background: "#FFFFFF" }}>
+    {/* Sidebar: full height, x 0–200/595 ≈ 33.6%. */}
+    <div className="absolute inset-y-0 left-0 w-[33.6%]" style={{ background: "#282830" }} />
+
+    {/* Banner: x 40–554.5/595, y 40–188/842. Painted after the sidebar so it
+        overlaps the top of it, exactly as header()'s notch-then-banner order
+        does in the real render. */}
     <div
-      className="flex items-center gap-2 px-3 py-2"
-      style={{ background: "#EBE4D6" }}
-    >
-      <div
-        className="h-8 w-8 shrink-0 rounded-full border"
-        style={{
-          background: "linear-gradient(135deg, #a8967a, #6b5940)",
-          borderColor: "#8a7860",
-        }}
-      />
-      <div>
-        <p
-          className="font-serif text-[12px] leading-none"
-          style={{ color: "#2C2418" }}
-        >
-          Yassine Sinif
-        </p>
-        <p className="mt-0.5 italic" style={{ color: "#7a6a4e" }}>
-          AI &amp; Data Engineering
-        </p>
-        <p className="mt-0.5" style={{ color: "#8a7860" }}>
-          Casablanca · yassinsinif4@gmail.com
-        </p>
-      </div>
+      className="absolute"
+      style={{ left: "6.7%", top: "4.7%", width: "86.5%", height: "17.6%", background: "#B59E96" }}
+    />
+    {/* Photo: centre 121/595, 106/842, radius 46pt. */}
+    <div
+      className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-gradient-to-br from-neutral-400 to-neutral-600"
+      style={{ left: "20.3%", top: "12.6%", width: "13.6%", aspectRatio: "1 / 1" }}
+    />
+    {/* Name + contact: x 220/595 ≈ 37%. */}
+    <div className="absolute text-white" style={{ left: "37%", top: "9.5%", width: "56%" }}>
+      <p className="font-serif text-[9px] font-bold uppercase leading-none">Yassine Sinif</p>
+      <p className="mt-[3px] text-[5px] leading-tight">yassinsinif4@gmail.com</p>
+      <p className="text-[5px] leading-tight">Casablanca, Morocco</p>
     </div>
-    <div className="flex flex-1">
-      <div className="flex-1 px-3 py-2">
-        <p
-          className="font-serif text-[7px] font-bold uppercase tracking-widest"
-          style={{ color: "#7a6a4e" }}
-        >
-          Profile
-        </p>
-        <p className="mt-0.5 italic leading-snug">
-          Engineering student in AI &amp; Data Science, final year.
-        </p>
-        <p
-          className="mt-2 font-serif text-[7px] font-bold uppercase tracking-widest"
-          style={{ color: "#7a6a4e" }}
-        >
-          Experience
-        </p>
-        <p className="mt-0.5 font-bold" style={{ color: "#2C2418" }}>
-          AI Data Engineer Intern
-        </p>
-        <p style={{ color: "#8a7860" }}>Aptiv · Tangier · 2026 – Present</p>
-        <p className="mt-1">Predictive maintenance and agentic RAG assistant.</p>
-        <p
-          className="mt-2 font-serif text-[7px] font-bold uppercase tracking-widest"
-          style={{ color: "#7a6a4e" }}
-        >
-          Education
-        </p>
-        <p className="mt-0.5 font-bold" style={{ color: "#2C2418" }}>
-          Engineering Degree
-        </p>
-        <p style={{ color: "#8a7860" }}>EMSI Casablanca · 2022</p>
-      </div>
-      <div
-        className="w-[32%] shrink-0 border-l px-2 py-2"
-        style={{ borderColor: "#D9CFB8", background: "#F0EAD9" }}
+
+    {/* Both columns start at CONTENT_TOP = 218/842 ≈ 25.9%. */}
+    <div
+      className="absolute px-1.5 text-[5.5px] leading-tight"
+      style={{ left: "6.7%", top: "26%", width: "23%", color: "#E0E0E1" }}
+    >
+      <p className="font-serif font-bold tracking-widest" style={{ color: "#B59E96" }}>
+        SKILLS
+      </p>
+      <p className="mt-1">Python, FastAPI</p>
+      <p>React, TypeScript</p>
+      <p className="mt-1.5 font-serif font-bold tracking-widest" style={{ color: "#B59E96" }}>
+        LANGUAGES
+      </p>
+      <p className="mt-1">Arabic</p>
+      <div className="mt-[1px] h-[1.5px] w-full" style={{ background: "#B59E96" }} />
+    </div>
+
+    <div
+      className="absolute text-[5.5px] leading-snug"
+      style={{ left: "37%", top: "26%", width: "56%", color: "#1A1A1A" }}
+    >
+      <span
+        className="inline-block font-serif font-bold uppercase tracking-widest text-white"
+        style={{ background: "#B59E96", padding: "1px 4px" }}
       >
-        <p
-          className="font-serif text-[7px] font-bold uppercase tracking-widest"
-          style={{ color: "#7a6a4e" }}
-        >
-          Skills
-        </p>
-        <p className="mt-0.5">Python</p>
-        <p>FastAPI, React</p>
-        <p>SQL, MongoDB</p>
-        <p
-          className="mt-1.5 font-serif text-[7px] font-bold uppercase tracking-widest"
-          style={{ color: "#7a6a4e" }}
-        >
-          Languages
-        </p>
-        <p className="mt-0.5">Arabic — Native</p>
-        <p>English — B2</p>
-      </div>
+        Profile
+      </span>
+      <p className="mt-1 italic leading-snug">
+        Engineering student in AI &amp; Data Science, final year.
+      </p>
+      <span
+        className="mt-1.5 inline-block font-serif font-bold uppercase tracking-widest text-white"
+        style={{ background: "#B59E96", padding: "1px 4px" }}
+      >
+        Experience
+      </span>
+      <p className="mt-1 font-bold">AI Data Engineer Intern</p>
+      <p style={{ color: "#8A8A8A" }}>Aptiv · Tangier, Morocco</p>
     </div>
   </div>
 );
