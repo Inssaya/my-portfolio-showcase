@@ -721,6 +721,46 @@ def list_sessions(user: AuthUser = Depends(get_current_user)) -> dict:
     }
 
 
+# One message's worth of text. Long enough for any real reply; a guard against
+# a pathological turn making this response enormous, not a product decision.
+MAX_REPLAYED_CHARS = 4_000
+
+
+@app.get("/messages/{session_id}")
+def messages(session_id: str, user: AuthUser = Depends(get_current_user)) -> dict:
+    """The conversation so far, so reopening a past CV shows what was said.
+
+    The transcript was already being written to Postgres and restored on load
+    — it simply had no way out of the process. Nothing surfaced it, so
+    "Continue" from the History page dropped the visitor into a chat that
+    looked empty, next to a CV that plainly was not.
+
+    Only what a person actually said or was told is returned. Tool calls are
+    internal bookkeeping, and the `system` entry is the raw text extracted
+    from an upload — thousands of characters the visitor never typed and
+    should not have replayed at them. That upload becomes the one-line marker
+    it was on screen at the time, so the reply to it is not left answering
+    nothing.
+    """
+    session = store.get(session_id, user.id, user.access_token)
+    if session is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "That session has expired.")
+
+    turns: list[dict] = []
+    for entry in session.transcript:
+        role = entry.get("role")
+        if role == "system":
+            # The filename is not kept — the blob is the extracted text — so
+            # this says what happened without inventing a name for it.
+            turns.append({"role": "user", "content": "Uploaded a document"})
+        elif role in ("user", "assistant"):
+            content = (entry.get("content") or "").strip()
+            if content:
+                turns.append({"role": role, "content": content[:MAX_REPLAYED_CHARS]})
+
+    return {"session_id": session.id, "turns": turns}
+
+
 @app.get("/draft/{session_id}")
 def draft(session_id: str, user: AuthUser = Depends(get_current_user)) -> dict:
     """What the session currently holds. Powers the live preview panel."""

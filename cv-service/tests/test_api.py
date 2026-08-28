@@ -254,3 +254,60 @@ def test_ping_does_not_touch_settings_or_the_pool(monkeypatch, client: TestClien
     monkeypatch.setattr(main_module, "get_pool", explode)
 
     assert client.get("/ping").status_code == 200
+
+
+# ---------------------------------------------------- replaying a conversation
+
+def test_messages_replays_what_was_said(client: TestClient) -> None:
+    """Reopening a past CV has to show the conversation, not an empty chat.
+
+    The transcript was persisted and restored server-side all along — no
+    endpoint returned it, so "Continue" from History dropped the visitor into
+    a blank thread beside a finished CV.
+    """
+    session = store.create(user_id=TEST_USER_ID)
+    session.transcript = [
+        {"role": "user", "content": "Hi, I need a CV"},
+        {"role": "assistant", "content": "Happy to help — what's your name?"},
+    ]
+
+    body = client.get(f"/messages/{session.id}").json()
+
+    assert body["turns"] == [
+        {"role": "user", "content": "Hi, I need a CV"},
+        {"role": "assistant", "content": "Happy to help — what's your name?"},
+    ]
+
+
+def test_messages_hides_internals_but_keeps_the_upload_visible(client: TestClient) -> None:
+    """Two things must not reach the visitor: tool bookkeeping, and the raw
+    text extracted from their upload — thousands of characters they never
+    typed. The upload still has to leave a mark, or its reply is left
+    answering a message that appears not to exist.
+    """
+    session = store.create(user_id=TEST_USER_ID)
+    session.transcript = [
+        {"role": "system", "content": "NAME\nYassine\nSKILLS\n" + "x" * 5_000,
+         "kind": "upload"},
+        {"role": "tool", "name": "update_resume",
+         "arguments": {"field": "skills"}, "content": "Saved skills (6 lines)."},
+        {"role": "assistant", "content": "I've saved your skills."},
+    ]
+
+    turns = client.get(f"/messages/{session.id}").json()["turns"]
+
+    assert turns == [
+        {"role": "user", "content": "Uploaded a document"},
+        {"role": "assistant", "content": "I've saved your skills."},
+    ]
+    assert "update_resume" not in str(turns), "tool bookkeeping leaked to the visitor"
+    assert "xxxx" not in str(turns), "the raw upload text was replayed at the visitor"
+
+
+def test_messages_will_not_hand_over_someone_elses_conversation(client: TestClient) -> None:
+    """The transcript is the most personal thing here. Same rule as every other
+    session route: another user's id reads as one that does not exist."""
+    victim = store.create(user_id="someone-else")
+    victim.transcript = [{"role": "user", "content": "my private details"}]
+
+    assert client.get(f"/messages/{victim.id}").status_code == 404

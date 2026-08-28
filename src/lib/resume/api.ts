@@ -324,6 +324,34 @@ export async function removePhoto(sessionId: string): Promise<void> {
   await fetch(`${BASE_URL}/photo/${sessionId}`, { method: "DELETE", headers: await authHeader() });
 }
 
+export interface StoredTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/**
+ * The conversation already held against a session.
+ *
+ * Needed because opening a past CV from History used to show an empty chat:
+ * the transcript was persisted and restored server-side but never sent to the
+ * browser, so the visitor saw a blank thread beside a finished CV. Returns []
+ * on any failure — a chat that cannot load its history should still be usable
+ * for the next message rather than showing an error banner.
+ */
+export async function fetchMessages(sessionId: string): Promise<StoredTurn[]> {
+  if (!resumeApiConfigured) return [];
+  try {
+    const response = await fetch(`${BASE_URL}/messages/${sessionId}`, {
+      headers: await authHeader(),
+    });
+    if (!response.ok) return [];
+    const body = (await response.json()) as { turns: StoredTurn[] };
+    return body.turns ?? [];
+  } catch {
+    return [];
+  }
+}
+
 /** What the session currently holds. Drives the "Build my CV" button. */
 export async function fetchDraft(sessionId: string): Promise<DraftState | null> {
   if (!resumeApiConfigured) return null;

@@ -56,6 +56,39 @@ SECTION_PATTERNS: dict[str, tuple[str, ...]] = {
 }
 
 
+# "Programming Languages", "Languages & Frameworks", "Languages and Tools" —
+# a *skills sub-heading*, not the spoken-languages section.
+#
+# This cost a visitor their entire skills section. Their CV's sidebar read
+# "TECHNICAL SKILLS" then "LANGUAGES & FRAMEWORKS" then the technologies. The
+# first line opened `skills` correctly; the second matched the word
+# "languages" and closed it again immediately — so `skills` ended up empty and
+# was dropped, and every technology was filed under Languages next to "Arabic
+# — Native". The coherence check could not catch it either: the real
+# "LANGUAGES" heading later appended the actual spoken languages to the same
+# key, so the section did contain language-ish text and looked fine.
+#
+# Matched *before* the general vocabulary and mapped to `skills`, not merely
+# rejected as a heading: a CV whose only such heading is a standalone
+# "Programming Languages" (no "Skills" heading at all) then still files those
+# technologies under skills rather than dropping them into whatever section
+# happened to be open.
+_SKILLS_SUBHEADING = re.compile(
+    r"\b(?:programming|programmation|coding|scripting|markup|query|"
+    r"frameworks?|tools?|technolog\w*|librar\w*|software|development)\b",
+    re.I,
+)
+
+# The word that needs qualifying before it means "spoken languages".
+#
+# French is the useful case here: it separates the two senses lexically —
+# *langage* is a programming language, *langue* is one you speak — so
+# "Langages" needs no qualifier at all to be a skills heading, while "Langues"
+# is unambiguously the spoken section.
+_LANGUAGE_WORD = re.compile(r"(?<![\w'])(?:languages?|langues?)(?![\w'])", re.I)
+_PROGRAMMING_LANGUAGE_WORD = re.compile(r"(?<![\w'])langages?(?![\w'])", re.I)
+
+
 class ExtractionError(Exception):
     """Raised when the file cannot yield text at all."""
 
@@ -188,11 +221,56 @@ def _looks_like_heading(line: str) -> str | None:
         return None
 
     lowered = stripped.lower()
+
+    # Checked ahead of the general vocabulary: "Languages & Frameworks" has to
+    # read as a skills sub-heading before it can be read as the Languages
+    # section. A bare "Languages"/"Langues" carries no qualifier and so is
+    # unaffected; French "Langages" is programming-specific on its own.
+    if _PROGRAMMING_LANGUAGE_WORD.search(lowered):
+        return "skills"
+    if _LANGUAGE_WORD.search(lowered) and _SKILLS_SUBHEADING.search(lowered):
+        return "skills"
+
     for name, needles in SECTION_PATTERNS.items():
         for needle in needles:
             if re.search(rf"(?<![\w']){re.escape(needle)}s?(?![\w'])", lowered):
                 return name
     return None
+
+
+def _split_heading(line: str) -> tuple[str | None, str]:
+    """Split "Label: content" into its section and the content left on the line.
+
+    A heading is normally alone on its line, but three common shapes put real
+    content beside it, and treating the whole line as a heading silently ate
+    that content:
+
+        Languages & Frameworks: Python, Django    <- a wrapped skills group
+        Profile: Engineering student...           <- a one-line CV
+        Skills: Python, SQL
+
+    The first is not hypothetical: the `classic` template prints skills as
+    "Category: items" and wraps mid-list, so extracting a CV this service had
+    itself produced lost the first technology of every group — "Python" simply
+    vanished from a round trip.
+
+    Returns the section name and whatever followed the colon, so the caller can
+    open the section *and* keep the text. Only splits when the part before the
+    colon reads as a heading on its own; "Built a platform: it worked" is
+    ordinary prose and stays whole.
+    """
+    # The colon is checked *first*. "Languages & Frameworks: Python," is short
+    # enough and digit-free enough to satisfy the whole-line heading test on
+    # its own, so asking that question first would classify it as a bare
+    # heading and drop "Python" — which is exactly the bug.
+    label, separator, rest = line.partition(":")
+    if separator and rest.strip():
+        labelled = _looks_like_heading(label)
+        if labelled:
+            return labelled, rest.strip()
+        return None, ""
+
+    return _looks_like_heading(line), ""
 
 
 # Sections whose contents are self-evident enough to check. If one of these
@@ -347,10 +425,14 @@ def extract_cv(data: bytes, filename: str) -> dict:
     current: str | None = None
     preamble: list[str] = []
     for line in lines:
-        heading = _looks_like_heading(line)
+        heading, inline = _split_heading(line)
         if heading:
             current = heading
             sections.setdefault(current, [])
+            # "Skills: Python, SQL" opens the section *and* contributes its
+            # first line, rather than the label eating the content.
+            if inline:
+                sections[current].append(inline)
             continue
         (sections[current] if current else preamble).append(line)
 

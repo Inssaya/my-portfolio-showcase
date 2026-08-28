@@ -5,6 +5,7 @@ import {
   TIMED_OUT,
   downloadResume,
   fetchDraft,
+  fetchMessages,
   fetchPhotoUrl,
   fetchSessions,
   generateResume,
@@ -133,10 +134,8 @@ export function useResumeChat(initialSessionId?: string | null) {
   );
 
   // Opening a specific past session (My Data's "Continue" link): persist the
-  // override so a reload stays on it, and pull its draft state immediately —
-  // the chat transcript itself starts empty regardless (see the backend's
-  // Session.from_row docstring for why that is deliberate, not a bug), but
-  // the live preview panel (canBuild/pdfVersion/photo) should not wait for a
+  // override so a reload stays on it, and pull its draft state immediately so
+  // the live preview panel (canBuild/pdfVersion/photo) does not wait for a
   // first message to catch up.
   useEffect(() => {
     if (!initialSessionId) return;
@@ -146,6 +145,40 @@ export function useResumeChat(initialSessionId?: string | null) {
     // is stable across the identity that matters here (setPhoto).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSessionId]);
+
+  // Replay what was already said in this session.
+  //
+  // The model's own `history` deliberately starts empty — the draft is this
+  // app's memory, not a replayed transcript (see Session.from_row). That is
+  // about what the *model* is sent, and it was mistaken for a reason the
+  // *visitor* sees nothing: opening a past CV dropped them into a blank chat
+  // beside a finished document. The messages were being stored and restored
+  // all along; nothing sent them to the browser.
+  //
+  // Runs for whatever session this hook starts on, so a plain reload restores
+  // the thread too, not just "Continue" from History.
+  useEffect(() => {
+    const sessionId = sessionRef.current;
+    if (!sessionId) return;
+    let cancelled = false;
+
+    void fetchMessages(sessionId).then((stored) => {
+      // Three ways this can arrive too late to be wanted: the hook unmounted,
+      // the visitor moved to another session, or they started talking while
+      // it was in flight. Replaying an old thread over any of those would be
+      // worse than not replaying it at all.
+      if (cancelled || sessionRef.current !== sessionId || !stored.length) return;
+      setTurns((prev) => (prev.length ? prev : stored));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // Deliberately mount-only: `reset()` and `?new=1` clear the session, and
+    // re-running on every id change would re-fetch a thread the visitor is
+    // already mid-conversation in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const applyResponse = useCallback(
     (data: ChatResponse) => {

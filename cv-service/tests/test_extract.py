@@ -7,7 +7,13 @@ from __future__ import annotations
 import pytest
 
 from app.cv.builder import build_resume
-from app.cv.extract import SECTION_CAP, ExtractionError, extract_cv
+from app.cv.extract import (
+    SECTION_CAP,
+    ExtractionError,
+    _looks_like_heading,
+    _split_heading,
+    extract_cv,
+)
 
 PLAIN_CV = """\
 Yassine Sinif
@@ -39,6 +45,116 @@ def test_finds_sections_in_plain_text() -> None:
     assert set(result["sections"]) >= {"profile", "experience", "education", "skills", "languages"}
     assert "Aptiv" in result["sections"]["experience"]
     assert "full_text" not in result["sections"], "should not fall back when headings were found"
+
+
+# A real upload reproduced this, and it cost the visitor their entire skills
+# section. Their sidebar read "TECHNICAL SKILLS", then "LANGUAGES &
+# FRAMEWORKS", then the technologies — and the sub-heading matched the word
+# "languages", closing the skills section one line after it opened. `skills`
+# came out empty and was dropped; every technology was filed under Languages,
+# beside "Arabic — Native".
+#
+# The coherence guard could not catch it: the real "LANGUAGES" heading further
+# down appended the actual spoken languages to the same key, so the section
+# did contain language-ish text and passed the check.
+SUBHEADING_COLLISION_CV = (
+    "Yassine Sinif\n"
+    "AI & Data Engineering\n"
+    "\n"
+    "TECHNICAL SKILLS\n"
+    "LANGUAGES & FRAMEWORKS\n"
+    "Python, Django, FastAPI, React, TypeScript\n"
+    "DATA & ML\n"
+    "pandas, NumPy, scikit-learn, PyTorch\n"
+    "\n"
+    "LANGUAGES\n"
+    "Arabic - Native\n"
+    "French - B2\n"
+)
+
+
+def test_a_skills_subheading_does_not_hijack_the_languages_section() -> None:
+    sections = extract_cv(SUBHEADING_COLLISION_CV.encode("utf-8"), "cv.txt")["sections"]
+
+    skills = sections.get("skills", "")
+    assert "Python" in skills and "pandas" in skills, (
+        "the technologies did not reach skills — a sub-heading split the section"
+    )
+    # The other half: the real Languages section must still be exactly that,
+    # with none of the technology text swept into it.
+    languages = sections.get("languages", "")
+    assert "Arabic" in languages
+    assert "Python" not in languages, "technologies were filed as spoken languages"
+
+
+@pytest.mark.parametrize("style", ["modern", "classic"])
+def test_a_cv_this_service_rendered_survives_being_re_uploaded(style: str) -> None:
+    """The round trip a visitor actually performs: download a CV, upload it
+    back later to edit it.
+
+    Two separate faults both landed on skills here. The sub-heading collision
+    above emptied the section outright; then `classic` prints skills as
+    "Category: items" and wraps mid-list, so the line "Languages & Frameworks:
+    Python," was short and digit-free enough to read as a bare heading and be
+    consumed whole — quietly deleting the first technology of the group.
+    """
+    pdf, _ = build_resume(
+        style=style,
+        full_name="Yassine Sinif",
+        headline="AI & Data Engineering",
+        contact="Casablanca, Morocco\nyassinsinif4@gmail.com",
+        skills=(
+            "Languages & Frameworks: Python, Django, FastAPI\n"
+            "Data Engineering: PostgreSQL, Kafka, ETL"
+        ),
+        languages="Arabic - Native\nFrench - B2",
+    )
+    sections = extract_cv(pdf, "cv.pdf")["sections"]
+
+    skills = sections.get("skills", "")
+    for technology in ("Python", "Django", "PostgreSQL"):
+        assert technology in skills, f"{technology} was lost re-reading a {style} CV"
+
+    languages = sections.get("languages", "")
+    assert "Arabic" in languages
+    assert "Python" not in languages
+
+
+def test_a_labelled_line_keeps_its_content() -> None:
+    """"Skills: Python, SQL" has to open the section *and* keep the list.
+    Ordinary prose that merely contains a colon must stay a single line."""
+    assert _split_heading("Skills: Python, SQL") == ("skills", "Python, SQL")
+    assert _split_heading("Languages & Frameworks: Python,") == ("skills", "Python,")
+    assert _split_heading("TECHNICAL SKILLS") == ("skills", "")
+    assert _split_heading("Skills:") == ("skills", "")
+    assert _split_heading("Built a platform: it worked") == (None, "")
+
+
+@pytest.mark.parametrize(
+    "heading, expected",
+    [
+        # Skills sub-headings that name "languages" — the collision above.
+        ("LANGUAGES & FRAMEWORKS", "skills"),
+        ("Programming Languages", "skills"),
+        ("Languages and Tools", "skills"),
+        ("Languages & Technologies", "skills"),
+        # French separates the two senses lexically: a *langage* is a
+        # programming language, a *langue* is one you speak. So "Langages"
+        # needs no qualifier to be skills, and "Langues" is never skills.
+        ("Langages de programmation", "skills"),
+        ("Langages", "skills"),
+        # Unqualified — still the spoken-languages section.
+        ("LANGUAGES", "languages"),
+        ("Langues", "languages"),
+        ("Spoken Languages", "languages"),
+        # Untouched neighbours, in case the new rule runs too early.
+        ("TECHNICAL SKILLS", "skills"),
+        ("Work Experience", "experience"),
+        ("EDUCATION", "education"),
+    ],
+)
+def test_heading_is_classified(heading: str, expected: str) -> None:
+    assert _looks_like_heading(heading) == expected
 
 
 # A real upload (a Canva-exported CV template) reproduced this: pypdf's
