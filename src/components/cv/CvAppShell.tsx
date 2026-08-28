@@ -1,7 +1,7 @@
 import { ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import type { User } from "@supabase/supabase-js";
-import { ArrowLeft, FileText, History, LayoutTemplate, Lock, LogOut, Mail, Menu, Plus, Sparkles, User as UserIcon } from "lucide-react";
+import { ArrowLeft, FileText, History, LayoutTemplate, Lock, LogOut, Mail, Menu, Plus, User as UserIcon } from "lucide-react";
 import {
   Sheet,
   SheetClose,
@@ -192,7 +192,7 @@ const CvAppShell = ({ children, cvReady = false, sessionId = null }: CvAppShellP
                       onClick={promptToSave}
                       className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/10"
                     >
-                      <Sparkles size={16} />
+                      <UserIcon size={16} />
                       Create your account
                     </button>
                   </SheetClose>

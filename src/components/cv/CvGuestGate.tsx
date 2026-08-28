@@ -1,5 +1,5 @@
 import { ReactNode, useState } from "react";
-import { Lock, Sparkles } from "lucide-react";
+import { Lock } from "lucide-react";
 import { useIsGuest } from "@/lib/cv/guest";
 import CvSaveWorkPrompt from "@/components/cv/CvSaveWorkPrompt";
 
@@ -64,7 +64,6 @@ const CvGuestGate = ({ children, what }: CvGuestGateProps) => {
             onClick={() => setAskOpen(true)}
             className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90"
           >
-            <Sparkles size={14} />
             Create your account
           </button>
         </div>

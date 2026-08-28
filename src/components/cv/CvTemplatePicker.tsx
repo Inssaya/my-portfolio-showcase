@@ -105,9 +105,16 @@ const CvTemplatePicker = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
           onClick={onClose}
         >
+          {/* max-h + its own overflow-y is what keeps this usable on a phone:
+              two full CV-shaped preview cards are taller than a phone
+              viewport, and without an internal scroll the dialog used to
+              overflow a `fixed` ancestor with nothing to scroll it — the
+              header and close button ended up pushed off-screen with no way
+              back to them. Capped to dvh, not vh, so mobile Chrome's
+              address-bar collapse doesn't leave a gap under the sheet. */}
           <motion.div
             initial={{ opacity: 0, y: 24, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -116,9 +123,9 @@ const CvTemplatePicker = ({
             role="dialog"
             aria-label="Pick a template"
             onClick={(event) => event.stopPropagation()}
-            className="w-full max-w-3xl rounded-2xl border border-border/60 bg-card p-6 shadow-2xl shadow-black/40"
+            className="flex max-h-[100dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-border/60 bg-card shadow-2xl shadow-black/40 sm:max-h-[85dvh] sm:rounded-2xl"
           >
-            <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border/50 px-6 py-4">
               <div>
                 <h2 className="font-sora text-lg font-bold">Pick a template</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -136,44 +143,46 @@ const CvTemplatePicker = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <TemplateCard
-                style="modern"
-                label="Modern"
-                caption="Teal sidebar, cream page. The house style."
-                selected={current === "modern"}
-                saving={saving === "modern"}
-                onPick={() => void pick("modern")}
-              >
-                <ModernPreview />
-              </TemplateCard>
+            <div className="overflow-y-auto px-6 py-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <TemplateCard
+                  style="modern"
+                  label="Modern"
+                  caption="Teal sidebar, cream page. The house style."
+                  selected={current === "modern"}
+                  saving={saving === "modern"}
+                  onPick={() => void pick("modern")}
+                >
+                  <ModernPreview />
+                </TemplateCard>
 
-              <TemplateCard
-                style="classic"
-                label="Classic"
-                caption="Serif with a photo header. Traditional feel."
-                selected={current === "classic"}
-                saving={saving === "classic"}
-                onPick={() => void pick("classic")}
-              >
-                <ClassicPreview />
-              </TemplateCard>
-            </div>
+                <TemplateCard
+                  style="classic"
+                  label="Classic"
+                  caption="Serif with a photo header. Traditional feel."
+                  selected={current === "classic"}
+                  saving={saving === "classic"}
+                  onPick={() => void pick("classic")}
+                >
+                  <ClassicPreview />
+                </TemplateCard>
+              </div>
 
-            {error && (
-              <p
-                role="alert"
-                className="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
-              >
-                {error}
+              {error && (
+                <p
+                  role="alert"
+                  className="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                >
+                  {error}
+                </p>
+              )}
+
+              <p className="mt-4 text-[11px] text-muted-foreground">
+                Switching a template doesn't rebuild your CV automatically —
+                press <span className="text-foreground">Rebuild</span> when
+                you're ready to see the new look.
               </p>
-            )}
-
-            <p className="mt-4 text-[11px] text-muted-foreground">
-              Switching a template doesn't rebuild your CV automatically —
-              press <span className="text-foreground">Rebuild</span> when
-              you're ready to see the new look.
-            </p>
+            </div>
           </motion.div>
         </motion.div>
       )}

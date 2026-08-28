@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Sparkles, User as UserIcon, Mail, Calendar, Pencil, Check, X } from "lucide-react";
+import { User as UserIcon, Mail, Calendar, Pencil, Check, X } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import CvAppShell from "@/components/cv/CvAppShell";
 import CvGuestGate from "@/components/cv/CvGuestGate";
@@ -297,7 +297,6 @@ const CvProfile = () => {
             )}
 
             <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3.5 py-1.5 text-xs font-semibold text-accent">
-              <Sparkles size={13} className="shrink-0" />
               Beta member{memberSince ? ` since ${memberSince}` : ""}
             </div>
           </div>

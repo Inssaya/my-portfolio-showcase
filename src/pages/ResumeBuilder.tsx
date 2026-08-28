@@ -1,7 +1,7 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, Check, Download, FileText, FileUp, Sparkles, X } from "lucide-react";
+import { ArrowUp, Check, Download, FileText, FileUp, X } from "lucide-react";
 import ChatMarkdown from "@/components/ChatMarkdown";
 import CvAppShell from "@/components/cv/CvAppShell";
 import CvSaveWorkPrompt from "@/components/cv/CvSaveWorkPrompt";
@@ -172,22 +172,19 @@ const ResumeBuilder = () => {
           <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
             {empty && !unavailable && (
               <div className="space-y-5 py-6">
-                <div className="flex items-start gap-3">
-                  <Sparkles size={18} className="mt-0.5 shrink-0 text-accent" />
-                  <div className="space-y-2 text-sm leading-relaxed text-muted-foreground">
-                    <p className="font-sora font-semibold text-foreground">
-                      Two ways to start
-                    </p>
-                    <p>
-                      <strong className="text-foreground">Have a CV?</strong> Drop
-                      it here or use the upload button — I'll read it, fix the
-                      writing and redesign it.
-                    </p>
-                    <p>
-                      <strong className="text-foreground">Starting fresh?</strong>{" "}
-                      Just tell me about yourself and I'll ask what I need.
-                    </p>
-                  </div>
+                <div className="space-y-2 text-sm leading-relaxed text-muted-foreground">
+                  <p className="font-sora font-semibold text-foreground">
+                    Two ways to start
+                  </p>
+                  <p>
+                    <strong className="text-foreground">Have a CV?</strong> Drop
+                    it here or use the upload button — I'll read it, fix the
+                    writing and redesign it.
+                  </p>
+                  <p>
+                    <strong className="text-foreground">Starting fresh?</strong>{" "}
+                    Just tell me about yourself and I'll ask what I need.
+                  </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {OPENERS.map((opener) => (

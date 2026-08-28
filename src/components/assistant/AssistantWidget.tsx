@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, Check, MessageSquare, Sparkles, X } from "lucide-react";
+import { ArrowUp, Check, MessageSquare, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ChatMarkdown from "@/components/ChatMarkdown";
 import { AssistantHandlers, useAssistant } from "@/lib/assistant/useAssistant";
@@ -90,7 +90,6 @@ const AssistantWidget = ({ onOpen, pausedLabel, ...handlers }: AssistantWidgetPr
           >
             <header className="flex items-center justify-between border-b border-border/50 px-4 py-3">
               <div className="flex items-center gap-2">
-                <Sparkles size={15} className="text-accent" />
                 <span className="font-sora text-sm font-semibold">Ask about Yassine</span>
               </div>
               <button
