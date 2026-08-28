@@ -2,10 +2,55 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Loader2, X } from "lucide-react";
 import { setSessionStyle } from "@/lib/resume/api";
+import modernThumb from "@/assets/cv-templates/modern.jpg";
+import classicThumb from "@/assets/cv-templates/classic.jpg";
+import classicBlueThumb from "@/assets/cv-templates/classic-blue.jpg";
+import classicGreenThumb from "@/assets/cv-templates/classic-green.jpg";
+import classicBurgundyThumb from "@/assets/cv-templates/classic-burgundy.jpg";
 
-export type CvTemplate = "modern" | "classic";
+export type CvTemplate =
+  | "modern"
+  | "classic"
+  | "classic-blue"
+  | "classic-green"
+  | "classic-burgundy";
 
 export const DEFAULT_TEMPLATE: CvTemplate = "modern";
+
+const TEMPLATES: CvTemplate[] = [
+  "modern",
+  "classic",
+  "classic-blue",
+  "classic-green",
+  "classic-burgundy",
+];
+
+/**
+ * Real renders, not CSS mockups.
+ *
+ * A hand-drawn miniature shipped once as a "loosely inspired" restyle of the
+ * `classic` layout — light and cream where the real render is a full-height
+ * dark sidebar with a taupe banner — and a visitor who picked it got back a
+ * CV that looked nothing like what they chose. These are PNG screenshots of
+ * `build_resume()`'s actual output (Yassine's real CV, all 5 pickable
+ * styles), so what is shown here is what downloading produces — full stop,
+ * not "an impression of it".
+ */
+const THUMBNAILS: Record<CvTemplate, string> = {
+  modern: modernThumb,
+  classic: classicThumb,
+  "classic-blue": classicBlueThumb,
+  "classic-green": classicGreenThumb,
+  "classic-burgundy": classicBurgundyThumb,
+};
+
+export const TEMPLATE_LABELS: Record<CvTemplate, { label: string; caption: string }> = {
+  modern: { label: "Modern", caption: "Teal sidebar, cream page. The house style." },
+  classic: { label: "Classic", caption: "Serif with a photo header. Taupe accent." },
+  "classic-blue": { label: "Classic — Blue", caption: "Classic's layout, slate blue accent." },
+  "classic-green": { label: "Classic — Green", caption: "Classic's layout, forest green accent." },
+  "classic-burgundy": { label: "Classic — Burgundy", caption: "Classic's layout, deep wine accent." },
+};
 
 /** Preferred template survives across sessions in one browser, so switching
  *  once carries over to the next CV without having to reopen the picker. */
@@ -14,7 +59,7 @@ const STORAGE_KEY = "resume_preferred_style";
 export function readPreferredTemplate(): CvTemplate {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "modern" || stored === "classic") return stored;
+    if (TEMPLATES.includes(stored as CvTemplate)) return stored as CvTemplate;
   } catch {
     // Storage disabled — the default is what visitors get.
   }
@@ -44,12 +89,7 @@ interface CvTemplatePickerProps {
 }
 
 /**
- * A modal for switching between the two CV templates.
- *
- * The visitor picks by seeing, not by reading a name — so each card is a
- * miniature of the actual CV design with Yassine's info baked in as an
- * example. Cheap: they are plain CSS, not server-rendered PDFs, so opening
- * the picker costs nothing and works offline.
+ * A modal for switching between the CV templates.
  *
  * The existing PDF is intentionally NOT re-rendered here. Rebuilding is
  * still the visitor's action ("Build my CV" / "Rebuild"), so a picker change
@@ -116,7 +156,7 @@ const CvTemplatePicker = ({
           onClick={onClose}
         >
           {/* max-h + its own overflow-y is what keeps this usable on a phone:
-              two full CV-shaped preview cards are taller than a phone
+              five full CV-shaped preview cards are taller than a phone
               viewport, and without an internal scroll the dialog used to
               overflow a `fixed` ancestor with nothing to scroll it — the
               header and close button ended up pushed off-screen with no way
@@ -130,14 +170,14 @@ const CvTemplatePicker = ({
             role="dialog"
             aria-label="Pick a template"
             onClick={(event) => event.stopPropagation()}
-            className="flex max-h-[100dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-border/60 bg-card shadow-2xl shadow-black/40 sm:max-h-[85dvh] sm:rounded-2xl"
+            className="flex max-h-[100dvh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl border border-border/60 bg-card shadow-2xl shadow-black/40 sm:max-h-[85dvh] sm:rounded-2xl"
           >
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border/50 px-6 py-4">
               <div>
                 <h2 className="font-sora text-lg font-bold">Pick a template</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Choose the look for your CV. The preview shows an example — your
-                  own information will be filled in.
+                  Real renders of the CV you're building — your own information
+                  will be filled in exactly like this.
                 </p>
               </div>
               <button
@@ -151,28 +191,19 @@ const CvTemplatePicker = ({
             </div>
 
             <div className="overflow-y-auto px-6 py-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <TemplateCard
-                  style="modern"
-                  label="Modern"
-                  caption="Teal sidebar, cream page. The house style."
-                  selected={current === "modern"}
-                  saving={saving === "modern"}
-                  onPick={() => void pick("modern")}
-                >
-                  <ModernPreview />
-                </TemplateCard>
-
-                <TemplateCard
-                  style="classic"
-                  label="Classic"
-                  caption="Serif with a photo header. Traditional feel."
-                  selected={current === "classic"}
-                  saving={saving === "classic"}
-                  onPick={() => void pick("classic")}
-                >
-                  <ClassicPreview />
-                </TemplateCard>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                {TEMPLATES.map((style) => (
+                  <TemplateCard
+                    key={style}
+                    style={style}
+                    label={TEMPLATE_LABELS[style].label}
+                    caption={TEMPLATE_LABELS[style].caption}
+                    thumbnail={THUMBNAILS[style]}
+                    selected={current === style}
+                    saving={saving === style}
+                    onPick={() => void pick(style)}
+                  />
+                ))}
               </div>
 
               {error && (
@@ -201,19 +232,19 @@ interface TemplateCardProps {
   style: CvTemplate;
   label: string;
   caption: string;
+  thumbnail: string;
   selected: boolean;
   saving: boolean;
   onPick: () => void;
-  children: React.ReactNode;
 }
 
 const TemplateCard = ({
   label,
   caption,
+  thumbnail,
   selected,
   saving,
   onPick,
-  children,
 }: TemplateCardProps) => (
   <button
     type="button"
@@ -235,193 +266,19 @@ const TemplateCard = ({
         <Loader2 size={12} className="animate-spin text-accent" />
       </span>
     )}
-    <div className="relative aspect-[7/9] w-full overflow-hidden bg-neutral-100">
-      {children}
+    <div className="relative aspect-[3/4] w-full overflow-hidden bg-neutral-100">
+      <img
+        src={thumbnail}
+        alt={`${label} template preview`}
+        loading="lazy"
+        className="h-full w-full object-cover object-top"
+      />
     </div>
     <div className="border-t border-border/60 bg-card px-3 py-2.5">
       <p className="font-sora text-sm font-semibold text-foreground">{label}</p>
       <p className="mt-0.5 text-[11px] text-muted-foreground">{caption}</p>
     </div>
   </button>
-);
-
-/**
- * A miniature of the LaTeX reference (`cv/yassine-sinif-cv.tex`).
- *
- * Not pixel-accurate — a card at this size can't be — but every visual choice
- * that makes the real template recognisable is here: the teal sidebar band on
- * the left, the cream page, the round photo, the Playfair name in the main
- * column, the accent-coloured section headings.
- */
-const ModernPreview = () => (
-  <div className="absolute inset-0 flex" style={{ background: "#FAF9F5" }}>
-    <div
-      className="flex w-[38%] shrink-0 flex-col items-center px-2 pt-3 text-[6px] leading-tight"
-      style={{ background: "#254553", color: "#E3E6E9" }}
-    >
-      <div
-        className="mb-2 h-9 w-9 rounded-full border"
-        style={{
-          background: "linear-gradient(135deg, #6b8290, #3a5560)",
-          borderColor: "#677E88",
-        }}
-      />
-      <p className="mb-1 font-bold tracking-widest" style={{ color: "#C2C6CF" }}>
-        CONTACT
-      </p>
-      <div className="w-full space-y-0.5 text-center">
-        <p>Casablanca</p>
-        <p>+212 6 23 84 25 35</p>
-        <p className="truncate">yassinsinif4@…</p>
-      </div>
-      <p
-        className="mt-2 mb-1 font-bold tracking-widest"
-        style={{ color: "#C2C6CF" }}
-      >
-        SKILLS
-      </p>
-      <div className="w-full space-y-0.5 text-center">
-        <p className="opacity-90">Python, FastAPI</p>
-        <p className="opacity-90">React, TypeScript</p>
-        <p className="opacity-90">SQL, MongoDB</p>
-      </div>
-      <p
-        className="mt-2 mb-1 font-bold tracking-widest"
-        style={{ color: "#C2C6CF" }}
-      >
-        LANGUAGES
-      </p>
-      <div className="w-full space-y-0.5 text-center">
-        <p>Arabic — Native</p>
-        <p>English — B2</p>
-      </div>
-    </div>
-    <div className="flex-1 px-3 pt-3 text-[6px] leading-snug" style={{ color: "#3A3734" }}>
-      <p
-        className="font-serif text-[13px] leading-none"
-        style={{ color: "#12241F" }}
-      >
-        Yassine Sinif
-      </p>
-      <p className="mt-0.5 text-[6px] font-semibold" style={{ color: "#0E5B52" }}>
-        AI &amp; Data Engineering
-      </p>
-      <p
-        className="mt-2 text-[6px] font-bold tracking-widest"
-        style={{ color: "#0E5B52" }}
-      >
-        PROFILE
-      </p>
-      <p className="mt-1 leading-snug">
-        Engineering student in AI &amp; Data Science, final year. Seeking a
-        6-month PFE internship starting Feb 2027.
-      </p>
-      <p
-        className="mt-2 text-[6px] font-bold tracking-widest"
-        style={{ color: "#0E5B52" }}
-      >
-        EXPERIENCE
-      </p>
-      <p className="mt-0.5 text-[7px] font-bold" style={{ color: "#1A1A17" }}>
-        AI Data Engineer Intern{" "}
-        <span style={{ color: "#0E5B52" }}>— Aptiv</span>
-      </p>
-      <p style={{ color: "#797772" }}>Tangier · Jun 2026 – Present</p>
-      <p
-        className="mt-2 text-[6px] font-bold tracking-widest"
-        style={{ color: "#0E5B52" }}
-      >
-        PROJECTS
-      </p>
-      <p className="mt-0.5">
-        <span className="font-bold" style={{ color: "#1A1A17" }}>
-          Nexora AI
-        </span>{" "}
-        — Call-center SaaS with on-premise RAG.
-      </p>
-    </div>
-  </div>
-);
-
-/**
- * A miniature of the actual `classic` renderer (`_cvdesign.py`), not a
- * loosely-inspired restyle.
- *
- * It shipped once as a restyle — a light cream card, a thin taupe strip, a
- * sidebar on the *right* — and the real PDF a visitor got back looked
- * nothing like what they picked: a full-height dark sidebar on the *left*, a
- * taupe banner spanning the top with the photo and name on it, and taupe
- * filled badges (not plain coloured text) for every section heading in the
- * main column. Every colour below is the same hex `_cvdesign.py` paints with
- * (DARK/TAUPE/SIDE_TEXT/BODY/SUBTLE), and every position is that file's own
- * point coordinates converted to a percentage of the A4 page (595×842pt) —
- * not eyeballed, so it cannot drift from the renderer the way a loosely-
- * inspired restyle already did once.
- */
-const ClassicPreview = () => (
-  <div className="absolute inset-0" style={{ background: "#FFFFFF" }}>
-    {/* Sidebar: full height, x 0–200/595 ≈ 33.6%. */}
-    <div className="absolute inset-y-0 left-0 w-[33.6%]" style={{ background: "#282830" }} />
-
-    {/* Banner: x 40–554.5/595, y 40–188/842. Painted after the sidebar so it
-        overlaps the top of it, exactly as header()'s notch-then-banner order
-        does in the real render. */}
-    <div
-      className="absolute"
-      style={{ left: "6.7%", top: "4.7%", width: "86.5%", height: "17.6%", background: "#B59E96" }}
-    />
-    {/* Photo: centre 121/595, 106/842, radius 46pt. */}
-    <div
-      className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-gradient-to-br from-neutral-400 to-neutral-600"
-      style={{ left: "20.3%", top: "12.6%", width: "13.6%", aspectRatio: "1 / 1" }}
-    />
-    {/* Name + contact: x 220/595 ≈ 37%. */}
-    <div className="absolute text-white" style={{ left: "37%", top: "9.5%", width: "56%" }}>
-      <p className="font-serif text-[9px] font-bold uppercase leading-none">Yassine Sinif</p>
-      <p className="mt-[3px] text-[5px] leading-tight">yassinsinif4@gmail.com</p>
-      <p className="text-[5px] leading-tight">Casablanca, Morocco</p>
-    </div>
-
-    {/* Both columns start at CONTENT_TOP = 218/842 ≈ 25.9%. */}
-    <div
-      className="absolute px-1.5 text-[5.5px] leading-tight"
-      style={{ left: "6.7%", top: "26%", width: "23%", color: "#E0E0E1" }}
-    >
-      <p className="font-serif font-bold tracking-widest" style={{ color: "#B59E96" }}>
-        SKILLS
-      </p>
-      <p className="mt-1">Python, FastAPI</p>
-      <p>React, TypeScript</p>
-      <p className="mt-1.5 font-serif font-bold tracking-widest" style={{ color: "#B59E96" }}>
-        LANGUAGES
-      </p>
-      <p className="mt-1">Arabic</p>
-      <div className="mt-[1px] h-[1.5px] w-full" style={{ background: "#B59E96" }} />
-    </div>
-
-    <div
-      className="absolute text-[5.5px] leading-snug"
-      style={{ left: "37%", top: "26%", width: "56%", color: "#1A1A1A" }}
-    >
-      <span
-        className="inline-block font-serif font-bold uppercase tracking-widest text-white"
-        style={{ background: "#B59E96", padding: "1px 4px" }}
-      >
-        Profile
-      </span>
-      <p className="mt-1 italic leading-snug">
-        Engineering student in AI &amp; Data Science, final year.
-      </p>
-      <span
-        className="mt-1.5 inline-block font-serif font-bold uppercase tracking-widest text-white"
-        style={{ background: "#B59E96", padding: "1px 4px" }}
-      >
-        Experience
-      </span>
-      <p className="mt-1 font-bold">AI Data Engineer Intern</p>
-      <p style={{ color: "#8A8A8A" }}>Aptiv · Tangier, Morocco</p>
-    </div>
-  </div>
 );
 
 export default CvTemplatePicker;

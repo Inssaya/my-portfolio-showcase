@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import CvSaveWorkPrompt from "@/components/cv/CvSaveWorkPrompt";
 import CvTemplatePicker, {
   CvTemplate,
+  TEMPLATE_LABELS,
   readPreferredTemplate,
 } from "@/components/cv/CvTemplatePicker";
 import { guestName, isGuest } from "@/lib/cv/guest";
@@ -225,7 +226,7 @@ const CvAppShell = ({ children, cvReady = false, sessionId = null }: CvAppShellP
               type="button"
               onClick={() => setTemplateOpen(true)}
               className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2.5 py-1.5 text-xs font-medium text-foreground/80 transition-colors hover:border-accent/50 hover:text-accent"
-              title={`Template: ${template === "modern" ? "Modern" : "Classic"}`}
+              title={`Template: ${TEMPLATE_LABELS[template].label}`}
             >
               <LayoutTemplate size={14} />
               Template

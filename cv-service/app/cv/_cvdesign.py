@@ -330,11 +330,17 @@ class CVRenderer:
     """Paints the CV. Coordinates are given top-down and flipped on the way out,
     because every measurement taken off the reference is top-down."""
 
-    def __init__(self, buffer, title: str):
+    def __init__(self, buffer, title: str, accent: str | None = None):
         _register_fonts()
         self.c = pdfcanvas.Canvas(buffer, pagesize=A4)
         self.c.setTitle(title)
         self.pages = 1
+        # The banner, section badges, side headings and language bars are all
+        # painted in one colour. Parameterising it here — rather than adding a
+        # second copy of this file per palette — is what lets `classic-blue`,
+        # `classic-green` etc. exist as one recolour each instead of three
+        # more vendored renderers to keep in sync with this one forever.
+        self.accent = colors.HexColor(accent) if accent else TAUPE
         self._paint_page_furniture()
         self.side_y = CONTENT_TOP
         self.main_y = CONTENT_TOP
@@ -388,7 +394,7 @@ class CVRenderer:
         c.setFillColor(WHITE)
         c.rect(NOTCH_X, self._y(NOTCH_Y + NOTCH_H), PAGE_W - NOTCH_X, NOTCH_H, stroke=0, fill=1)
 
-        c.setFillColor(TAUPE)
+        c.setFillColor(self.accent)
         c.rect(BANNER_X, self._y(BANNER_Y + BANNER_H), BANNER_W, BANNER_H, stroke=0, fill=1)
 
         if photo_path:
@@ -456,7 +462,7 @@ class CVRenderer:
             else self.side_last + LEADING + HEADING_LIFT
         )
         self.side_fresh = False
-        self._text(SIDE_X, self.side_y, text.upper(), SERIF, HEAD_SIZE, TAUPE,
+        self._text(SIDE_X, self.side_y, text.upper(), SERIF, HEAD_SIZE, self.accent,
                    char_space=HEAD_TRACK)
         self.side_last = self.side_y
         self.side_y += HEADING_DROP
@@ -480,17 +486,17 @@ class CVRenderer:
             y = self._y(self.side_y - 4.5)
             self.c.setFillColor(WHITE)
             self.c.rect(SIDE_X, y, SIDE_W, 2.8, stroke=0, fill=1)
-            self.c.setFillColor(TAUPE)
+            self.c.setFillColor(self.accent)
             self.c.rect(SIDE_X, y, SIDE_W * max(0.0, min(1.0, level)), 2.8, stroke=0, fill=1)
             self._side_line()
             self.side_y += BLOCK_GAP
 
     def side_marked(self, lines: list[str]) -> None:
-        """Interests: a small taupe square instead of a bullet."""
+        """Interests: a small accent-coloured square instead of a bullet."""
         for item in lines:
             wrapped = _wrap(item, SERIF, BODY_SIZE, SIDE_W - 11.2)
             self._side_room(len(wrapped) * LEADING + 6)
-            self.c.setFillColor(TAUPE)
+            self.c.setFillColor(self.accent)
             self.c.rect(SIDE_X, self._y(self.side_y), 6.0, 6.0, stroke=0, fill=1)
             for line in wrapped:
                 self._text(SIDE_X + 11.2, self.side_y, line, SERIF, BODY_SIZE, SIDE_TEXT)
@@ -523,7 +529,7 @@ class CVRenderer:
         # to clear the cap height above and leave a little air below, or the
         # capitals get sliced by their own background.
         width = _spaced_width(label, SERIF, HEAD_SIZE, HEAD_TRACK) + 8.9
-        self.c.setFillColor(TAUPE)
+        self.c.setFillColor(self.accent)
         self.c.rect(MAIN_X, self._y(self.main_y + 2.8), width, 11.4, stroke=0, fill=1)
         self._text(MAIN_X + 4.0, self.main_y, label, SERIF, HEAD_SIZE, WHITE,
                    char_space=HEAD_TRACK)

@@ -11,7 +11,7 @@ import io
 import pytest
 from pypdf import PdfReader
 
-from app.cv.builder import RESUME_FIELDS, build_resume
+from app.cv.builder import CLASSIC_ACCENTS, RESUME_FIELDS, build_resume
 
 SAMPLE = {
     "full_name": "Yassine Sinif",
@@ -36,7 +36,10 @@ def _text_of(pdf_bytes: bytes) -> str:
     return "\n".join(page.extract_text() or "" for page in reader.pages)
 
 
-@pytest.mark.parametrize("style", ["modern", "classic", "bold"])
+ALL_STYLES = ["modern", "classic", "classic-blue", "classic-green", "classic-burgundy", "bold"]
+
+
+@pytest.mark.parametrize("style", ALL_STYLES)
 def test_renders_a_valid_pdf(style: str) -> None:
     pdf_bytes, pages = build_resume(style=style, **SAMPLE)
 
@@ -46,7 +49,7 @@ def test_renders_a_valid_pdf(style: str) -> None:
     assert pages <= 2, f"{style} produced {pages} pages for a one-page CV"
 
 
-@pytest.mark.parametrize("style", ["modern", "classic", "bold"])
+@pytest.mark.parametrize("style", ALL_STYLES)
 def test_content_survives_rendering(style: str) -> None:
     """The facts a recruiter reads must actually be in the file.
 
@@ -68,6 +71,32 @@ def test_empty_sections_are_skipped() -> None:
     assert pdf_bytes.startswith(b"%PDF-")
     assert pages == 1
     assert "Sam Taylor" in _text_of(pdf_bytes)
+
+
+def test_classic_variants_actually_change_colour() -> None:
+    """Each `classic-*` is the same layout with a different accent — this pins
+    that the colour actually reaches the page rather than being accepted and
+    silently ignored, which is exactly the shape of bug that would still pass
+    `test_renders_a_valid_pdf` (a valid PDF in the wrong colour is still a
+    valid PDF).
+
+    Compares raw bytes, not extracted text: colour is a drawing command, not
+    something `extract_text()` would ever see either way.
+    """
+    baseline, _ = build_resume(style="classic", **SAMPLE)
+    variant_bytes = {
+        variant: build_resume(style=variant, **SAMPLE)[0] for variant in CLASSIC_ACCENTS
+    }
+
+    for variant, rendered in variant_bytes.items():
+        assert rendered != baseline, f"{variant} rendered identically to plain classic"
+
+    names = list(variant_bytes)
+    for i, first in enumerate(names):
+        for second in names[i + 1 :]:
+            assert variant_bytes[first] != variant_bytes[second], (
+                f"{first} and {second} rendered identically"
+            )
 
 
 def test_every_declared_field_is_accepted() -> None:

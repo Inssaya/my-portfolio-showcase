@@ -8,10 +8,17 @@ it) against a design sample. What changed is the boundary: the Hub stored an
 artifact and handed the model a handle, whereas here the caller wants the
 bytes, so `build_resume` returns them and the HTTP layer decides what to do.
 
-Three templates, all kept:
-  modern   teal sidebar, cream page, sans-serif. The house style, and default.
-  classic  serif/taupe with a photo header and language bars.
-  bold     single column, circular photo masthead, coloured section rules.
+Templates:
+  modern            teal sidebar, cream page, sans-serif. The house style, default.
+  classic           serif/taupe with a photo header and language bars.
+  classic-blue      classic's exact layout, recoloured — slate blue accent.
+  classic-green     classic's exact layout, recoloured — forest green accent.
+  classic-burgundy  classic's exact layout, recoloured — deep wine accent.
+  bold              single column, circular photo masthead, coloured section rules.
+
+The three `classic-*` variants are not separate renderers — `CVRenderer` takes
+an `accent` colour (see `_cvdesign.py`), and these are the one file recoloured
+three times, not three more vendored layouts to keep in sync by hand.
 """
 from __future__ import annotations
 
@@ -46,12 +53,23 @@ RESUME_FIELDS = (
     "certifications",
 )
 
-STYLES = ("modern", "classic", "bold")
+# Recolours of `classic` — same CVRenderer, same layout, only `accent` differs.
+# Kept as a dict rather than three near-duplicate functions so a fourth colour
+# is a one-line addition, not a new render path to maintain.
+CLASSIC_ACCENTS: dict[str, str] = {
+    "classic-blue": "#3C5B74",
+    "classic-green": "#3E6B52",
+    "classic-burgundy": "#7A3B42",
+}
+
+STYLES = ("modern", "classic", *CLASSIC_ACCENTS, "bold")
 
 # What the visitor may pick from in the UI. The renderer still knows how to
-# draw all three — `bold` remains reachable for stored sessions and tests — but
-# the picker keeps the choice narrow so the decision is genuine.
-PICKABLE_STYLES = ("modern", "classic")
+# draw `bold` — it remains reachable for stored sessions and tests — but the
+# picker keeps the choice to the recognisably different layouts (modern,
+# classic) plus its three recolours, so there is no near-duplicate pair for a
+# visitor to puzzle over.
+PICKABLE_STYLES = ("modern", "classic", *CLASSIC_ACCENTS)
 
 # ------------------------------------------------------------- typography ---
 # The reference CV distinguishes three separators that a model — and most
@@ -284,13 +302,13 @@ def build_resume(
       projects        one per line, "Project name - what it does and the tech"
       certifications  one per line, "Name - issuer, year"
     """
-    if style == "classic":
+    if style == "classic" or style in CLASSIC_ACCENTS:
         return _build_classic(
             full_name=full_name, contact=contact, headline=headline, profile=profile,
             experience=experience, internships=internships, education=education,
             skills=skills, languages=languages, interests=interests,
             projects=projects, certifications=certifications, photo=photo,
-            language=language,
+            language=language, accent=CLASSIC_ACCENTS.get(style),
         )
     if style == "bold":
         return _build_bold(
@@ -398,8 +416,14 @@ def _build_bold(
 def _build_classic(
     *, full_name, contact, headline, profile, experience, internships, education,
     skills, languages, interests, projects, certifications, photo, language,
+    accent: str | None = None,
 ) -> tuple[bytes, int]:
-    """The serif/taupe template, kept for anyone who prefers it."""
+    """The serif/photo-banner template, and its colour variants.
+
+    `accent` is None for plain `classic` (taupe, CVRenderer's own default) and
+    a hex string for a `classic-*` variant — same layout, same everything
+    else, only the banner/badges/bars colour changes.
+    """
     labels = LABELS.get(language, LABELS["fr"])
     full_name = normalise_name(full_name)
 
@@ -416,7 +440,7 @@ def _build_classic(
         contact_lines.append((kind or _guess_icon(text), text))
 
     buffer = io.BytesIO()
-    cv = CVRenderer(buffer, title=f"{full_name} - CV")
+    cv = CVRenderer(buffer, title=f"{full_name} - CV", accent=accent)
     cv.header(full_name, headline, contact_lines, photo)
 
     if skills.strip():
