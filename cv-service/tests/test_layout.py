@@ -284,6 +284,76 @@ def test_a_genuinely_long_cv_is_not_squeezed(rhythms) -> None:
     )
 
 
+def _tightest_setting(draft: dict, main_rhythm: float, side_rhythm: float) -> dict:
+    """Smallest baseline-gap ÷ type-size in each column, for one render.
+
+    Right-aligned runs reach `_text` with `x=0` and have their real x computed
+    inside it, so the column has to be worked out the same way — otherwise
+    every date in the main column is counted as a sidebar line sitting on top
+    of a contact detail.
+    """
+    from app.cv import _cvmodern
+    from app.cv.builder import LABELS, RESUME_FIELDS, _lay_out_modern
+
+    runs: list[tuple[int, str, float, float]] = []
+    original = ModernCV._text
+
+    def spy(self, page, x, top_down, text, font, size, color, track=0.0, right=None):
+        if right is not None:
+            x = right - _cvmodern._tracked_width(text, font, size, track)
+        if text.strip():
+            runs.append((page, "side" if x < _cvmodern.SIDEBAR_W else "main",
+                         top_down, size))
+        return original(self, page, x, top_down, text, font, size, color, track, right)
+
+    ModernCV._text = spy
+    try:
+        cv = ModernCV(io.BytesIO(), title="t", main_rhythm=main_rhythm,
+                      side_rhythm=side_rhythm)
+        _lay_out_modern(cv, LABELS["fr"], photo="",
+                        **{f: draft.get(f, "") for f in RESUME_FIELDS})
+        cv.finish()
+    finally:
+        ModernCV._text = original
+
+    tightest = {}
+    for column in ("side", "main"):
+        for page in {r[0] for r in runs}:
+            lines = sorted((r for r in runs if r[0] == page and r[1] == column),
+                           key=lambda r: r[2])
+            for above, below in zip(lines, lines[1:]):
+                gap = below[2] - above[2]
+                if gap <= 0.01:
+                    continue        # chained runs sharing one baseline
+                ratio = gap / max(above[3], below[3])
+                tightest[column] = min(tightest.get(column, ratio), ratio)
+    return tightest
+
+
+def test_no_rhythm_sets_a_line_tighter_than_the_design_does() -> None:
+    """Fitting cannot make two lines collide, and this says why.
+
+    Every gap the rhythm scales is *between* blocks; the leading inside one is
+    a fixed constant. So the closest two baselines ever come is decided by the
+    design and not by the fit pass — measured here against the reference render
+    rather than against a guess, because the reference itself sets a 24pt name
+    on 20.2pt of lead, and any "gap smaller than the type size" rule would call
+    its own masthead a collision.
+    """
+    design = _tightest_setting(REFERENCE_DRAFT, 1.0, 1.0)
+
+    for draft in (REFERENCE_DRAFT, REPORTED):
+        for side in (FIT_CEILING, 1.0, 0.88, FIT_FLOOR):
+            for main in (FIT_CEILING, 1.0, FIT_FLOOR):
+                got = _tightest_setting(draft, main, side)
+                for column, ratio in got.items():
+                    assert ratio >= design[column] - 1e-9, (
+                        f"main={main} side={side} sets a {column} line at "
+                        f"{ratio:.3f}x its type size, tighter than the design's "
+                        f"own {design[column]:.3f}x"
+                    )
+
+
 def test_type_size_and_leading_are_never_scaled() -> None:
     """Fitting spends the space *between* blocks. Shrinking the type or the
     leading to win a page is how a CV becomes unreadable to fit a rule, and it
