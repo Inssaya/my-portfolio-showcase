@@ -80,8 +80,10 @@ def test_renders_a_valid_pdf(style: str) -> None:
 
     assert pdf_bytes.startswith(b"%PDF-"), "not a PDF"
     assert pages >= 1
-    # A CV that fits on one page should not silently spill onto three.
-    assert pages <= 2, f"{style} produced {pages} pages for a one-page CV"
+    # SAMPLE is a short CV. It fits on one page, so tolerating two was not
+    # leniency but a blind spot: a real draft shipped a second page holding
+    # three lines and this suite called it acceptable. See test_layout.py.
+    assert pages == 1, f"{style} produced {pages} pages for a one-page CV"
 
 
 @pytest.mark.parametrize("style", ALL_STYLES)

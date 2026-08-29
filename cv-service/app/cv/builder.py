@@ -39,7 +39,7 @@ from ._cvdesign import (
     parse_entries,
     parse_languages,
 )
-from ._cvmodern import ModernCV
+from ._cvmodern import BOTTOM_LIMIT, ModernCV
 
 # The fields a draft is made of, in the order a CV reads. `session.py` and the
 # tool schemas both derive from this, so adding a section is a one-line change.
@@ -294,6 +294,88 @@ def safe_filename(full_name: str) -> str:
     return f"cv-{safe}.pdf"
 
 
+# ---- fitting the modern layout to the page ---------------------------------
+#
+# Two failures, one cause: nothing ever looked at the finished page.
+#
+# A CV that overruns by a few points is the worst outcome of the three — the
+# reader gets a second sheet holding three lines, which reads as a fault rather
+# than as a longer CV. One real draft overran by 5pt and shipped a page that
+# was 17% full. A CV that stops two thirds down its only page is the milder
+# version of the same thing: not wrong, but visibly unset.
+#
+# Both are answered by spending or reclaiming the space *between* blocks, which
+# is a design parameter. Never the type size, never the leading, and never the
+# content — a CV that says less so it fits is not a fix.
+#
+# The bounds are what keep it honest. Below FIT_FLOOR sections stop reading as
+# separate; above FIT_CEILING the page reads as padded. A CV that will not fit
+# inside that range genuinely needs the room and is given it, at the measured
+# rhythm rather than a squeezed one.
+FIT_FLOOR = 0.72
+FIT_CEILING = 1.18
+_TIGHTEN = (0.94, 0.88, 0.82, 0.77, FIT_FLOOR)
+_EXPAND = (1.06, 1.12, FIT_CEILING)
+
+# Two different numbers, and conflating them is how this breaks the reference.
+#
+# SPARSE_MAIN is *whether* to touch a page at all: above it the main column
+# reads as a full page of CV and the measured rhythm is the right answer, so
+# nothing happens. The reference CV sits at 92%, comfortably outside — it must
+# render at exactly 1.0, and `test_layout.py` asserts that it does.
+#
+# COMFORTABLE is *how far* to go once a page has been judged sparse. It stops
+# short of the page limit because a column pushed to the very bottom has no
+# margin for the next edit, and a CV is always edited again.
+SPARSE_MAIN = 0.82
+COMFORTABLE = 0.93
+
+
+def _fit_modern(draw) -> tuple[bytes, int]:
+    """Render, look at the result, and re-render if the page is badly used.
+
+    Cheap because `ModernCV` draws nothing until `finish()` — a trial render is
+    arithmetic over the same parsed draft, not canvas work.
+    """
+    pdf, pages, cv = draw(1.0, 1.0)
+    main_k = side_k = 1.0
+
+    if pages > 1:
+        # Tighten only the column that actually spilled. Tightening both would
+        # pull up a main column that is already ending short and widen the very
+        # hole this is closing.
+        main_over, side_over = cv.main_page > 0, cv.side_page > 0
+        for step in _TIGHTEN:
+            trial = (step if main_over else 1.0, step if side_over else 1.0)
+            tighter, got, probe = draw(*trial)
+            if got < pages:
+                pdf, pages, cv = tighter, got, probe
+                main_k, side_k = trial
+                break
+        if pages > 1:
+            # Genuinely a multi-page CV. Leave it at the measured rhythm — a
+            # squeezed two-page document is worse than an honest one.
+            return pdf, pages
+
+    # Now one page, and the question is whether the wide column uses it. The
+    # sidebar is left alone even when it is short: it is a list, and a list
+    # ending early looks like a list. It is the main column's unused half that
+    # reads as a blank sheet with a CV at the top of it.
+    #
+    # Skipped when the main column was itself tightened to save a page — it has
+    # already been told it has too little room, and stretching it back out here
+    # would just undo that.
+    target = BOTTOM_LIMIT * COMFORTABLE
+    if main_k < 1.0 or cv.main_last >= BOTTOM_LIMIT * SPARSE_MAIN:
+        return pdf, pages
+    for step in _EXPAND:
+        looser, got, probe = draw(step, side_k)
+        if got > pages or probe.main_last > target:
+            break
+        pdf = looser
+    return pdf, pages
+
+
 def build_resume(
     *,
     full_name: str,
@@ -342,12 +424,34 @@ def build_resume(
 
     labels = LABELS.get(language, LABELS["en"])
     full_name = normalise_name(full_name)
-    buffer = io.BytesIO()
     # `modern` itself passes neither colour, so it keeps the exact reference
     # palette rather than a re-derivation of it (tests/test_fidelity.py).
     sidebar, accent = MODERN_PALETTES.get(style, (None, None))
-    cv = ModernCV(buffer, title=f"{full_name} - CV", sidebar=sidebar, accent=accent)
 
+    def draw(main_rhythm: float, side_rhythm: float):
+        buffer = io.BytesIO()
+        cv = ModernCV(buffer, title=f"{full_name} - CV", sidebar=sidebar,
+                      accent=accent, main_rhythm=main_rhythm, side_rhythm=side_rhythm)
+        _lay_out_modern(cv, labels, full_name=full_name, contact=contact,
+                        headline=headline, profile=profile, experience=experience,
+                        internships=internships, education=education, skills=skills,
+                        languages=languages, interests=interests, projects=projects,
+                        certifications=certifications, photo=photo)
+        pages = cv.finish()
+        return buffer.getvalue(), pages, cv
+
+    return _fit_modern(draw)
+
+
+def _lay_out_modern(cv, labels, *, full_name, contact, headline, profile, experience,
+                    internships, education, skills, languages, interests, projects,
+                    certifications, photo):
+    """Send one draft through the modern renderer, sidebar first.
+
+    Split out of `build_resume` so the same layout can be run more than once at
+    different spacings without duplicating the section order — see
+    `_fit_modern`. Nothing here decides anything; it is the original body.
+    """
     if photo:
         cv.photo(photo)
     if contact.strip():
@@ -386,9 +490,6 @@ def build_resume(
         # way a project name is, so nothing here is set in bold.
         cv.heading(labels["certifications"])
         cv.lead_in_list([(_as_pair(c), "") for c in _lines_of(certifications)])
-
-    pages = cv.finish()
-    return buffer.getvalue(), pages
 
 
 def _build_bold(

@@ -216,11 +216,41 @@ class ModernCV:
     """
 
     def __init__(self, buffer, title: str, sidebar: str | None = None,
-                 accent: str | None = None):
+                 accent: str | None = None, main_rhythm: float = 1.0,
+                 side_rhythm: float = 1.0):
         _register_fonts()
         self.c = pdfcanvas.Canvas(buffer, pagesize=(PAGE_W, PAGE_H))
         self.c.setTitle(title)
         self.ops: list[tuple[int, object]] = []
+
+        # The two rhythms scale the space *between* blocks — section to
+        # section, entry to entry — and nothing else. Type sizes and leading
+        # are untouched, so a line of prose reads identically at every setting;
+        # what changes is how much air sits around it.
+        #
+        # They are separate per column for the same reason the two columns
+        # paginate separately: their content is unrelated. A sidebar that needs
+        # tightening to save a page must not also tighten a main column that is
+        # already ending two thirds down the page — that widens the hole it is
+        # trying to close. `_fit_modern` in builder.py chooses both.
+        #
+        # At 1.0 every value below is the measured constant unchanged, so the
+        # default render is exactly what it always was.
+        self.main_rhythm, self.side_rhythm = main_rhythm, side_rhythm
+        self.sec_gap = SEC_GAP * main_rhythm
+        self.sec_drop = SEC_DROP * main_rhythm
+        self.entry_gap = ENTRY_GAP * main_rhythm
+        self.item_gap = ITEM_GAP * main_rhythm
+        self.title_to_meta = TITLE_TO_META * main_rhythm
+        self.meta_to_body = META_TO_BODY * main_rhythm
+        self.side_head_drop = SIDE_HEAD_DROP * side_rhythm
+        self.side_head_gap = SIDE_HEAD_GAP * side_rhythm
+        self.side_sub_gap = SIDE_SUB_GAP * side_rhythm
+        self.side_first_sub = SIDE_FIRST_SUB * side_rhythm
+        self.side_sub_drop = SIDE_SUB_DROP * side_rhythm
+        # The contact/language pitch is the one "gap" that is also a line
+        # advance: squeeze it past the leading and consecutive entries collide.
+        self.side_pitch = max(SIDE_PITCH * side_rhythm, TIGHT_LEAD)
 
         # Two colours carry this template: the sidebar band and the accent used
         # for the headline, section heads, employers and bullet dots. The ring
@@ -331,47 +361,68 @@ class ModernCV:
 
         self._emit(0, draw)
 
-    def _side_room(self, needed: float) -> None:
-        if self.side_y + needed > BOTTOM_LIMIT:
+    def _side_place(self, start: float, height: float) -> None:
+        """Put the cursor at `start`, or on the next page if the block won't fit.
+
+        Two things here were wrong for a long time and cost whole pages.
+
+        `height` runs from the block's first baseline to its **last** — not to
+        where the cursor ends up afterwards. The advance past the final line is
+        whitespace, and reserving it broke the page for blocks that fit.
+
+        `start` is where the block will really begin, *after* its own leading
+        gap. The old callers checked the cursor from before that gap was
+        applied, i.e. a number they were about to throw away, then moved. On
+        one real CV the two errors together reserved 48pt for an education
+        entry that needed 32.5, against a column with 29pt left — so a sidebar
+        whose content ends at 760.6 on a 770 limit was broken anyway, and the
+        second page it invented held three lines.
+        """
+        if start + height > BOTTOM_LIMIT:
             self.side_page += 1
             self.side_y = self.side_last = PAGE_MARGIN_TOP
+        else:
+            self.side_y = start
 
     def side_heading(self, text: str) -> None:
-        self._side_room(46)
-        if not self.side_fresh:
-            self.side_y = self.side_last + SIDE_HEAD_GAP
-            self._side_room(26)
+        start = self.side_y if self.side_fresh else self.side_last + self.side_head_gap
+        # Keep the heading with the first line of what it introduces. The main
+        # column has always done this for a role's title; the sidebar never got
+        # the equivalent, so EDUCATION could sit alone at the foot of a page
+        # with its qualifications overleaf.
+        self._side_place(start, self.side_head_drop + 12.0)
         self.side_fresh = False
         self._text(self.side_page, SIDE_X, self.side_y, text.upper(), SANS_B,
                    SIDE_HEAD_SIZE, SIDE_HEAD, track=SIDE_HEAD_TRACK)
         self.side_last = self.side_y
-        self.side_y += SIDE_HEAD_DROP
+        self.side_y += self.side_head_drop
 
     def side_lines(self, lines: list[str], link_tint: bool = False) -> None:
         """One entry per line, on the wide sidebar pitch (contact, languages)."""
         for item in lines:
             colour = self.side_link if (link_tint and _looks_like_link(item)) else SIDE_BODY
             wrapped = _wrap(item, SANS, SIDE_CONTACT_SIZE, SIDE_W)
-            self._side_room(len(wrapped) * TIGHT_LEAD + 6)
+            self._side_place(self.side_y, (len(wrapped) - 1) * TIGHT_LEAD)
             for index, line in enumerate(wrapped):
                 self._text(self.side_page, SIDE_X, self.side_y, line, SANS,
                            SIDE_CONTACT_SIZE, colour)
                 self.side_last = self.side_y
-                self.side_y += TIGHT_LEAD if index < len(wrapped) - 1 else SIDE_PITCH
+                self.side_y += TIGHT_LEAD if index < len(wrapped) - 1 else self.side_pitch
 
     def side_groups(self, groups: list[tuple[str, str]]) -> None:
         """Skills as `LABEL` plus its comma-separated members underneath."""
         for index, (label, members) in enumerate(groups):
             wrapped = _wrap(members, SANS, SIDE_BODY_SIZE, SIDE_W)
-            self._side_room(len(wrapped) * TIGHT_LEAD + (SIDE_SUB_DROP if label else 0) + 6)
             # The first group sits closer to its section heading than a later
             # group sits to the group above it.
-            self.side_y = self.side_last + (SIDE_SUB_GAP if index else SIDE_FIRST_SUB)
+            start = self.side_last + (self.side_sub_gap if index else self.side_first_sub)
+            self._side_place(start, (self.side_sub_drop if label else 0.0)
+                             + (len(wrapped) - 1) * TIGHT_LEAD)
             if label:
                 self._text(self.side_page, SIDE_X, self.side_y, label.upper(), SANS_B,
                            SIDE_SUB_SIZE, SIDE_HEAD, track=SIDE_SUB_TRACK)
                 self.side_last = self.side_y
-                self.side_y += SIDE_SUB_DROP
+                self.side_y += self.side_sub_drop
             for line in wrapped:
                 self._text(self.side_page, SIDE_X, self.side_y, line, SANS,
                            SIDE_BODY_SIZE, SIDE_BODY)
@@ -381,16 +432,24 @@ class ModernCV:
     def side_education(self, entries: list) -> None:
         for index, entry in enumerate(entries):
             title_lines = _wrap(entry.title, SANS_B, SIDE_BODY_SIZE, SIDE_W)
-            self._side_room(len(title_lines) * 12.0 + 24)
-            if index:
-                self.side_y = self.side_last + SIDE_SUB_GAP
+            detail = " \u00b7 ".join(part for part in (entry.org, entry.dates) if part)
+            details = ([detail] if detail else []) + entry.notes
+            detail_lines = sum(len(_wrap(text, SANS, META_SIZE, SIDE_W)) for text in details)
+
+            # A qualification and the school it was taken at are one thing, so
+            # the whole entry is measured and placed together rather than
+            # letting the school follow its title onto the next page.
+            height = len(title_lines) * 12.0 + detail_lines * 9.8
+            height -= 9.8 if detail_lines else 12.0     # to the last baseline
+            start = self.side_last + self.side_sub_gap if index else self.side_y
+            self._side_place(start, height)
+
             for line in title_lines:
                 self._text(self.side_page, SIDE_X, self.side_y, line, SANS_B,
                            SIDE_BODY_SIZE, SIDE_STRONG)
                 self.side_last = self.side_y
                 self.side_y += 12.0
-            detail = " \u00b7 ".join(part for part in (entry.org, entry.dates) if part)
-            for text in ([detail] if detail else []) + entry.notes:
+            for text in details:
                 for line in _wrap(text, SANS, META_SIZE, SIDE_W):
                     self._text(self.side_page, SIDE_X, self.side_y, line, SANS,
                                META_SIZE, SIDE_HEAD)
@@ -413,12 +472,12 @@ class ModernCV:
             self.main_last = self.main_y
 
     def heading(self, text: str) -> None:
-        self.main_y = self.main_last + SEC_GAP
+        self.main_y = self.main_last + self.sec_gap
         self._main_room(30)
         self._text(self.main_page, MAIN_X, self.main_y, text.upper(), SANS_B,
                    SEC_HEAD_SIZE, self.accent, track=SEC_HEAD_TRACK)
         self.main_last = self.main_y
-        self.main_y += SEC_DROP
+        self.main_y += self.sec_drop
         self.main_fresh = True
 
     def paragraph(self, text: str) -> None:
@@ -433,7 +492,7 @@ class ModernCV:
         for index, item in enumerate(items):
             wrapped = _wrap(item, SANS, BODY_SIZE, MAIN_RIGHT - BULLET_X)
             self.main_y = self.main_last + (first_gap if index == 0
-                                            else TIGHT_LEAD + ITEM_GAP)
+                                            else TIGHT_LEAD + self.item_gap)
             self._main_room(len(wrapped) * TIGHT_LEAD + 4)
             self._dot(self.main_page, BULLET_X - 7.0, self.main_y, 1.7)
             for line in wrapped:
@@ -444,7 +503,7 @@ class ModernCV:
 
     def entries(self, items: list) -> None:
         for index, entry in enumerate(items):
-            self.main_y = self.main_last + (SEC_DROP if index == 0 else ENTRY_GAP)
+            self.main_y = self.main_last + (self.sec_drop if index == 0 else self.entry_gap)
             # Keep a role's title with at least its first line of evidence.
             self._main_room(48)
             end = MAIN_X
@@ -478,12 +537,12 @@ class ModernCV:
             if entry.org and not org_inline:
                 meta = f"{entry.org} \u00b7 {meta}" if meta else entry.org
             if meta:
-                self.main_y = self.main_last + TITLE_TO_META
+                self.main_y = self.main_last + self.title_to_meta
                 self._text(self.main_page, MAIN_X, self.main_y, meta, SANS,
                            META_SIZE, META_INK)
                 self.main_last = self.main_y
 
-            first = META_TO_BODY if meta else TITLE_TO_META + 4.6
+            first = self.meta_to_body if meta else self.title_to_meta + 4.6
             for note in entry.notes:
                 self.main_y = self.main_last + first
                 for line in _wrap(note, SANS, BODY_SIZE, MAIN_W):
@@ -502,8 +561,8 @@ class ModernCV:
         in the title ink and the description flows on inline from it."""
         for index, (lead, rest) in enumerate(items):
             probe = _wrap(f"{lead} \u2014 {rest}", SANS, BODY_SIZE, MAIN_RIGHT - BULLET_X)
-            self.main_y = self.main_last + (SEC_DROP if index == 0 and self.main_fresh
-                                            else TIGHT_LEAD + ITEM_GAP)
+            self.main_y = self.main_last + (self.sec_drop if index == 0 and self.main_fresh
+                                            else TIGHT_LEAD + self.item_gap)
             self._main_room(len(probe) * TIGHT_LEAD + 4)
             self._dot(self.main_page, BULLET_X - 7.0, self.main_y, 1.7)
 
