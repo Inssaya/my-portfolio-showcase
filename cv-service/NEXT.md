@@ -359,6 +359,55 @@ Each is contained and independently useful:
 
 ---
 
+## Layout: what the fit pass does not reach
+
+`_fit_modern` (`app/cv/builder.py`) deleted the phantom second page — see
+HANDOFF §4.22-25 — but two cases still ship a page under 30% full. Both are
+measured, neither is a regression, and both need a decision rather than a
+patch, which is why they are here and not fixed.
+
+**1. A sidebar that cannot fit any page (`modern`).** Rhythm scaling only
+moves the space *between* blocks, so its authority over a column that is
+mostly wrapped lines is limited. Measured on the reported CV plus synthetic
+skill groups, sidebar natural extent against the 770 limit:
+
+| draft | gaps at 1.0 | gaps at 0.72 | gap buys |
+|---|---|---|---|
+| as reported | 817.2 | 699.2 | 118.0 → **fits** |
+| + 2 skill groups | 910.8 | 774.2 | 136.6 → over by 4.2 |
+| + 5 skill groups | 1051.2 | 886.6 | 164.6 → over by 116.6 |
+
+So roughly two extra skill groups past the reported CV is where one page stops
+being reachable. Scaling the leading as well buys only another ~20pt — not
+worth breaking the "never the leading, never the type size" rule that
+`test_layout.py` pins, since it rescues only the knife-edge case.
+
+The lever with real authority is the one thing that changes what the template
+*is*: the same skills text is **135pt shorter set at `MAIN_W` than at
+`SIDE_W`** (a 2.16× width ratio), and the main column typically has ~165pt
+free. Moving a trailing sidebar section into the main column on overflow would
+fix it — and would mean EDUCATION sometimes appears on the right, so a visitor
+who adds one line gets a different-shaped document. `_cvmodern.py`'s docstring
+states the split ("education and skills live in the sidebar, so the main
+column is nothing but evidence") as the design, so this is the owner's call.
+
+**2. `classic` has the same symptom from the opposite cause.** 12 bullets past
+the reported CV gives 2 pages with 277 characters on the second. It is not the
+same bug: `_cvdesign.py` uses *shared* pagination (`_new_page()` advances both
+columns at once, line 451/513), so a main column overrunning by a few points
+takes the sidebar with it. It needs its own analysis, not a copy of
+`_fit_modern`.
+
+`bold` also renders the reported CV as 2 pages where `modern` and `classic`
+manage one, but that is by design: `two_up_footer` keeps the skills/languages
+footer atomic and jumps to a fresh page rather than splitting it.
+
+Reproduce any of this with a sweep over drafts × styles, asserting no page
+holds under ~400 characters when the page count is above one — the shape of
+`test_no_page_is_nearly_empty` in `tests/test_layout.py`.
+
+---
+
 ## How to verify you have not broken anything
 
 ```bash
