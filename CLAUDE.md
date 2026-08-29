@@ -24,7 +24,7 @@ Phase 1 is complete and tested. Phase 2 auth is done — every route requires a
 signed-in Supabase user (`app/auth.py`, verified live: unauthenticated
 requests get a real 401). Session **persistence** is done too: `app/db.py`
 writes sessions and transcripts through to Postgres and reads them back on a
-miss, so a session survives a restart (`app/session.py`). 411 tests pass.
+miss, so a session survives a restart (`app/session.py`). 480 tests pass.
 
 Signing up is no longer the first thing a visitor meets: with no session they
 are signed in **anonymously** and build a CV straight away, and the account
@@ -70,7 +70,11 @@ Quick orientation:
 - `app/cv/_cvmodern.py` and `_cvdesign.py` are **vendored renderers** with
   geometry measured off a reference PDF. Do not tidy them.
 - `cv/yassine-sinif-cv.tex` is the design authority. `tests/test_fidelity.py`
-  asserts the renderer still matches it.
+  asserts the renderer still matches it — but only its fonts, palette and two
+  geometry constants, *not* a single vertical measurement. `tests/test_layout.py`
+  covers the rest: the modern layout is fitted to the page within a bounded
+  range (`_fit_modern`), and the first test there pins the reference CV to the
+  designed spacing, because nothing else would notice it moving.
 
 ## Commands
 
@@ -82,7 +86,7 @@ npm run build
 
 # cv-service (from cv-service/)
 docker compose up --build                            # :8000
-.venv/Scripts/python -m pytest -q                    # 251 tests, no network
+.venv/Scripts/python -m pytest -q                    # 480 tests, no network
 .venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
 ```
 
