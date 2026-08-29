@@ -15,6 +15,7 @@ import logging
 
 from . import quota
 from .config import get_settings
+from .cv.builder import RESUME_FIELDS
 from .llm import Completion, LLMError, complete, read_image
 from .session import Session
 from .tools import TOOL_SCHEMAS, ToolError, run_tool
@@ -107,7 +108,7 @@ STYLE OF YOUR REPLIES
 Short. Two or three sentences, then your question. You may use **bold** and \
 "- " bullets; they render properly. Never show raw section formatting \
 ("Role | Employer | Dates") to the visitor — that is for your tool calls only. \
-Write in the visitor's language if they write in French or Arabic, else English.
+Write in the visitor's language if they write in French or Arabic, else English. The CV itself is separate: pass language="fr" to `generate_resume` when the CV is written in French, so its printed headings read PROFIL and COMPÉTENCES TECHNIQUES rather than PROFILE and TECHNICAL SKILLS. It defaults to English, which on a French CV prints English headings over French text.
 """
 
 
@@ -115,6 +116,13 @@ Write in the visitor's language if they write in French or Arabic, else English.
 # exchanges — enough for "no, change that one" to still have its referent.
 VERBATIM_WINDOW = 6
 
+
+# How many times one turn may be sent back to save sections it skipped.
+#
+# Two, not more: the point is to catch a model that replied too early, not to
+# argue with one that has decided a section is placeholder junk. Each nudge
+# costs a round out of max_tool_rounds either way, so this cannot run away.
+MAX_UPLOAD_NUDGES = 2
 
 # How an uploaded document announces itself in the history. Matched as a
 # prefix rather than carried as an extra dict key, because these dicts go
@@ -307,14 +315,50 @@ def run_turn(
 
     actions: list[str] = []
     pdf_version_before = session.pdf_version
+    nudges = 0
 
     for _round in range(settings.max_tool_rounds):
         result = complete(_wire_messages(session), TOOL_SCHEMAS, sticky_key=session.key_label)
         session.usage.add(result.prompt_tokens, result.completion_tokens)
         session.key_label = result.key_label or session.key_label
 
-        # No tools requested: this is the final answer for this turn.
+        # No tools requested: this is the final answer for this turn — unless
+        # an upload is still sitting unsaved.
         if not result.tool_calls:
+            unsaved = session.pending_upload_fields - set(session.filled_fields())
+            if unsaved and nudges < MAX_UPLOAD_NUDGES:
+                # The prompt already says to save everything before writing a
+                # word, and a real French CV proved that is not enough: every
+                # section extracted cleanly, and the model saved the name and
+                # contact then asked the visitor what job they were looking
+                # for. Describing a section is not saving it, and the text is
+                # gone from the visitor's point of view once the turn ends.
+                #
+                # Named explicitly rather than "you missed some": the model
+                # has to know *which*, and the list is free to compute.
+                nudges += 1
+                logger.info(
+                    "session %s: upload sections unsaved after reply (%s)",
+                    session.id, ", ".join(sorted(unsaved)),
+                )
+                session.history.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            "[System: the uploaded CV has content for these "
+                            "sections and you have not saved any of it: "
+                            f"{', '.join(sorted(unsaved))}. Call update_resume "
+                            "for each one now, using the text from the upload. "
+                            "If a section is genuinely only template "
+                            "placeholder text, skip it and say so to the "
+                            "visitor. Do not reply until you have saved the "
+                            "rest.]"
+                        ),
+                    }
+                )
+                continue
+
+            session.pending_upload_fields = set()
             session.history.append({"role": "assistant", "content": result.content})
             session.transcript.append({"role": "assistant", "content": result.content})
             return {
@@ -507,5 +551,15 @@ def seed_uploaded_cv(session: Session, extraction: dict, filename: str) -> None:
             "\n\n[The rest of this document was too long to include. Ask the "
             "visitor about anything that seems to be missing.]"
         )
+    # What this upload actually supplied, so the turn cannot end with it
+    # sitting unsaved in the context window. "header" is not a CV field — it is
+    # the text above the first heading, which the model splits into name and
+    # headline itself — so it is not tracked here.
+    session.pending_upload_fields = {
+        name
+        for name, content in (extraction.get("sections") or {}).items()
+        if name in RESUME_FIELDS and str(content).strip()
+    }
+
     session.history.append({"role": "user", "content": blob})
     session.transcript.append({"role": "system", "content": blob, "kind": "upload"})

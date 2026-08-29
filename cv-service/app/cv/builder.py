@@ -448,7 +448,10 @@ def _build_classic(
     a hex string for a `classic-*` variant — same layout, same everything
     else, only the banner/badges/bars colour changes.
     """
-    labels = LABELS.get(language, LABELS["fr"])
+    # English fallback like the other two templates. This used to default to
+    # French here alone, so an unrecognised language code printed French
+    # headings on classic and English ones on modern from the same draft.
+    labels = LABELS.get(language, LABELS["en"])
     full_name = normalise_name(full_name)
 
     contact_lines: list[tuple[str, str]] = []

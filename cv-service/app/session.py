@@ -101,6 +101,18 @@ class Session:
     # Not persisted — it is a property of the caller, not of the draft.
     is_anonymous: bool = False
 
+    # Fields an uploaded CV supplied that the model has not saved yet.
+    #
+    # The prompt tells it to save every extracted section before replying, and
+    # a prompt is not a guarantee: a French CV came through with all eight
+    # sections extracted correctly and the model saved the name and the
+    # contact, then asked the visitor what job they wanted — with their whole
+    # career sitting in the context window. `run_turn` checks this before
+    # letting a turn end and names what is still missing.
+    #
+    # Not persisted: it describes one upload in flight, not the draft.
+    pending_upload_fields: set[str] = field(default_factory=set)
+
     # Digests of the files already uploaded in this session, so the same one
     # arriving twice is recognised. Not persisted: it is a guard against a
     # double tap or an impatient retry within one conversation, and a restored

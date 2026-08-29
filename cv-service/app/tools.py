@@ -110,7 +110,13 @@ TOOL_SCHEMAS: list[dict] = [
                     "language": {
                         "type": "string",
                         "enum": ["en", "fr"],
-                        "description": "Language of the section headings on the PDF.",
+                        "description": (
+                            "Language of the section headings printed on the PDF — "
+                            "PROFIL/FORMATION rather than PROFILE/EDUCATION. Set it to "
+                            "match the language the CV is written in. It defaults to "
+                            "'en', so a French CV left unset prints English headings "
+                            "over French content."
+                        ),
                     },
                 },
                 "required": [],
