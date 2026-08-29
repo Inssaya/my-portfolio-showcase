@@ -106,6 +106,43 @@ gracefully until that workflow has run — see `mapAppUser` in
 `src/lib/admin-data.ts`, which falls back to the email test when
 `is_guest` is absent.
 
+`supabase/test_portfolio_privacy.sql` asserts the publishing rules against a
+real database. Run it after touching anything in the published-portfolio
+section of the schema — it rolls back, so it is safe anywhere.
+
+## The portfolio builder
+
+A visitor who has built a CV can publish it as a public page at
+`/p/<session id>`. It is a **second renderer over the same draft**, not a
+copy: editing the CV edits the live page, and `src/lib/portfolio/parse.ts`
+mirrors the Python parsers so the page and the PDF read one source
+identically.
+
+Two things here are load-bearing and easy to "simplify" into a leak:
+
+- **The public surface is a function, not a policy.** RLS grants whole rows,
+  and a `cv_sessions` row holds the phone number, the address, token counts
+  and `user_id`. A "public read where published" policy would publish
+  somebody's mobile the moment they shared a link, however carefully the page
+  avoided rendering it. `public_portfolio()` chooses *columns*, which is the
+  granularity the promise needs, and the phone is stripped **there** — where
+  the data leaves the server — so the rule holds for anyone reading the API
+  and not only for people looking at our page.
+- **It does not go through cv-service.** That service never holds
+  `service_role` (see `app/db.py`), so it could not read a stranger's row
+  anyway — and it sleeps on Render's free tier. A portfolio link somebody put
+  on their CV cannot open with a cold start in front of it.
+
+Publishing requires a real account, enforced in `set_portfolio_published()`
+rather than in the UI: guests are `authenticated` too, and
+`purge_stale_guest_accounts()` deletes idle guest accounts and cascades to
+`cv_sessions`, so a guest's public URL is guaranteed to break later.
+
+Portraits are never persisted, so a published page has no photo and the hero
+is designed around that rather than showing a placeholder. Themes live in
+`src/lib/portfolio/themes.ts` and are picked by the person — nothing infers
+anything about them.
+
 ## Secrets
 
 `.env.local` and `cv-service/.env` hold live keys and are gitignored. Never
