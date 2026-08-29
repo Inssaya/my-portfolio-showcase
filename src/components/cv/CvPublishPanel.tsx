@@ -1,7 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Copy, ExternalLink, Globe, Loader2, X } from "lucide-react";
-import { fetchPublishState, portfolioUrl, setPublished } from "@/lib/portfolio/api";
+import {
+  SchemaNotAppliedError,
+  fetchPublishState,
+  portfolioUrl,
+  setPublished,
+} from "@/lib/portfolio/api";
 import {
   DEFAULT_THEME,
   THEMES,
@@ -92,6 +97,15 @@ const CvPublishPanel = ({ open, onClose, sessionId }: CvPublishPanelProps) => {
       const message = caught instanceof Error ? caught.message : "";
       if (/account is required/i.test(message)) {
         setAskAccount(true);
+      } else if (caught instanceof SchemaNotAppliedError) {
+        // Names the actual cause instead of advising a retry that cannot
+        // work. This is the site owner's problem, not the visitor's, and
+        // "try again" sent one person hunting through Supabase for an hour.
+        setError(
+          "Publishing isn't switched on for this deployment yet — the database " +
+            "is missing this feature's setup. If this is your site, apply " +
+            "supabase/setup.sql.",
+        );
       } else {
         setError("Couldn't update that. Try again.");
       }

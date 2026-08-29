@@ -113,6 +113,11 @@ export async function fetchPublishState(
   }
 }
 
+/** Thrown when the database has not been migrated yet — the functions this
+ *  feature needs simply are not there. Its own type because it is the one
+ *  failure the visitor cannot do anything about, and the owner can. */
+export class SchemaNotAppliedError extends Error {}
+
 /**
  * Publish, unpublish, or restyle a portfolio.
  *
@@ -134,6 +139,14 @@ export async function setPublished(
     publish_phone: state.showPhone ?? null,
   });
 
+  // PGRST202 is PostgREST for "no such function". It means supabase/setup.sql
+  // has not been applied to this project — the deploy is ahead of the schema.
+  // Worth telling apart from every other failure: "try again" is wrong advice
+  // for it, because trying again will not help and nothing the visitor does
+  // will.
+  if (error?.code === "PGRST202" || /Could not find the function/i.test(error?.message ?? "")) {
+    throw new SchemaNotAppliedError(error?.message ?? "function missing");
+  }
   if (error) throw new Error(error.message);
   return Boolean(data);
 }
