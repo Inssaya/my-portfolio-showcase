@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  initials,
+  isPlaceholder,
   lines,
   parseContact,
   parseEntries,
   parseLeadIns,
+  parsePairLines,
   parseSkillGroups,
   splitLeadIn,
 } from "../parse";
@@ -25,7 +26,8 @@ describe("parseEntries", () => {
 
     expect(entry.title).toBe("AI Data Engineer Intern");
     expect(entry.org).toBe("Aptiv");
-    expect(entry.dates).toBe("Jun 2026 - Present");
+    // Normalised to the en dash the PDF prints — see the parity block below.
+    expect(entry.dates).toBe("Jun 2026 – Present");
     expect(entry.meta).toBe("Tangier, Morocco");
     expect(entry.bullets).toEqual([
       "Built a KPI platform.",
@@ -159,11 +161,71 @@ describe("lines", () => {
   });
 });
 
-describe("initials", () => {
-  it("takes at most two", () => {
-    expect(initials("Yassine Sinif")).toBe("YS");
-    expect(initials("Yassine Amine Sinif")).toBe("YA");
-    expect(initials("Cher")).toBe("C");
-    expect(initials("")).toBe("");
+describe("parity with the PDF renderer", () => {
+  // Each of these was a real divergence: the same draft produced one thing in
+  // the downloaded PDF and something else on the published page.
+
+  it("drops the column names a model fills empty slots with", () => {
+    // builder.py's _PLACEHOLDERS. Without this the page announced that
+    // somebody worked at "Company Name", in "Location", while their PDF —
+    // from the identical draft — showed neither.
+    const [entry] = parseEntries("Manager | Company Name | 2023 | Location");
+
+    expect(entry.title).toBe("Manager");
+    expect(entry.org).toBe("");
+    expect(entry.meta).toBe("");
+  });
+
+  it("drops placeholder lines from flat fields", () => {
+    expect(lines("N/A\nCity\n-\nReal thing")).toEqual(["Real thing"]);
+  });
+
+  it("keeps a real value that merely contains a placeholder word", () => {
+    // Matched whole-field, never as a substring: somebody genuinely works at
+    // "Location Services Ltd" and somebody's title is genuinely "Manager".
+    expect(isPlaceholder("Location Services Ltd")).toBe(false);
+    expect(parseEntries("Manager | Location Services Ltd | 2023")[0].org).toBe(
+      "Location Services Ltd",
+    );
+  });
+
+  it("normalises pipes in certifications and languages", () => {
+    // _as_pair. A pipe is the *entry* column delimiter, so in a flat field it
+    // is only ever a separator reached for by analogy — and it used to reach
+    // the page verbatim as "Certificate | Issuer | 2026".
+    expect(parsePairLines("AWS Solutions Architect | Amazon | 2024")).toEqual([
+      "AWS Solutions Architect — Amazon — 2024",
+    ]);
+    expect(parsePairLines("Arabic | Native")).toEqual(["Arabic — Native"]);
+  });
+
+  it("normalises a loose hyphen to the dash the PDF prints", () => {
+    expect(parsePairLines("Arabic - Native")).toEqual(["Arabic — Native"]);
+  });
+
+  it("turns a date span into an en dash, and a qualifier into a mid dot", () => {
+    // _as_range: "2024 - 2025 - 1 month" is a range *and* a duration.
+    const [entry] = parseEntries("Intern | Web Agency | 2024 - 2025 - 1 month");
+    expect(entry.dates).toBe("2024 – 2025 · 1 month");
+  });
+
+  it("demotes an absurdly long title into a note", () => {
+    // A title is drawn unwrapped on one line in the PDF, so a whole mangled
+    // block collapsed into a "title" ran off both edges of the page.
+    const long = "x".repeat(120);
+    const [entry] = parseEntries(`${long} | Org | 2024`);
+    expect(entry.title).toBe("");
+    expect(entry.notes).toContain(long);
+  });
+
+  it("splits on a bare em dash, as _split_lead does", () => {
+    expect(splitLeadIn("Nexora AI—Call-center SaaS")).toEqual({
+      lead: "Nexora AI",
+      rest: "Call-center SaaS",
+    });
+  });
+
+  it("strips a run of bullet markers, not just one", () => {
+    expect(lines("- • Nexora AI")).toEqual(["Nexora AI"]);
   });
 });

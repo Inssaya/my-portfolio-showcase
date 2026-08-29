@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2" />
+
+    <!-- Served for /p/* only. Deliberately minimal and deliberately not a
+         copy of index.html — see "The portfolio builder" in CLAUDE.md. -->
+    <title>Portfolio</title>
+    <meta name="description" content="A portfolio built with the CV Builder." />
+
+    <meta property="og:type" content="profile" />
+    <meta property="og:title" content="Portfolio" />
+    <meta property="og:description" content="A portfolio built with the CV Builder." />
+    <!-- No og:image on purpose. A link with no picture is plain; a link with
+         the wrong person's face on it is a misrepresentation. -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Portfolio" />
+
+    <meta name="color-scheme" content="light dark" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

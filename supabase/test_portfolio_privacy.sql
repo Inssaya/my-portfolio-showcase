@@ -79,6 +79,7 @@ begin
   if got not like '%+212%' then
     raise exception 'FAIL: opting in did not publish the phone number';
   end if;
+  perform public.set_portfolio_published(live_id, true, null, false);
 
   -- ------------------------------------------------------- ownership ------
   -- Somebody else's session is not theirs to publish, unpublish or restyle.
@@ -107,6 +108,25 @@ begin
     raise exception 'FAIL: the guest row was published despite the refusal';
   end if;
 
+  -- ------------------------------- the conversion window ------------------
+  -- Someone who has just signed up: an email is attached but is_anonymous
+  -- has not flipped yet. purge_stale_guest_accounts() would never delete
+  -- them — it requires email is null — so publishing must be allowed. When
+  -- the refusal tested only is_anonymous, this visitor signed up, was
+  -- refused, and was shown the sign-up form again.
+  insert into auth.users (id, email, is_anonymous)
+  values ('33333333-3333-3333-3333-333333333333', 'converted@example.test', true);
+  insert into public.cv_sessions (id, user_id, draft)
+  values ('cccccccc-cccc-cccc-cccc-cccccccccccc',
+          '33333333-3333-3333-3333-333333333333', '{}'::jsonb);
+
+  perform set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', true);
+  if not public.set_portfolio_published('cccccccc-cccc-cccc-cccc-cccccccccccc',
+                                        true, null, null) then
+    raise exception 'FAIL: a just-converted account was refused; the publish '
+      'check and the purge it cites now disagree';
+  end if;
+
   -- ------------------------------------------- no identity at all ---------
   -- An unauthenticated caller must be refused rather than defaulting to
   -- "not a guest" and slipping through.
@@ -119,6 +139,68 @@ begin
   end;
 
   raise notice 'portfolio privacy: all checks passed';
+end $$;
+
+-- Every shape of telephone number this has to catch, and every line it must
+-- leave alone. This block is the reason contact_is_phone() is a named
+-- function rather than an expression buried in a subquery: it is the entire
+-- privacy guarantee, and its first version silently published five of the
+-- formats below.
+do $$
+declare
+  leaked   text;
+  removed  text;
+begin
+  -- Must be stripped. Each of these was published by the original pattern
+  -- unless marked otherwise.
+  select string_agg(line, ' | ') into leaked from (values
+      ('+212 6 23 84 25 35'),          -- caught before
+      ('Phone: 0612345678'),
+      ('Tel: 06 12 34 56 78'),
+      -- A documented shape of this field: Session.set_field splits a
+      -- pipe-delimited contact block, and _build_classic reads "kind | text".
+      ('phone | 0612345678'),
+      ('(020) 7946 0958'),
+      ('0612345678 (WhatsApp)'),
+      ('(415) 555-2671'),
+      ('415-555-2671'),
+      ('212.555.0147'),
+      ('9876543210'),
+      ('Mobile: +44 7700 900123'),
+      ('Tél. 06.12.34.56.78'),
+      ('WhatsApp 06 12 34 56 78'),
+      ('Yassine · me@x.com · 0612345678 · Casablanca')
+    ) as t(line)
+    where not public.contact_is_phone(line);
+
+  if leaked is not null then
+    raise exception 'FAIL: these telephone numbers would be published: %', leaked;
+  end if;
+
+  -- Must survive. A privacy rule that eats the address or the dates is a
+  -- different bug, not a safer one.
+  select string_agg(line, ' | ') into removed from (values
+      ('Casablanca, Morocco'),
+      ('yassinsinif4@gmail.com'),
+      ('github.com/Inssaya'),
+      ('sinif-yassine.vercel.app'),
+      ('2022-2027'),
+      ('01 Rue de la Paix, 20000 Casablanca'),
+      ('06000 Nice, France'),
+      ('Casablanca 20000'),
+      ('Permis B, 2018-2020'),
+      ('Bac +5, promotion 2020-2024'),
+      ('Jun 2026 - Present'),
+      ('AWS Certified 2024'),
+      ('London, UK')
+    ) as t(line)
+    where public.contact_is_phone(line);
+
+  if removed is not null then
+    raise exception 'FAIL: these lines are not phone numbers and would be deleted: %', removed;
+  end if;
+
+  raise notice 'contact_is_phone: 14 formats caught, 13 lines preserved';
 end $$;
 
 -- The raw table must stay unreachable for anonymous callers. This is the

@@ -121,6 +121,23 @@ const CvPublishPanel = ({ open, onClose, sessionId }: CvPublishPanelProps) => {
   };
 
   return (
+    <>
+      {/* A sibling of the overlay, never a child of it. Nested inside, every
+          click in this form bubbled to the overlay's onClick={onClose} and
+          unmounted the panel — including the first click into the email
+          field — and both dialogs being z-50 meant the wider publish card
+          painted on top of it. Since anonymous sign-in makes every new
+          visitor a guest, that was the default path into this feature.
+          CvAppShell renders it as a top-level sibling for the same reason. */}
+      <CvSaveWorkPrompt
+        open={askAccount}
+        reason="save"
+        onClose={() => setAskAccount(false)}
+        onSaved={() => {
+          setAskAccount(false);
+          void save({ published: true, theme, showPhone });
+        }}
+      />
     <AnimatePresence>
       {open && (
         <motion.div
@@ -130,16 +147,6 @@ const CvPublishPanel = ({ open, onClose, sessionId }: CvPublishPanelProps) => {
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
           onClick={onClose}
         >
-          <CvSaveWorkPrompt
-            open={askAccount}
-            reason="save"
-            onClose={() => setAskAccount(false)}
-            onSaved={() => {
-              setAskAccount(false);
-              void save({ published: true, theme, showPhone });
-            }}
-          />
-
           <motion.div
             initial={{ opacity: 0, y: 24, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -309,6 +316,7 @@ const CvPublishPanel = ({ open, onClose, sessionId }: CvPublishPanelProps) => {
         </motion.div>
       )}
     </AnimatePresence>
+    </>
   );
 };
 

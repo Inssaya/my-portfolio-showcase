@@ -138,6 +138,25 @@ rather than in the UI: guests are `authenticated` too, and
 `purge_stale_guest_accounts()` deletes idle guest accounts and cascades to
 `cv_sessions`, so a guest's public URL is guaranteed to break later.
 
+**`/p/*` is served `portfolio.html`, not `index.html`** — a second Vite entry
+point, routed by `vercel.json`. `index.html` is 660 lines of *this site's* SEO:
+the owner's name in the title, his face in `og:image`, and five blocks of
+JSON-LD declaring the page to be about him. Serving that for a stranger's
+portfolio put his name and photograph on their LinkedIn/WhatsApp share card
+and told search engines their page was his. None of it is fixable from React —
+those crawlers do not run JavaScript, so the tags have to be right in the HTML
+that is served. `portfolio.html` is deliberately minimal rather than a copy, so
+there is nothing to keep in sync and nothing personal to leak. Per-portfolio
+tags would need the route rendered server-side; that is still open.
+
+**`src/lib/portfolio/parse.ts` must agree with the Python parsers**
+(`builder.py`, `_cvdesign.py`) — the page and the PDF read one draft, so a
+difference does not throw, it silently publishes something other than the
+document the visitor downloads. It drifted once, in four places.
+`__tests__/__parity.test.ts` diffs the TypeScript against real Python output;
+regenerate the fixture with `__tests__/dump_python_fixtures.py` after touching
+either side.
+
 Portraits are never persisted, so a published page has no photo and the hero
 is designed around that rather than showing a placeholder. Themes live in
 `src/lib/portfolio/themes.ts` and are picked by the person — nothing infers

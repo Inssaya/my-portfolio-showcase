@@ -183,10 +183,20 @@ export const THEMES: Record<PortfolioTheme, ThemeTokens> = {
 
 export const THEME_KEYS = Object.keys(THEMES) as PortfolioTheme[];
 
-/** Unknown values fall back rather than rendering an unstyled page — the
- *  database deliberately does not constrain this column. */
+/**
+ * Unknown values fall back rather than rendering an unstyled page — the
+ * database deliberately does not constrain this column.
+ *
+ * `hasOwnProperty` and not `in`: `in` walks the prototype chain, so a theme
+ * of "constructor", "toString" or "__proto__" passed the check and returned a
+ * function, and the page then crashed dereferencing `theme.colors.bg`. The
+ * whole point of leaving the column unconstrained is that bad data there is
+ * cosmetic; a white screen is not cosmetic.
+ */
 export function resolveTheme(value: string | null | undefined): PortfolioTheme {
-  return value && value in THEMES ? (value as PortfolioTheme) : DEFAULT_THEME;
+  return value && Object.prototype.hasOwnProperty.call(THEMES, value)
+    ? (value as PortfolioTheme)
+    : DEFAULT_THEME;
 }
 
 /**

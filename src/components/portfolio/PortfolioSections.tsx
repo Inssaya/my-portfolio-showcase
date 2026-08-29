@@ -6,6 +6,7 @@ import {
   parseContact,
   parseEntries,
   parseLeadIns,
+  parsePairLines,
   parseSkillGroups,
   lines,
 } from "@/lib/portfolio/parse";
@@ -315,26 +316,30 @@ interface ListProps {
   block: string;
 }
 
-/** Certifications, interests, languages — structurally the same shape, so
- *  they share one component rather than three that drift apart. */
-export const LeadInList = ({ theme, title, block }: ListProps) => {
-  const items = parseLeadIns(block);
+/**
+ * Certifications: whole lines, unbolded, with pipes and loose hyphens
+ * normalised to em dashes.
+ *
+ * Not split into a bold lead and a muted rest, even though the shape invites
+ * it — `builder.py` deliberately passes these through as whole lines so the
+ * PDF draws them in plain body ink, because "the issuer is not a headline the
+ * way a project name is". Splitting here would have emboldened half of every
+ * certification on a page that is supposed to match the document.
+ */
+export const PairLineList = ({ theme, title, block }: ListProps) => {
+  const items = parsePairLines(block);
   if (!items.length) return null;
 
   return (
     <Section theme={theme} title={title}>
-      <ul className="space-y-3">
+      <ul className="space-y-2.5">
         {items.map((item, index) => (
-          <li key={`${item.lead}-${index}`} className="max-w-[65ch] text-sm">
-            <span className="break-words font-medium" style={{ color: theme.colors.text }}>
-              {item.lead}
-            </span>
-            {item.rest && (
-              <span className="break-words" style={{ color: theme.colors.muted }}>
-                {" — "}
-                {item.rest}
-              </span>
-            )}
+          <li
+            key={`${item}-${index}`}
+            className="max-w-[65ch] break-words text-sm"
+            style={{ color: theme.colors.text }}
+          >
+            {item}
           </li>
         ))}
       </ul>

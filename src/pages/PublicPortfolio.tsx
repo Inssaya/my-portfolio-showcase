@@ -9,7 +9,7 @@ import { THEMES, fontHref, resolveTheme } from "@/lib/portfolio/themes";
 import {
   Entries,
   Hero,
-  LeadInList,
+  PairLineList,
   PlainList,
   Profile,
   Projects,
@@ -19,8 +19,11 @@ import {
 /**
  * Somebody's published portfolio, at /p/<session id>.
  *
- * Deliberately outside every shell the rest of the app has: no CvAppShell, no
- * portfolio-owner navigation, no theme provider. This page belongs to the
+ * Deliberately outside every shell the rest of the app has: no CvAppShell and
+ * no owner navigation. It sits inside the app's ThemeProvider because every
+ * route does, but ignores it — every colour here is painted inline from the
+ * published theme, so the site's own light/dark setting cannot reach in and
+ * repaint somebody else's page. It belongs to the
  * person who published it, and a stranger opening the link should see their
  * page — not our product with their name in it. That is also why it paints
  * its own background over the viewport rather than inheriting the site's.
@@ -129,8 +132,8 @@ const PublicPortfolio = () => {
         <Projects theme={theme} block={portfolio.projects} />
         <Skills theme={theme} block={portfolio.skills} />
         <Entries theme={theme} title="Education" block={portfolio.education} />
-        <LeadInList theme={theme} title="Certifications" block={portfolio.certifications} />
-        <PlainList theme={theme} title="Languages" block={portfolio.languages} />
+        <PairLineList theme={theme} title="Certifications" block={portfolio.certifications} />
+        <PairLineList theme={theme} title="Languages" block={portfolio.languages} />
         <PlainList theme={theme} title="Interests" block={portfolio.interests} />
 
         <footer

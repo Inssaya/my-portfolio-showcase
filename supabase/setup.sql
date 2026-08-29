@@ -601,14 +601,14 @@ end $$;
 -- edit to the CV is an edit to the live page.
 --
 -- THE HARD PART IS THAT RLS CANNOT DO THIS. A select policy grants whole
--- rows, and a cv_sessions row holds the draft entire: phone number, street
--- address, token counts, user_id. "Public read where published" would
--- therefore publish somebody's mobile number the moment they shared a link,
--- however carefully the frontend avoided rendering it — the REST API is one
--- fetch away for anyone holding the id.
+-- rows, and a cv_sessions row holds the draft entire: phone number, address,
+-- token counts, user_id. "Public read where published" would therefore
+-- publish somebody's mobile number the moment they shared a link, however
+-- carefully the frontend avoided rendering it — the REST API is one fetch
+-- away for anyone holding the id.
 --
 -- So cv_sessions stays owner-only, exactly as it is, and the public surface
--- is this SECURITY DEFINER function instead. A function can choose *columns*,
+-- is a SECURITY DEFINER function instead. A function can choose *columns*,
 -- which is the granularity the promise actually needs. It is also why the
 -- phone filtering below lives here and not in React: a rule enforced in the
 -- renderer is a rule that holds until someone reads the JSON.
@@ -629,8 +629,73 @@ alter table public.cv_sessions
 -- portfolio and publishes by default. A phone number is the one line that is
 -- correct on a CV a recruiter asked for and harmful on a page Google indexes,
 -- so it is opt-in and defaults to off.
+--
+-- KNOWN LIMIT, stated rather than implied: this covers `contact`, which is
+-- where contact details belong and land in practice. A phone number typed
+-- into the middle of the profile paragraph is not caught, and there is no
+-- separate toggle for a street address — an address is a line inside
+-- `contact` with no reliable machine signature across countries, unlike a
+-- phone number. Most CVs here carry a city ("Casablanca, Morocco"), which is
+-- wanted on a portfolio.
 alter table public.cv_sessions
   add column if not exists show_phone boolean not null default false;
+
+
+-- Does this line carry a telephone number?
+--
+-- Split out and named because it is the whole privacy guarantee, and because
+-- getting it wrong is silent: a false negative publishes somebody's mobile on
+-- a page that is open to search engines, and nothing anywhere reports it.
+--
+-- The first version of this claimed to mirror PHONE_RE in app/cv/extract.py
+-- and did not — it anchored the national-format branch to the whole line
+-- (^...$) where the Python uses a word boundary. Everything below survived
+-- and was published: "Phone: 0612345678", "Tel: 06 12 34 56 78",
+-- "phone | 0612345678" (a *documented* shape of this field — see the pipe
+-- handling in Session.set_field and _build_classic), "(020) 7946 0958" and
+-- "0612345678 (WhatsApp)".
+--
+-- The asymmetry that shapes the rest: in extract.py a missed number costs
+-- nothing, because that regex only decides what to show a model. Here a miss
+-- is the failure. So this is deliberately broader than the Python — it also
+-- catches North American formats and bare digit runs, and treats an explicit
+-- "Phone:"/"Tel:"/"WhatsApp" label plus six digits as a number whatever its
+-- shape. Erring the other way is cheap: a wrongly removed line is one
+-- checkbox or one edit away, a published home number is not.
+--
+-- Each branch below is pinned by supabase/test_portfolio_privacy.sql, in both
+-- directions — 14 real number formats stripped, and 14 lines that must
+-- survive: a year range, a postcode, "01 Rue de la Paix, 20000 Casablanca",
+-- "06000 Nice, France", "Bac +5, promotion 2020-2024", dates, emails, links.
+create or replace function public.contact_is_phone(line text)
+returns boolean
+language sql immutable set search_path = public
+as $$
+  select
+    -- International, any spacing: +212 6 23 84 25 35, +44 7700 900123.
+       line ~ '\+\d[\d\s.()-]{6,20}\d'
+    -- National leading zero. \y (Postgres' word boundary) and not ^...$, so
+    -- it is still found after a label or beside other text.
+    or line ~ '\y0\d[\d\s.()-]{6,18}\d'
+    -- North American: (415) 555-2671, 415-555-2671, 212.555.0147.
+    or line ~ '\y\d{3}[\s.()-]{1,3}\d{3}[\s.-]\d{4}\y'
+    -- A bare run of ten or more digits is a phone number in a contact block.
+    or line ~ '\y\d{10,}\y'
+    -- Labelled, whatever the format: counts digits rather than matching a
+    -- shape, so "Tel: 06 12 34 56 78" is caught despite having no run of six.
+    or (line ~* '\y(phone|tel|telephone|mobile|cell|whats\s*app|gsm|t[ée]l)\y'
+        and length(regexp_replace(coalesce(line, ''), '\D', '', 'g')) >= 6)
+$$;
+revoke all on function public.contact_is_phone(text) from public;
+grant execute on function public.contact_is_phone(text) to anon, authenticated;
+
+
+-- `create or replace` cannot change a function's return type, and this file
+-- is re-applied on every push to main — so the day a column is added to the
+-- list below, the whole schema apply would fail with "cannot change return
+-- type of existing function". Dropping first is what admin_list_users() above
+-- does, for exactly this reason.
+drop function if exists public.public_portfolio(uuid);
 
 create or replace function public.public_portfolio(pid uuid)
 returns table (
@@ -645,17 +710,15 @@ as $$
     coalesce(s.draft->>'full_name', ''),
     coalesce(s.draft->>'headline', ''),
     coalesce(s.draft->>'profile', ''),
-    -- Drop any line that reads as a phone number unless it was opted in.
-    -- Line-wise rather than a blanket scrub: the contact block is one item
-    -- per line, so removing the phone must not take the city or the GitHub
-    -- link with it. The pattern mirrors PHONE_RE in app/cv/extract.py —
-    -- anchored on a leading + or 0 so a year range like "2022-2027" is not
-    -- mistaken for a number and silently removed.
+    -- Line-wise, so removing the phone does not take the city or the GitHub
+    -- link with it. `with ordinality` and an explicit ORDER BY because
+    -- string_agg has no defined input order without one — the contact block
+    -- is an ordered list and must not come back shuffled.
     (
-      select coalesce(string_agg(line, E'\n'), '')
-      from unnest(string_to_array(coalesce(s.draft->>'contact', ''), E'\n')) as line
-      where s.show_phone
-         or line !~ '(\+\d[\d\s.()-]{6,20}\d)|(^\s*0\d[\d\s.()-]{6,18}\d\s*$)'
+      select coalesce(string_agg(line, E'\n' order by ord), '')
+      from unnest(string_to_array(coalesce(s.draft->>'contact', ''), E'\n'))
+           with ordinality as t(line, ord)
+      where s.show_phone or not public.contact_is_phone(line)
     ),
     coalesce(s.draft->>'experience', ''),
     coalesce(s.draft->>'internships', ''),
@@ -675,6 +738,7 @@ revoke all on function public.public_portfolio(uuid) from public;
 -- the link can open without an account.
 grant execute on function public.public_portfolio(uuid) to anon, authenticated;
 
+
 -- Publishing is a write, and it goes through a function rather than straight
 -- at the row for one reason the frontend cannot enforce: `authenticated` now
 -- includes anonymous guests, so the existing "own sessions" policy would let
@@ -682,6 +746,16 @@ grant execute on function public.public_portfolio(uuid) to anon, authenticated;
 -- purge_stale_guest_accounts() deletes idle guest accounts and cascades to
 -- cv_sessions, so a guest's public URL is guaranteed to 404 later. An account
 -- is what makes the link durable.
+--
+-- The refusal below therefore tests *exactly* the predicate that purge uses:
+-- anonymous AND no email attached. It previously tested only the first half,
+-- which refused a wider set than the purge deletes — including, in the window
+-- after conversion but before `is_anonymous` flips, somebody who had just
+-- signed up. That visitor would be shown the sign-up form again, complete it
+-- again, and be refused again. The justification and the check now cannot
+-- drift apart, because they are the same expression.
+drop function if exists public.set_portfolio_published(uuid, boolean, text, boolean);
+
 create or replace function public.set_portfolio_published(
   pid uuid, make_public boolean, pick_theme text default null,
   publish_phone boolean default null
@@ -690,16 +764,20 @@ returns boolean
 language plpgsql volatile security definer set search_path = public
 as $$
 declare
-  is_guest boolean;
+  is_purgeable_guest boolean;
 begin
-  -- Version-safe read of is_anonymous, matching admin_list_users(): the
-  -- column only exists on GoTrue builds with anonymous sign-in, and a missing
-  -- key must not make this file fail to run on an older project.
+  -- Version-safe read of is_anonymous, matching admin_list_users() and
+  -- purge_stale_guest_accounts(): the column only exists on GoTrue builds
+  -- with anonymous sign-in, and a missing key must not make this file fail to
+  -- run on an older project.
   select coalesce((to_jsonb(u) ->> 'is_anonymous')::boolean, u.email is null)
-    into is_guest
+         and u.email is null
+    into is_purgeable_guest
   from auth.users u where u.id = auth.uid();
 
-  if make_public and coalesce(is_guest, true) then
+  -- NULL means no such user, i.e. no authenticated caller: refuse rather
+  -- than fall through to "not a guest".
+  if make_public and coalesce(is_purgeable_guest, true) then
     raise exception 'An account is required to publish a portfolio.'
       using errcode = 'insufficient_privilege';
   end if;

@@ -51,9 +51,14 @@ export type PortfolioLoad =
 export async function fetchPublicPortfolio(id: string): Promise<PortfolioLoad> {
   if (!supabase) return { status: "error" };
 
-  // A malformed id would make Postgres raise on the uuid cast; checking here
-  // keeps a typo in the URL as an ordinary "not found" page.
-  if (!/^[0-9a-f-]{32,36}$/i.test(id)) return { status: "not-found" };
+  // A malformed id would make Postgres raise on the uuid cast, which surfaces
+  // as "we couldn't load it" rather than the "not found" page a typo should
+  // get. The real uuid shape, not a loose character-class-and-length check —
+  // that admitted 36 dashes and 35 hex digits, both of which reached the RPC
+  // and raised.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return { status: "not-found" };
+  }
 
   const { data, error } = await supabase.rpc("public_portfolio", { pid: id });
 
