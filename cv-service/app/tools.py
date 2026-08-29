@@ -16,6 +16,7 @@ import tempfile
 from contextlib import contextmanager, suppress
 
 from .cv.builder import PICKABLE_STYLES, RESUME_FIELDS, STYLES, build_resume, safe_filename
+from .cv.language import detect_draft_language
 from .cv.verify import (
     drop_duplicate_entries,
     input_years,
@@ -259,10 +260,19 @@ def run_tool(session: Session, name: str, arguments: dict | None = None) -> str:
         style = str(arguments.get("style") or session.style).strip()
         if style not in STYLES:
             style = "modern"
-        language = str(arguments.get("language") or session.language).strip()
-        if language not in ("en", "fr"):
-            language = "en"
-        session.style, session.language = style, language
+        # Detected from the draft, not defaulted to English and not left to
+        # the model to remember. A French CV printed PROFILE and TECHNICAL
+        # SKILLS over French prose because `language` simply defaulted; asking
+        # the model to set it was the first fix, and a rule that depends on
+        # the model remembering is the same mistake this file already avoids
+        # everywhere else. An explicit argument still wins — the visitor may
+        # genuinely want English headings on a French CV — but silence now
+        # means "look at the text", not "assume English".
+        chosen = str(arguments.get("language") or "").strip()
+        if chosen not in ("en", "fr"):
+            chosen = detect_draft_language(session.draft)
+        session.style, session.language = style, chosen
+        language = chosen
 
         payload = {name_: session.draft.get(name_, "") for name_ in RESUME_FIELDS}
 
