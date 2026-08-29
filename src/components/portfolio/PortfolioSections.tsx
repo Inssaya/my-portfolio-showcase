@@ -78,8 +78,8 @@ export const Hero = ({ theme, fullName, headline, contact }: HeroProps) => {
 
       {items.length > 0 && (
         <ul className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-          {items.map((item) => (
-            <li key={item.label} className="max-w-full">
+          {items.map((item, index) => (
+            <li key={`${item.label}-${index}`} className="max-w-full">
               {item.href ? (
                 <a
                   href={item.href}
@@ -129,7 +129,7 @@ export const Profile = ({ theme, text }: { theme: ThemeTokens; text: string }) =
 // ------------------------------------------------------------- experience ---
 
 const EntryBlock = ({ theme, entry }: { theme: ThemeTokens; entry: Entry }) => (
-  <li className="relative">
+  <>
     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
       <h3
         className="break-words text-base font-semibold"
@@ -153,17 +153,17 @@ const EntryBlock = ({ theme, entry }: { theme: ThemeTokens; entry: Entry }) => (
       </p>
     )}
 
-    {entry.notes.map((note) => (
-      <p key={note} className="mt-2 max-w-[65ch] text-sm" style={{ color: theme.colors.text }}>
+    {entry.notes.map((note, index) => (
+      <p key={`${note}-${index}`} className="mt-2 max-w-[65ch] text-sm" style={{ color: theme.colors.text }}>
         {note}
       </p>
     ))}
 
     {entry.bullets.length > 0 && (
       <ul className="mt-3 space-y-2">
-        {entry.bullets.map((bullet) => (
+        {entry.bullets.map((bullet, index) => (
           <li
-            key={bullet}
+            key={`${bullet}-${index}`}
             className="flex max-w-[68ch] gap-3 text-sm leading-relaxed"
             style={{ color: theme.colors.text }}
           >
@@ -177,7 +177,7 @@ const EntryBlock = ({ theme, entry }: { theme: ThemeTokens; entry: Entry }) => (
         ))}
       </ul>
     )}
-  </li>
+  </>
 );
 
 interface EntriesProps {
@@ -202,14 +202,14 @@ export const Entries = ({ theme, title, block }: EntriesProps) => {
         style={{ borderColor: theme.colors.border }}
       >
         {entries.map((entry, index) => (
-          <div key={`${entry.title}-${index}`} className="relative">
+          <li key={`${entry.title}-${index}`} className="relative">
             <span
               aria-hidden
               className="absolute -left-[33px] top-2 hidden h-2 w-2 rounded-full sm:block"
               style={{ background: theme.colors.accent }}
             />
             <EntryBlock theme={theme} entry={entry} />
-          </div>
+          </li>
         ))}
       </ul>
     </Section>
@@ -234,9 +234,9 @@ export const Projects = ({ theme, block }: { theme: ThemeTokens; block: string }
   return (
     <Section theme={theme} title="Projects">
       <div className={`grid gap-4 ${columns}`}>
-        {items.map((item) => (
+        {items.map((item, index) => (
           <article
-            key={item.lead}
+            key={`${item.lead}-${index}`}
             className={`${theme.shape.card} ${theme.shape.radius} p-4`}
             style={{
               borderColor: theme.colors.border,
@@ -273,8 +273,8 @@ export const Skills = ({ theme, block }: { theme: ThemeTokens; block: string }) 
   return (
     <Section theme={theme} title="Skills">
       <div className="space-y-5">
-        {groups.map((group) => (
-          <div key={group.label || group.items[0]}>
+        {groups.map((group, index) => (
+          <div key={`${group.label}-${index}`}>
             {group.label && (
               <p
                 className="mb-2 text-[11px] font-semibold uppercase tracking-wider"
@@ -286,9 +286,9 @@ export const Skills = ({ theme, block }: { theme: ThemeTokens; block: string }) 
             {/* Chips, never proficiency bars. A bar puts a number on something
                 nobody measured, and reads as invented precision. */}
             <ul className="flex flex-wrap gap-2">
-              {group.items.map((item) => (
+              {group.items.map((item, index) => (
                 <li
-                  key={item}
+                  key={`${item}-${index}`}
                   className={`${theme.shape.radius} px-2.5 py-1 text-xs`}
                   style={{
                     background: theme.colors.surface,
@@ -324,8 +324,8 @@ export const LeadInList = ({ theme, title, block }: ListProps) => {
   return (
     <Section theme={theme} title={title}>
       <ul className="space-y-3">
-        {items.map((item) => (
-          <li key={item.lead} className="max-w-[65ch] text-sm">
+        {items.map((item, index) => (
+          <li key={`${item.lead}-${index}`} className="max-w-[65ch] text-sm">
             <span className="break-words font-medium" style={{ color: theme.colors.text }}>
               {item.lead}
             </span>
@@ -349,9 +349,9 @@ export const PlainList = ({ theme, title, block }: ListProps) => {
   return (
     <Section theme={theme} title={title}>
       <ul className="flex flex-wrap gap-2">
-        {items.map((item) => (
+        {items.map((item, index) => (
           <li
-            key={item}
+            key={`${item}-${index}`}
             className={`${theme.shape.radius} px-2.5 py-1 text-xs`}
             style={{
               background: theme.colors.surface,
