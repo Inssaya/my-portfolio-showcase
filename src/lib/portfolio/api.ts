@@ -70,6 +70,45 @@ export interface PublishState {
 }
 
 /**
+ * What this session's portfolio settings currently are, for the owner.
+ *
+ * Without this the publish panel opens claiming nothing is published, because
+ * its state started empty — so somebody who published, closed it and came
+ * back would be told their live page was offline, and shown a Publish button
+ * for a page that already exists.
+ *
+ * Read straight from the row rather than through `public_portfolio`: the
+ * owner is allowed to see their own settings whether or not the page is live,
+ * and the public function deliberately returns nothing for an unpublished
+ * one. The existing "own sessions" RLS policy is what authorises this.
+ *
+ * Returns null rather than throwing when the columns are not there yet — the
+ * schema is applied by a workflow on push, so the frontend can be live for a
+ * few minutes before the migration has run.
+ */
+export async function fetchPublishState(
+  sessionId: string,
+): Promise<PublishState | null> {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from("cv_sessions")
+      .select("published, theme, show_phone")
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return {
+      published: Boolean(data.published),
+      theme: (data.theme ?? "") as PortfolioTheme,
+      showPhone: Boolean(data.show_phone),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Publish, unpublish, or restyle a portfolio.
  *
  * Returns false when the row was not the caller's, and throws only for a

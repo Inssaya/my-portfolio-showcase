@@ -1,11 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Copy, ExternalLink, Globe, Loader2, X } from "lucide-react";
-import { portfolioUrl, setPublished } from "@/lib/portfolio/api";
+import { fetchPublishState, portfolioUrl, setPublished } from "@/lib/portfolio/api";
 import {
   DEFAULT_THEME,
   THEMES,
   THEME_KEYS,
+  resolveTheme,
   type PortfolioTheme,
 } from "@/lib/portfolio/themes";
 import { useIsGuest } from "@/lib/cv/guest";
@@ -45,8 +46,26 @@ const CvPublishPanel = ({ open, onClose, sessionId }: CvPublishPanelProps) => {
     if (!open) {
       setError(null);
       setCopied(false);
+      return;
     }
-  }, [open]);
+    // Load the live settings every time it opens. Without this the panel
+    // insists nothing is published — it would offer a Publish button for a
+    // page that already exists, and hide the URL of a page that is live.
+    if (!sessionId) return;
+    let cancelled = false;
+    void fetchPublishState(sessionId).then((state) => {
+      if (cancelled || !state) return;
+      setLive(state.published);
+      setShowPhone(state.showPhone);
+      // resolveTheme, not the raw value: the column is deliberately
+      // unconstrained, so an unknown theme must fall back rather than leave
+      // the picker with nothing selected.
+      setTheme(resolveTheme(state.theme));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, sessionId]);
 
   const url = sessionId ? portfolioUrl(sessionId) : "";
 
