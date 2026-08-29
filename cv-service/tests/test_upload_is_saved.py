@@ -140,3 +140,52 @@ def test_a_conversation_with_no_upload_is_untouched(monkeypatch) -> None:
     _script(monkeypatch, Completion(content="Sure — what's your name?"))
 
     assert run_turn(session, "hi")["reply"] == "Sure — what's your name?"
+
+
+# ------------------------------------------- the text has to still be there ---
+
+def test_the_upload_survives_compaction_until_it_is_saved() -> None:
+    """The nudge above is an instruction to save sections from a document. If
+    that document has been compacted out of context by the time the model
+    acts on it, the instruction becomes an instruction to invent.
+
+    That is not hypothetical — it is what shipped. A real CV came back with
+    "Software Developer — XYZ Company" and "Intern — ABC Corp" under the
+    visitor's own name and phone number, because history had grown past
+    VERBATIM_WINDOW between the upload and the save.
+    """
+    from app.agent import UPLOAD_MARKER, _compact
+
+    session = store.create(user_id="u1")
+    seed_uploaded_cv(session, EXTRACTION, "cv.pdf")
+    session.history.append({"role": "user", "content": "here is my CV"})
+    # Well past the verbatim window.
+    for index in range(6):
+        session.history.append({"role": "assistant", "content": f"turn {index}"})
+        session.history.append({"role": "user", "content": f"ok {index}"})
+
+    def upload_in_context() -> bool:
+        return any(
+            str(m.get("content", "")).startswith(UPLOAD_MARKER) for m in _compact(session)
+        )
+
+    assert upload_in_context(), "the CV text was compacted away while still unsaved"
+
+    # Once the draft holds it, the digest is the truth and the text is
+    # redundant — the architecture's own argument. It must not stay pinned.
+    for field in EXTRACTION["sections"]:
+        if field != "header":
+            session.set_field(field, "the real content")
+    assert not upload_in_context(), "the CV text stayed pinned after being saved"
+
+
+def test_a_conversation_with_no_upload_pins_nothing() -> None:
+    """The pin must not cost anything on an ordinary interview."""
+    from app.agent import _compact
+
+    session = store.create(user_id="u1")
+    for index in range(10):
+        session.history.append({"role": "user", "content": f"q{index}"})
+        session.history.append({"role": "assistant", "content": f"a{index}"})
+
+    assert len(_compact(session)) <= 8

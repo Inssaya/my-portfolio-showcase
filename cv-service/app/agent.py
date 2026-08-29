@@ -228,7 +228,43 @@ def _compact(session: Session) -> list[dict]:
         "saved on the server right now — treat this as the truth, not your memory "
         "of what was said.]\n" + session.draft_summary()
     )
-    return [{"role": "user", "content": digest}, *history[cut:]]
+    kept = history[cut:]
+    return [{"role": "user", "content": digest}, *_pinned_upload(session, history, kept), *kept]
+
+
+def _pinned_upload(session: Session, history: list[dict], kept: list[dict]) -> list[dict]:
+    """Keep an uploaded CV's text in context until its sections are saved.
+
+    THE ARGUMENT FOR DROPPING HISTORY DOES NOT COVER THIS. `_compact` above is
+    safe because the draft is authoritative server state, so replaying the
+    conversation that produced a section is redundant with reading the section.
+    That holds *once the section is saved*. Before then the upload is the only
+    copy of the text, and the digest that replaces it says nothing about it.
+
+    What happened without this, on a real CV: the upload landed, the model
+    saved the name and contact, and by the round where it came to save the
+    rest, history had grown past VERBATIM_WINDOW and the CV text had been
+    compacted away. Asked to save sections it could no longer read, the model
+    wrote plausible ones instead — "XYZ Company", "ABC Corp", "University of
+    Casablanca", a JavaScript stack — for a networks and cybersecurity
+    technician. A fabricated CV under a real person's name is far worse than
+    an empty one.
+
+    Pinned only while something from it is still unsaved, so it costs nothing
+    on an ordinary conversation and disappears the moment the draft has the
+    content — at which point the architecture's own argument applies again.
+    """
+    # What is still missing, not merely what the upload supplied: the set is
+    # cleared when a turn ends, so testing it alone kept the text pinned for
+    # the whole conversation after everything had already been saved.
+    if not session.pending_upload_fields - set(session.filled_fields()):
+        return []
+    if any(str(m.get("content", "")).startswith(UPLOAD_MARKER) for m in kept):
+        return []
+    for message in reversed(history):
+        if str(message.get("content", "")).startswith(UPLOAD_MARKER):
+            return [message]
+    return []
 
 
 def _pdf_status(session: Session) -> dict:
@@ -348,11 +384,13 @@ def run_turn(
                             "[System: the uploaded CV has content for these "
                             "sections and you have not saved any of it: "
                             f"{', '.join(sorted(unsaved))}. Call update_resume "
-                            "for each one now, using the text from the upload. "
-                            "If a section is genuinely only template "
-                            "placeholder text, skip it and say so to the "
-                            "visitor. Do not reply until you have saved the "
-                            "rest.]"
+                            "for each one now, using the text from the "
+                            "upload. Use ONLY what that text actually says: if "
+                            "you cannot see the content for a section, say so "
+                            "to the visitor and ask them — never write a "
+                            "plausible-looking employer, school, date or skill "
+                            "you were not given. If a section is genuinely only "
+                            "template placeholder text, skip it and say so.]"
                         ),
                     }
                 )

@@ -127,6 +127,16 @@ _PLACEHOLDER_TEXT_RE = re.compile(
     r"university of example|example university|your university|your school|"
     r"your name|your full name|full name here|name here|"
     r"your company|company name here|your address|your city|"
+    # The stand-in employers a model reaches for when it is asked to fill a
+    # section it cannot actually see. These appeared on a real visitor's CV —
+    # "Software Developer — XYZ Company", "Intern — ABC Corp" — under their
+    # real name and phone number. Unambiguous dummies only: no real employer
+    # is called "XYZ Company", but plenty are called "ABC Logistics", so the
+    # noun is required rather than the initials alone.
+    r"xyz (?:company|corp|corporation|inc|ltd|technologies)|"
+    r"abc (?:company|corp|corporation|inc|ltd)|"
+    r"acme (?:company|corp|corporation|inc|ltd)?|"
+    r"example (?:company|corp|corporation|inc|ltd)|"
     # Canva's default resume-template address ("123 Anywhere St., Any City,
     # ST 12345") — the digits/state/zip vary by template, so only the two
     # invariant phrases are matched.
