@@ -595,6 +595,130 @@ begin
 end $$;
 
 
+-- ------------------------------------------------- published portfolios -----
+-- A visitor who has built a CV can publish it as a public one-page portfolio
+-- at /p/<session id>. Same draft, second renderer — nothing is copied, so an
+-- edit to the CV is an edit to the live page.
+--
+-- THE HARD PART IS THAT RLS CANNOT DO THIS. A select policy grants whole
+-- rows, and a cv_sessions row holds the draft entire: phone number, street
+-- address, token counts, user_id. "Public read where published" would
+-- therefore publish somebody's mobile number the moment they shared a link,
+-- however carefully the frontend avoided rendering it — the REST API is one
+-- fetch away for anyone holding the id.
+--
+-- So cv_sessions stays owner-only, exactly as it is, and the public surface
+-- is this SECURITY DEFINER function instead. A function can choose *columns*,
+-- which is the granularity the promise actually needs. It is also why the
+-- phone filtering below lives here and not in React: a rule enforced in the
+-- renderer is a rule that holds until someone reads the JSON.
+--
+-- Second reason this shape wins: a portfolio link is shared with strangers
+-- and must load immediately. Routing it through cv-service would put a Render
+-- free-tier cold start — up to a minute — in front of a page someone put on
+-- their CV. This is a direct PostgREST call and answers in milliseconds.
+alter table public.cv_sessions
+  add column if not exists published boolean not null default false;
+-- Not constrained to a known list on purpose: adding a theme should be a
+-- frontend change, not a migration. An unrecognised value falls back to the
+-- default at render time, so bad data here is cosmetic rather than a broken
+-- page.
+alter table public.cv_sessions
+  add column if not exists theme text not null default 'obsidian';
+-- Everything else in `contact` (email, links, city) is the point of a
+-- portfolio and publishes by default. A phone number is the one line that is
+-- correct on a CV a recruiter asked for and harmful on a page Google indexes,
+-- so it is opt-in and defaults to off.
+alter table public.cv_sessions
+  add column if not exists show_phone boolean not null default false;
+
+create or replace function public.public_portfolio(pid uuid)
+returns table (
+  full_name text, headline text, profile text, contact text,
+  experience text, internships text, education text, skills text,
+  languages text, interests text, projects text, certifications text,
+  theme text, updated_at timestamptz
+)
+language sql stable security definer set search_path = public
+as $$
+  select
+    coalesce(s.draft->>'full_name', ''),
+    coalesce(s.draft->>'headline', ''),
+    coalesce(s.draft->>'profile', ''),
+    -- Drop any line that reads as a phone number unless it was opted in.
+    -- Line-wise rather than a blanket scrub: the contact block is one item
+    -- per line, so removing the phone must not take the city or the GitHub
+    -- link with it. The pattern mirrors PHONE_RE in app/cv/extract.py —
+    -- anchored on a leading + or 0 so a year range like "2022-2027" is not
+    -- mistaken for a number and silently removed.
+    (
+      select coalesce(string_agg(line, E'\n'), '')
+      from unnest(string_to_array(coalesce(s.draft->>'contact', ''), E'\n')) as line
+      where s.show_phone
+         or line !~ '(\+\d[\d\s.()-]{6,20}\d)|(^\s*0\d[\d\s.()-]{6,18}\d\s*$)'
+    ),
+    coalesce(s.draft->>'experience', ''),
+    coalesce(s.draft->>'internships', ''),
+    coalesce(s.draft->>'education', ''),
+    coalesce(s.draft->>'skills', ''),
+    coalesce(s.draft->>'languages', ''),
+    coalesce(s.draft->>'interests', ''),
+    coalesce(s.draft->>'projects', ''),
+    coalesce(s.draft->>'certifications', ''),
+    s.theme,
+    s.updated_at
+  from public.cv_sessions s
+  where s.id = pid and s.published;
+$$;
+revoke all on function public.public_portfolio(uuid) from public;
+-- anon as well as authenticated: the whole point is a page a stranger with
+-- the link can open without an account.
+grant execute on function public.public_portfolio(uuid) to anon, authenticated;
+
+-- Publishing is a write, and it goes through a function rather than straight
+-- at the row for one reason the frontend cannot enforce: `authenticated` now
+-- includes anonymous guests, so the existing "own sessions" policy would let
+-- a guest publish. That is not a policy preference, it is a broken promise —
+-- purge_stale_guest_accounts() deletes idle guest accounts and cascades to
+-- cv_sessions, so a guest's public URL is guaranteed to 404 later. An account
+-- is what makes the link durable.
+create or replace function public.set_portfolio_published(
+  pid uuid, make_public boolean, pick_theme text default null,
+  publish_phone boolean default null
+)
+returns boolean
+language plpgsql volatile security definer set search_path = public
+as $$
+declare
+  is_guest boolean;
+begin
+  -- Version-safe read of is_anonymous, matching admin_list_users(): the
+  -- column only exists on GoTrue builds with anonymous sign-in, and a missing
+  -- key must not make this file fail to run on an older project.
+  select coalesce((to_jsonb(u) ->> 'is_anonymous')::boolean, u.email is null)
+    into is_guest
+  from auth.users u where u.id = auth.uid();
+
+  if make_public and coalesce(is_guest, true) then
+    raise exception 'An account is required to publish a portfolio.'
+      using errcode = 'insufficient_privilege';
+  end if;
+
+  update public.cv_sessions
+     set published  = make_public,
+         theme      = coalesce(pick_theme, theme),
+         show_phone = coalesce(publish_phone, show_phone)
+   -- The ownership test is the whole authorisation story for this function;
+   -- SECURITY DEFINER means RLS is not doing it for us here.
+   where id = pid and user_id = auth.uid();
+
+  return found;
+end;
+$$;
+revoke all on function public.set_portfolio_published(uuid, boolean, text, boolean) from public;
+grant execute on function public.set_portfolio_published(uuid, boolean, text, boolean) to authenticated;
+
+
 -- ------------------------------------------------------------ verify --------
 -- Should return ZERO rows. Any row is a live hole.
 --

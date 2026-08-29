@@ -1,7 +1,7 @@
 import { ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import type { User } from "@supabase/supabase-js";
-import { ArrowLeft, FileText, History, LayoutTemplate, Lock, LogOut, Mail, Menu, Plus, User as UserIcon } from "lucide-react";
+import { ArrowLeft, FileText, Globe, History, LayoutTemplate, Lock, LogOut, Mail, Menu, Plus, User as UserIcon } from "lucide-react";
 import {
   Sheet,
   SheetClose,
@@ -17,6 +17,7 @@ import CvTemplatePicker, {
   TEMPLATE_LABELS,
   readPreferredTemplate,
 } from "@/components/cv/CvTemplatePicker";
+import CvPublishPanel from "@/components/cv/CvPublishPanel";
 import { guestName, isGuest } from "@/lib/cv/guest";
 
 /**
@@ -84,6 +85,7 @@ const CvAppShell = ({ children, cvReady = false, sessionId = null }: CvAppShellP
   const [savePromptOpen, setSavePromptOpen] = useState(false);
   const [asked, setAsked] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
   const [template, setTemplate] = useState<CvTemplate>(() => readPreferredTemplate());
 
   useEffect(() => {
@@ -114,6 +116,11 @@ const CvAppShell = ({ children, cvReady = false, sessionId = null }: CvAppShellP
     >
     <div className="min-h-[100svh] bg-background">
       <CvSaveWorkPrompt open={savePromptOpen} onClose={() => setSavePromptOpen(false)} />
+      <CvPublishPanel
+        open={publishOpen}
+        onClose={() => setPublishOpen(false)}
+        sessionId={sessionId}
+      />
       <CvTemplatePicker
         open={templateOpen}
         onClose={() => setTemplateOpen(false)}
@@ -222,6 +229,20 @@ const CvAppShell = ({ children, cvReady = false, sessionId = null }: CvAppShellP
             {/* History lives in the burger menu already, so it doesn't need a
                 second spot here — the topbar reserves its space for actions
                 that belong to the CV in front of you. */}
+            {/* Only once a CV exists: "publish a portfolio" is meaningless
+                before there is anything to publish, and an always-present
+                button would be a dead end on a fresh chat. */}
+            {cvReady && (
+              <button
+                type="button"
+                onClick={() => setPublishOpen(true)}
+                title="Publish as a web page"
+                className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+              >
+                <Globe size={14} />
+                Publish
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setTemplateOpen(true)}

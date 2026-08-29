@@ -26,6 +26,7 @@ const CvProfile = lazy(() => import("./pages/cv/CvProfile.tsx"));
 const CvMyData = lazy(() => import("./pages/cv/CvMyData.tsx"));
 const CvContact = lazy(() => import("./pages/cv/CvContact.tsx"));
 const CvProtectedRoute = lazy(() => import("./components/cv/CvProtectedRoute.tsx"));
+const PublicPortfolio = lazy(() => import("./pages/PublicPortfolio.tsx"));
 
 const AdminLayout = lazy(() => import("./components/admin/AdminLayout.tsx"));
 const AdminLogin = lazy(() => import("./pages/admin/AdminLogin.tsx"));
@@ -117,6 +118,11 @@ const App = () => (
                 </CvProtectedRoute>
               }
             />
+            {/* Somebody else's published portfolio. Public by design and
+                deliberately outside CvProtectedRoute — the whole point is a
+                link a stranger can open without an account. */}
+            <Route path="/p/:id" element={<PublicPortfolio />} />
+
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
 
